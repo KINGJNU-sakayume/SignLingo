@@ -1,0 +1,65 @@
+name: Validate and deploy Motion Lab
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Check TypeScript
+        run: npm run typecheck
+      - name: Test reconstruction geometry and data contracts
+        run: npm test
+      - name: Build for repository subpath
+        run: npm run build
+      - name: Install Chromium for UI validation
+        run: npx playwright install --with-deps chromium
+      - name: Verify upload UI, viewer and motion interchange
+        run: npm run test:browser
+      - name: Preserve browser failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-failure-diagnostics
+          path: test-results/
+          if-no-files-found: ignore
+      - name: Upload static Pages build
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check Pages configuration
+        id: pages
+        uses: actions/configure-pages@v5
+      - name: Explain missing Pages setup
+        if: failure() && steps.pages.outcome == 'failure'
+        run: |
+          echo '::error::Enable repository Settings > Pages > Build and deployment > Source: GitHub Actions, then rerun this workflow. No local build or inference server is required.'
+      - name: Deploy verified build
+        id: deployment
+        uses: actions/deploy-pages@v4

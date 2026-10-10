@@ -1,0 +1,6 @@
+{
+  "name": "signlingo-reconstruction", "version": "0.1.0", "private": true, "type": "module",
+  "scripts": { "dev": "vite --host 0.0.0.0", "typecheck": "tsc --noEmit", "test": "vitest run", "build": "tsc --noEmit && vite build", "preview": "vite preview --host 0.0.0.0", "test:browser": "playwright test" },
+  "dependencies": { "@mediapipe/tasks-vision": "1.1.0", "@react-three/drei": "10.7.9", "@react-three/fiber": "9.8.1", "lucide-react": "^0.468.0", "react": "^19.2.0", "react-dom": "^19.2.0", "three": "^0.185.0", "zod": "^4.1.12" },
+  "devDependencies": { "@playwright/test": "^1.58.2", "@types/node": "^24.10.0", "@types/react": "^19.2.0", "@types/react-dom": "^19.2.0", "@types/three": "^0.185.0", "@vitejs/plugin-react": "^6.0.0", "typescript": "^5.9.3", "vite": "8.3.4", "vitest": "^4.0.18" }
+}
