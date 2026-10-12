@@ -1,6 +1,6 @@
 # SignLingo · Motion Lab
 
-A client-side video → MediaPipe landmarks → constrained articulated mannequin proof of concept for investigating Korean Sign Language (KSL) reconstruction. **This is an estimated motion tool, not a validated KSL instructor.** No curriculum, accounts, scoring, prerecorded gestures, or server inference.
+A client-side video → MediaPipe landmarks → articulated mannequin proof of concept for investigating Korean Sign Language (KSL) reconstruction. **This is an estimated motion tool, not a validated KSL instructor.** No curriculum, accounts, scoring, prerecorded gestures, or server inference.
 
 ## Use without a local installation
 
@@ -19,10 +19,10 @@ No video, extracted landmarks or motion JSON are uploaded by the application. Mo
 
 - **Rest pose** is a static rig preview, never a reconstructed sign.
 - Missing arms/hands are withheld. A lost handshape can be held for at most 200 ms, colored amber and explicitly assigned confidence zero; after that the hand mesh is hidden. Observed arm motion can remain visible.
-- Confidence numbers are pose visibility/presence and a conservative proxy combining arm visibility with hand *handedness classification* score. MediaPipe does not return a calibrated accuracy score for each finger. A high value does not establish correct depth or handshape.
+- Confidence numbers are pose visibility/presence and a conservative proxy combining arm visibility with hand *handedness classification* score and, in 0.2, palm conditioning. MediaPipe does not return a calibrated accuracy score for each finger. A high value does not establish correct depth or handshape.
 - Flagged frames include uncertain hand identity, wrist jumps, behind-torso depth, degenerate geometry, and anatomical limit corrections. No flag does not imply accuracy.
 - Legs are static presentation geometry. Facial expression and linguistic nonmanual grammar are not reconstructed. Head direction is only a coarse nose/ear estimate.
-- Manual wrist edits apply to the current sampled frame, are bounded by the same wrist limits, interpolate to adjacent frames, and persist in JSON. They are not a full pose editor; reprocessing discards edits.
+- Manual wrist edits apply to the current sampled frame, are limited to ±45° per axis (legacy 0.1 clips also retain their original wrist bounds), interpolate to adjacent frames, and persist in JSON. They are not a full pose editor; reprocessing discards edits.
 
 ## Development / validation
 
@@ -70,3 +70,11 @@ MediaPipe code is Apache 2.0; consult upstream model cards/terms for selected mo
 | `.github/workflows/pages.yml` | Validation and static Pages deployment |
 
 Read [RECONSTRUCTION_REPORT.md](RECONSTRUCTION_REPORT.md) for coordinate conventions, constraints, model research, evidence, and known accuracy limits. KSL is an independent language; no spoken-Korean word-to-gesture assumption is encoded here.
+
+## Phase 2 reconstruction laboratory
+
+The default 0.2.0 solver preserves source finger directions through the rendered parent hierarchy and separates forearm axial roll from wrist swing without clamping the detected palm orientation. Unusual estimated angles are inspection warnings; they are not silently forced into a neutral handshape. Fixed arm reach remains constrained, with every applied correction recorded.
+
+Enable **Technical inspection mode** after processing or importing motion. Compare original 0.1.0 and improved 0.2.0 on identical detections, inspect detected/rendered joints, direction residuals, joint-angle timelines, coverage, abrupt rotations, identity clues, elbow instability and per-joint corrections. The optional lab preserves the main upload, playback, camera and manual-edit workflow. Summary numbers are proxies, never linguistic accuracy.
+
+See [the reproducible consented evaluation workflow](docs/EVALUATION.md) for separate handshape, palm, location, path, coordination, temporal and anatomical review. `npm run evaluate -- --motion private-data/clip.motion.json --consent` produces a local summary in `work/evaluation/`. No real KSL validation is claimed. Schema version 1 and all 38 local joint names remain compatible; the pipeline version identifies solver behavior.

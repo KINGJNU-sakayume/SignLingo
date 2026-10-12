@@ -13,17 +13,21 @@ export function assignHands(frame: Detection): { assignment: Partial<Record<Side
     const d = Math.hypot(wrist.x-hand.image[0].x, wrist.y-hand.image[0].y);
     return d > 0.23 ? Infinity : d + (hand.label.toLowerCase() === side ? 0 : 0.015);
   };
-  let best = Infinity, second = Infinity;
+  let best = Infinity;
+  const alternatives: { cost: number; assignment: Partial<Record<Side, number>> }[] = [];
   let assignment: Partial<Record<Side, number>> = {};
   for (const l of [-1, ...candidates.map(x => x.i)]) for (const r of [-1, ...candidates.map(x => x.i)]) {
     if (l >= 0 && l === r) continue;
     const c = (l < 0 ? 0.25 : cost('left', l)) + (r < 0 ? 0.25 : cost('right', r));
-    if (c < best) { second = best; best = c; assignment = { ...(l >= 0 ? { left: l } : {}), ...(r >= 0 ? { right: r } : {}) }; }
-    else if (c < second) second = c;
+    const option = { ...(l >= 0 ? { left: l } : {}), ...(r >= 0 ? { right: r } : {}) };
+    alternatives.push({cost:c,assignment:option});
+    if (c < best) { best = c; assignment = option; }
   }
-  if (candidates.length > 1 && second-best < 0.025 && assignment.left !== undefined && assignment.right !== undefined) {
-    warnings.push('Ambiguous hand identity near crossing wrists; hands withheld.');
-    assignment = {};
+  const ambiguous = sides.filter(side => assignment[side] !== undefined && alternatives.some(a => a.cost-best < .025 && a.assignment[side] !== assignment[side]));
+  if (ambiguous.length) {
+    warnings.push('Ambiguous hand identity near crossing wrists; uncertain hands withheld.');
+    assignment = { ...assignment };
+    for (const side of ambiguous) delete assignment[side];
   }
   for (const side of sides) if (assignment[side] === undefined) warnings.push(`${side}: no reliable wrist-associated hand.`);
   return { assignment, warnings };

@@ -40,23 +40,36 @@ export function boneQuaternion(direction: Vector3, normal: Vector3) {
   return basisQuaternion(y, y.clone().cross(z))!;
 }
 export const LENGTHS = { upper: 0.28, lower: 0.26 };
-export function solveArm(shoulder: Vector3, target: Vector3, measuredElbow: Vector3, previousPole?: Vector3) {
+export function solveArm(shoulder: Vector3, target: Vector3, measuredElbow: Vector3, previousPole?: Vector3, reliability = 1) {
   const { upper: a, lower: b } = LENGTHS;
   let direction = target.clone().sub(shoulder);
   const requested = direction.length();
   if (requested < 1e-6) direction = new Vector3(0, -1, 0); else direction.normalize();
-  // Flexion 5..150 degrees; never permit hyperextension.
-  const min = Math.sqrt(a*a+b*b+2*a*b*Math.cos(rad(150)));
-  const max = Math.sqrt(a*a+b*b+2*a*b*Math.cos(rad(5)));
+  // Fixed lengths require a reach constraint. Allow full extension and deep flexion.
+  const min = Math.sqrt(a*a+b*b+2*a*b*Math.cos(rad(165)));
+  const max = Math.sqrt(a*a+b*b+2*a*b*Math.cos(rad(0.1)));
   const distance = clamp(requested, min, max);
   const wrist = shoulder.clone().addScaledVector(direction, distance);
   let pole = measuredElbow.clone().sub(shoulder);
   pole.addScaledVector(direction, -pole.dot(direction));
-  const unstable = pole.length() < 0.025;
-  if (unstable) {
-    pole = (previousPole ?? new Vector3(0, -1, -0.4)).clone();
-    pole.addScaledVector(direction, -pole.dot(direction));
-    if (pole.lengthSq() < 1e-8) pole = new Vector3(1, 0, 0).cross(direction);
+  const evidence = clamp((pole.length() - .008) / .037, 0, 1) * reliability;
+  const unstable = evidence < .6;
+  let transported = previousPole?.clone();
+  if (transported) {
+    transported.addScaledVector(direction, -transported.dot(direction));
+    if (transported.lengthSq() < 1e-8) transported = undefined;
+    else transported.normalize();
+  }
+  if (pole.lengthSq() > 1e-10) pole.normalize();
+  else pole.set(0, 0, 0);
+  // Reject a noisy reversal near extension, but preserve well-supported real movement.
+  if (transported && unstable) {
+    const weight = transported.dot(pole) < 0 ? 0 : evidence;
+    pole.multiplyScalar(weight).addScaledVector(transported, 1 - weight);
+  }
+  if (pole.lengthSq() < 1e-8) {
+    const axis = Math.abs(direction.x) < .8 ? new Vector3(1,0,0) : new Vector3(0,0,1);
+    pole = axis.addScaledVector(direction, -axis.dot(direction));
   }
   pole.normalize();
   const along = (a*a - b*b + distance*distance)/(2*distance);
@@ -65,7 +78,7 @@ export function solveArm(shoulder: Vector3, target: Vector3, measuredElbow: Vect
   const upper = elbow.clone().sub(shoulder), lower = wrist.clone().sub(elbow);
   const normal = upper.clone().cross(lower).normalize();
   const upperQ = boneQuaternion(upper, normal), lowerQ = boneQuaternion(lower, normal);
-  return { elbow, wrist, pole, upperQ, lowerQ, flexion: Math.PI - Math.acos(clamp((a*a+b*b-distance*distance)/(2*a*b), -1, 1)), correction: Math.abs(distance-requested), unstable };
+  return { elbow, wrist, pole, upperQ, lowerQ, flexion: Math.PI - Math.acos(clamp((a*a+b*b-distance*distance)/(2*a*b), -1, 1)), correction: Math.abs(distance-requested), unstable, evidence };
 }
 export function boundWrist(input: Quaternion) {
   const n = input.clone().normalize();

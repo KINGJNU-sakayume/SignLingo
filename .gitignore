@@ -7,3 +7,9 @@ playwright-report/
 *.webm
 *.task
 *.env*
+
+# Local/consented motion data and review outputs are private by default.
+*.motion.json
+*.evaluation.json
+private-data/
+evaluation-output/
