@@ -13,7 +13,7 @@ A client-side video → MediaPipe landmarks → articulated mannequin proof of c
 7. Compare source and 3D playback. Scrub, choose 0.25×/0.5×/1×, orbit, zoom, switch front/side/rear, show the skeleton/joints, and jump to flagged frames. Turquoise is anatomical left; amber is right.
 8. Export motion JSON. Reimport it later without rerunning inference. To compare again, attach the matching original filename/size and duration. JSON does **not** contain the video. Filename/size/duration matching is a convenience, not cryptographic source verification.
 
-No video, extracted landmarks or motion JSON are uploaded by the application. Model/CDN hosts receive ordinary asset requests. JSON exports contain source filenames and motion data; share deliberately. Live HTTPS and WebGL2 are required; recent desktop Chrome/Edge is the tested browser target.
+No video, extracted landmarks or motion JSON are uploaded by the application. Model/CDN hosts receive ordinary asset requests. JSON exports contain source filenames and motion data; share deliberately. Live HTTPS and WebGL2 are required; recent desktop Chrome/Edge is the tested browser target. On iOS/iPadOS, Tasks Vision runs on the main thread to avoid a WebKit worker canvas incompatibility; processing can be slower and briefly use more battery. Other browsers retain worker inference, with a main-thread retry only for worker DOM/canvas errors. This compatibility route is not yet validated on physical iOS hardware.
 
 ## What the viewer means
 
