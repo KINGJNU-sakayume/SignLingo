@@ -1,4 +1,4 @@
-import { test,expect,type Page } from '@playwright/test';
+import { test,expect,type Page,type BrowserContext } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { basename,join } from 'node:path';
 import { practiceClip } from '../practice-fixtures';
@@ -30,7 +30,7 @@ test('reference playback, DTW inspection, localized feedback, trimming, retries 
   const learner=practiceClip();learner.frames.forEach(f=>{f.bodyWorld[15].y+=.25;});
   await page.getByText('Load a local learner MotionClip (optional)',{exact:true}).click();
   await page.getByLabel('Load a local learner MotionClip (optional)',{exact:true}).setInputFiles({name:'synthetic-learner.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(learner))});
-  await expect(page.getByRole('heading',{name:'Component differences',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Component differences',exact:true})).toBeVisible({timeout:15000});
   await expect(page.getByRole('img',{name:'Temporal alignment',exact:true})).toBeVisible();
   await page.getByRole('button',{name:/Left hand is observed lower/}).click();
   await expect(page.getByLabel('Path hand')).toHaveValue('left');
@@ -52,7 +52,7 @@ test('local recording countdown, extraction, camera cleanup and mode exit (synth
   await page.getByRole('button',{name:'Enable camera',exact:true}).click();await expect(page.getByRole('button',{name:'Start 3-second countdown',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Start 3-second countdown',exact:true}).click();await expect(page.getByRole('status')).toHaveText('3');
   await expect(page.getByRole('button',{name:'Stop recording',exact:true})).toBeVisible();await expect(page.getByText(/Recording locally.*captured frames/)).toContainText(/(?:[5-9]|[1-9][0-9]+) captured frames/);
-  await page.getByRole('button',{name:'Stop recording',exact:true}).click();await expect(page.getByRole('heading',{name:'Component differences',exact:true})).toBeVisible();expect(await stopped(page)).toBe(true);await expect(page.getByRole('alert')).toHaveCount(0);
+  await page.getByRole('button',{name:'Stop recording',exact:true}).click();await expect(page.getByRole('heading',{name:'Component differences',exact:true})).toBeVisible({timeout:15000});expect(await stopped(page)).toBe(true);await expect(page.getByRole('alert')).toHaveCount(0);
   await page.getByRole('button',{name:'Try again',exact:true}).click();await page.getByRole('button',{name:'Enable camera',exact:true}).click();await expect(page.getByRole('button',{name:'Start 3-second countdown',exact:true})).toBeVisible();await page.getByRole('button',{name:'Start 3-second countdown',exact:true}).click();
   await page.getByRole('button',{name:'Motion Lab',exact:true}).click();expect(await stopped(page)).toBe(true);await expect(page.getByRole('heading',{name:'From movement to motion.',exact:true})).toBeVisible();expect(uploads).toEqual([]);
 });
@@ -65,4 +65,66 @@ test('real MediaPipe extracts a local webcam-style stream (public still photo, n
   await expect(page.getByRole('button',{name:'Start 3-second countdown',exact:true})).toBeVisible({timeout:120000});await page.getByRole('button',{name:'Start 3-second countdown',exact:true}).click();
   await expect(page.getByText(/Recording locally.*captured frames/)).toContainText(/(?:[5-9]|[1-9][0-9]+) captured frames/,{timeout:30000});await page.getByRole('button',{name:'Stop recording',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Component differences',exact:true})).toBeVisible({timeout:50000});await expect(page.getByRole('alert')).toHaveCount(0);expect(await stopped(page)).toBe(true);
+});
+
+import { phoneVideo } from './phone-fixture';
+async function mockWorker(context:BrowserContext,mode='ok') {
+  await context.route('**/detector.worker-*.js',route=>route.fulfill({contentType:'text/javascript',body:`const frames=${JSON.stringify(reference.frames)};self.onmessage=e=>{if(e.data.type==='init'){self.postMessage(${mode==='init-fail'?"{type:'error',message:'model download failed'}":"{type:'ready'}"});return;}e.data.frame.close();const frame=structuredClone(frames[Math.min(30,Math.floor(e.data.timestampMs/66))]);frame.timestamp=e.data.timestampMs;${mode==='empty'?"frame.hands=[];":""}self.postMessage(${mode==='inference-fail'?"{type:'error',message:'synthetic inference failure'}":"{type:'result',result:frame}"});};`}));
+}
+test('native-phone video fallback preserves reference comparison without camera or MediaRecorder',async({page,context})=>{
+  await mockWorker(context);await page.addInitScript(()=>{
+    Object.defineProperty(window,'MediaRecorder',{value:undefined});
+    Object.defineProperty(navigator.mediaDevices,'getUserMedia',{value:()=>{throw new Error('Fallback must not request webcam');}});
+  });
+  await openPractice(page);await page.setViewportSize({width:390,height:844});
+  const input=page.getByLabel('Record or choose a phone video',{exact:true});await expect(input).toHaveAttribute('capture','user');
+  const uploads:string[]=[];page.on('request',r=>{if(r.method()==='POST')uploads.push(r.url());});
+  await input.setInputFiles({name:'phone.mp4',mimeType:'video/mp4',buffer:phoneVideo});
+  await expect(page.getByRole('heading',{name:'Component differences',exact:true})).toBeVisible({timeout:15000});await expect(page.getByRole('alert')).toHaveCount(0);expect(uploads).toEqual([]);
+  await expect(page.getByText(reference.source.name,{exact:true})).toBeVisible();
+});
+
+for(const [mode,message] of [['init-fail','Model initialization failure'],['inference-fail','Inference failure'],['empty','tracking is insufficient']] as const){
+  test(`mobile fallback reports ${mode} without a misleading comparison`,async({page,context})=>{
+    await mockWorker(context,mode);await openPractice(page);
+    await page.getByLabel('Record or choose a phone video',{exact:true}).setInputFiles({name:'phone.mp4',mimeType:'video/mp4',buffer:phoneVideo});
+    await expect(page.getByRole('alert')).toContainText(message,{timeout:15000});await expect(page.getByRole('heading',{name:'Component differences',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Enable camera',exact:true})).toBeEnabled();
+  });
+}
+test('live diagnostics and overlay survive mirroring; mute invalidates the attempt',async({page,context})=>{
+  await syntheticCamera(page);await mockWorker(context);await openPractice(page);
+  await page.getByRole('button',{name:'Enable camera',exact:true}).click();await page.getByRole('button',{name:'Start 3-second countdown',exact:true}).click();
+  const status=page.getByLabel('Live tracking diagnostics');await expect(status).toContainText('Left hand: tracked');await expect(status).toContainText('Valid feature coverage: 100%');
+  await expect(page.locator('.practice-camera .landmarks')).toBeVisible();await expect(status).toContainText(/Processed FPS: [1-9]/);
+  await page.evaluate(()=>(window as unknown as {practiceTracks:MediaStreamTrack[]}).practiceTracks[0].dispatchEvent(new Event('mute')));
+  await expect(page.getByRole('alert')).toContainText('interrupted');expect(await stopped(page)).toBe(true);await expect(page.getByRole('heading',{name:'Component differences',exact:true})).toHaveCount(0);
+});
+test('backgrounding a recording explains discarded capture and releases resources',async({page,context})=>{
+  await syntheticCamera(page);await mockWorker(context);await openPractice(page);await page.getByRole('button',{name:'Enable camera',exact:true}).click();await page.getByRole('button',{name:'Start 3-second countdown',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Stop recording',exact:true})).toBeVisible();await page.evaluate(()=>{Object.defineProperty(document,'hidden',{value:true,configurable:true});document.dispatchEvent(new Event('visibilitychange'));});
+  await expect(page.getByRole('alert')).toContainText('page was hidden');expect(await stopped(page)).toBe(true);
+});
+test('iOS-selected main-thread Canvas inference and phone fallback without ImageBitmap',async({page,context})=>{
+  await page.addInitScript(()=>{
+    Object.defineProperty(navigator,'userAgent',{value:'Mozilla/5.0 (iPhone) CriOS/130'});Object.defineProperty(window,'createImageBitmap',{value:undefined});
+    Object.defineProperty(window,'Worker',{value:class{constructor(){throw new Error('iOS must not instantiate worker');}}});
+  });
+  // Mock the Tasks API, not the app detector, to exercise its real initialization,
+  // Canvas input, confidence cleanup, timestamps and main-thread lifecycle.
+  await context.route('**/vision_bundle-*.js',route=>route.fulfill({contentType:'text/javascript',body:`
+    const f=${JSON.stringify(reference.frames[0])};
+    export const FilesetResolver={forVisionTasks:async()=>({wasmLoaderPath:'data:text/javascript,export default function(){}'})};
+    function check(input){if(!(input instanceof HTMLCanvasElement))throw new Error('Expected Canvas');const p=input.getContext('2d').getImageData(2,2,1,1).data;if(p[2]<150||p[0]>60)throw new Error('Mirrored phone pixels were not restored');}
+    export const PoseLandmarker={createFromOptions:async()=>({close(){},detectForVideo(input,t){check(input);return {landmarks:[f.body],worldLandmarks:[f.bodyWorld]};}})};
+    export const HandLandmarker={createFromOptions:async()=>({close(){},detectForVideo(input,t){check(input);return {landmarks:f.hands.map(h=>h.image),worldLandmarks:f.hands.map(h=>h.world),handedness:f.hands.map(h=>[{categoryName:h.label,score:h.score}])};}})};
+  `}));
+  await openPractice(page);await page.getByLabel('Actual camera pixels are mirrored (unmirror before tracking)',{exact:true}).check();
+  await page.getByLabel('Record or choose a phone video',{exact:true}).setInputFiles({name:'phone.mp4',mimeType:'video/mp4',buffer:phoneVideo});
+  await expect(page.getByRole('heading',{name:'Component differences',exact:true})).toBeVisible({timeout:15000});await expect(page.getByRole('alert')).toHaveCount(0);
+});
+test('canceling fallback during initialization cannot publish a stale result',async({page,context})=>{
+  await context.route('**/detector.worker-*.js',route=>route.fulfill({contentType:'text/javascript',body:'self.onmessage=()=>{};'}));await openPractice(page);
+  await page.getByLabel('Record or choose a phone video',{exact:true}).setInputFiles({name:'phone.mp4',mimeType:'video/mp4',buffer:phoneVideo});
+  await expect(page.getByText('Loading pose & hand models',{exact:true})).toBeVisible();await page.getByRole('button',{name:'End camera session',exact:true}).click();
+  await expect(page.getByLabel('Record or choose a phone video',{exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'Component differences',exact:true})).toHaveCount(0);
 });

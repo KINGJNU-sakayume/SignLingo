@@ -19,17 +19,21 @@ export async function seekDecoded(video: HTMLVideoElement,seconds: number,signal
   if (Math.abs(video.currentTime-seconds)>0.00001) { const ready=waitEvent(video,'seeked',signal);video.currentTime=seconds;await ready; }
   if (video.readyState<2) await waitEvent(video,'loadeddata',signal);
 }
-export async function processVideo(file: File,detector: LandmarkDetector,options:{mirrored:boolean;sampleHz:number;signal:AbortSignal;progress:(p:Progress)=>void}):Promise<MotionClip> {
+export async function processVideo(file: File,detector: LandmarkDetector,options:{mirrored:boolean;sampleHz:number;signal:AbortSignal;progress:(p:Progress)=>void;maxDuration?:number;allowHandOnly?:boolean}):Promise<MotionClip> {
   const {signal,progress,sampleHz,mirrored}=options;
   const url=URL.createObjectURL(file),video=document.createElement('video');
   video.muted=true;video.playsInline=true;video.preload='auto';
   const onAbort=()=>detector.close();signal.addEventListener('abort',onAbort,{once:true});
+  let stage='Video decode failure';
   try {
+    signal.throwIfAborted();
     const loaded=waitEvent(video,'loadeddata',signal);video.src=url;video.load();await loaded;
-    if (!Number.isFinite(video.duration) || video.duration<=0 || video.duration>120) throw new Error('Use a video between 0 and 120 seconds for this memory-bounded PoC.');
+    if (!Number.isFinite(video.duration) || video.duration<=0 || video.duration>(options.maxDuration??120)) throw new Error(`Use a video between 0 and ${options.maxDuration??120} seconds.`);
     if (!video.videoWidth || !video.videoHeight) throw new Error('Video dimensions unavailable. Unsupported codec.');
     progress({phase:'Loading pose & hand models',done:0,total:0});
+    stage='Model initialization failure';
     await detector.initialize();signal.throwIfAborted();
+    stage='Inference failure';
     const canvas=document.createElement('canvas');
     const scale=Math.min(1,960/Math.max(video.videoWidth,video.videoHeight));
     canvas.width=Math.round(video.videoWidth*scale);canvas.height=Math.round(video.videoHeight*scale);
@@ -43,12 +47,14 @@ export async function processVideo(file: File,detector: LandmarkDetector,options
       await seekDecoded(video,time,signal);
       ctx.setTransform(mirrored?-1:1,0,0,1,mirrored?canvas.width:0,0);
       ctx.drawImage(video,0,0,canvas.width,canvas.height);
-      const bitmap=await createImageBitmap(canvas);
-      const detection=await detector.detect(bitmap,time*1000);
+      const detection=await detector.detect(canvas,time*1000);
       frames.push(reconstruction.reconstruct(detection));
       progress({phase:'Extracting & reconstructing',done:i+1,total});
     }
-    if (!frames.some(f=>f.pose.quality.body>0)) throw new Error('No reliable upper-body pose was detected. Keep one signer, both shoulders and hands visible. No animation was generated.');
+    if (!options.allowHandOnly && !frames.some(f=>f.pose.quality.body>0)) throw new Error('No reliable upper-body pose was detected. Keep one signer, both shoulders and hands visible. No animation was generated.');
     return {schema:'signlingo.motion',version:1,language:'ksl',pipeline:{version:PIPELINE_VERSION,detector:detector.id,models:MODELS},source:{name:file.name,size:file.size,duration:video.duration,width:video.videoWidth,height:video.videoHeight,mirrored,sampleHz},spaces:SPACES,nonmanual:{head:'Approximate nose/ear orientation; not facial grammar.',face:'not-estimated',linguisticValidation:'not-performed'},frames,edits:[]};
+  } catch(error) {
+    if(signal.aborted || (error instanceof Error && error.name==='AbortError'))throw error;
+    throw new Error(`${stage}: ${error instanceof Error?error.message:String(error)}`);
   } finally { detector.close();signal.removeEventListener('abort',onAbort);video.removeAttribute('src');video.load();URL.revokeObjectURL(url); }
 }

@@ -8,7 +8,10 @@ function cost(a: Feature,b: Feature) {
   for (const side of SIDES) {
     const x=a.hands[side],y=b.hands[side];
     if (!x || !y) {sum+=.75;weight++;continue;}
-    sum += 3*shapeDistance(x,y)/90 + 2*palmDistance(x,y)/180 + Math.min(2,x.position.distanceTo(y.position)); weight+=6;
+    sum += 3*shapeDistance(x,y)/90; weight+=3;
+    const palm=palmDistance(x,y);
+    if(palm!==undefined){sum+=2*palm/180;weight+=2;}
+    if(x.position&&y.position){sum+=Math.min(2,x.position.distanceTo(y.position));weight++;}
   }
   return sum/weight;
 }
@@ -42,35 +45,35 @@ export function compareMotion(reference: MotionClip,learner: MotionClip,referenc
     const paired = (measure:(x:HandFeature,y:HandFeature)=>number|undefined) => (x:Feature,y:Feature) => x.hands[side]&&y.hands[side]?measure(x.hands[side]!,y.hands[side]!):undefined;
     const shape=metric('handshape',side,'degrees',paired(shapeDistance));
     metric('palm',side,'degrees',paired(palmDistance));
-    metric('position',side,'body',paired((x,y)=>x.position.distanceTo(y.position)));
+    metric('position',side,'body',paired((x,y)=>x.position&&y.position?x.position.distanceTo(y.position):undefined));
     metric('face',side,'body',paired((x,y)=>x.face&&y.face?x.face.distanceTo(y.face):undefined));
     // Trajectory = displacement from interval start. Never extrapolate a missing start.
     const startA=a[0].hands[side],startB=b[0].hands[side];
-    metric('trajectory',side,'body',paired((x,y)=>startA&&startB?x.position.clone().sub(startA.position).distanceTo(y.position.clone().sub(startB.position)):undefined));
-    const directions=(fs:Feature[])=>new Map(fs.map((f,i)=>{const prior=fs[i-1],hand=f.hands[side],old=prior?.hands[side];const v=hand&&old&&f.time-prior.time<=.3?hand.position.clone().sub(old.position):undefined;return [f.index,v&&v.length()>.015?v.normalize():undefined] as const;}));
+    metric('trajectory',side,'body',paired((x,y)=>startA?.position&&startB?.position&&x.position&&y.position?x.position.clone().sub(startA.position).distanceTo(y.position.clone().sub(startB.position)):undefined));
+    const directions=(fs:Feature[])=>new Map(fs.map((f,i)=>{const prior=fs[i-1],hand=f.hands[side],old=prior?.hands[side];const v=hand?.position&&old?.position&&f.time-prior.time<=.3?hand.position.clone().sub(old.position):undefined;return [f.index,v&&v.length()>.015?v.normalize():undefined] as const;}));
     const ad=directions(a),bd=directions(b);
     metric('direction',side,'degrees',(x,y)=>{const u=ad.get(x.index),v=bd.get(y.index);return u&&v?u.angleTo(v)*180/Math.PI:undefined;});
     if (shape.value===null || shape.coverage<.9) feedback.push({kind:'tracking',key:'missing',side,pair:Math.max(0,path.findIndex(([i,j])=>!a[i].hands[side]||!b[j].hands[side]))});
     // Specific claims require three distinct, consecutive frames on BOTH sides of the alignment.
     // This rejects isolated spikes and repeated DTW matches as evidence of a sustained difference.
-    const claims: {key:Feedback['key']; value:(x:HandFeature,y:HandFeature)=>number; threshold:number}[]=[
-      {key:'low',value:(x,y)=>x.position.y-y.position.y,threshold:.16},
+    const claims: {key:Feedback['key']; value:(x:HandFeature,y:HandFeature)=>number|undefined; threshold:number}[]=[
+      {key:'low',value:(x,y)=>x.position&&y.position?x.position.y-y.position.y:undefined,threshold:.16},
       {key:'palm',value:palmDistance,threshold:25},
       {key:'index',value:(x,y)=>x.bend[1]-y.bend[1],threshold:25},
-      {key:'path',value:(x,y)=>startA&&startB?x.position.clone().sub(startA.position).distanceTo(y.position.clone().sub(startB.position)):0,threshold:.2},
+      {key:'path',value:(x,y)=>startA?.position&&startB?.position&&x.position&&y.position?x.position.clone().sub(startA.position).distanceTo(y.position.clone().sub(startB.position)):0,threshold:.2},
     ];
     if (shape.value!==null) for(const claim of claims) {
       let run: {i:number;j:number;k:number;value:number}[]=[];
       for(let k=0;k<path.length;k++) {
         const [i,j]=path[k],x=a[i].hands[side],y=b[j].hands[side],value=x&&y?claim.value(x,y):0,prev=run.at(-1);
-        if (!x || !y || value<=claim.threshold) {run=[];continue;}
+        if (!x || !y || value===undefined || value<=claim.threshold) {run=[];continue;}
         if(prev&&(a[i].time-a[prev.i].time>.3 || b[j].time-b[prev.j].time>.3)) run=[];
         if(!run.length || (i>run.at(-1)!.i && j>run.at(-1)!.j))run.push({i,j,k,value});
         if(run.length>=3) {feedback.push({kind:'observed',key:claim.key,side,pair:run[0].k,value:mean(run.map(v=>v.value))});break;}
       }
     }
   }
-  metric('coordination',undefined,'body',(x,y)=>x.hands.left&&x.hands.right&&y.hands.left&&y.hands.right?x.hands.left.position.clone().sub(x.hands.right.position).distanceTo(y.hands.left.position.clone().sub(y.hands.right.position)):undefined);
+  metric('coordination',undefined,'body',(x,y)=>x.hands.left?.position&&x.hands.right?.position&&y.hands.left?.position&&y.hands.right?.position?x.hands.left.position.clone().sub(x.hands.right.position).distanceTo(y.hands.left.position.clone().sub(y.hands.right.position)):undefined);
   const da=a.at(-1)!.time-a[0].time,db=b.at(-1)!.time-b[0].time;
-  return {referenceInterval,learnerInterval,pairs,metrics,feedback,durationRatio:db/da,maxWarp:Math.max(...path.map(([i,j])=>Math.abs((a[i].time-a[0].time)/da-(b[j].time-b[0].time)/db))),evidence:metrics.filter(m=>m.component==='handshape').every(m=>m.value!==null)?'sufficient':'limited'};
+  return {referenceInterval,learnerInterval,pairs,metrics,feedback,durationRatio:db/da,maxWarp:Math.max(...path.map(([i,j])=>Math.abs((a[i].time-a[0].time)/da-(b[j].time-b[0].time)/db))),evidence:metrics.filter(m=>m.component!=='direction').every(m=>m.value!==null)?'sufficient':'limited'};
 }
