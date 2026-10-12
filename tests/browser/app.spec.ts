@@ -39,6 +39,8 @@ test('technical laboratory compares stored detections, seeks exact frames and ex
   const download=page.waitForEvent('download');await page.getByRole('button',{name:'Export proxy summary'}).click();const stream=await(await download).createReadStream();const chunks:Buffer[]=[];for await(const chunk of stream!)chunks.push(chunk);const summary=JSON.parse(Buffer.concat(chunks).toString());
   expect(summary.paired.segments).toBe(90);expect(summary.improved.directionMeanDegrees).toBeLessThan(.00001);expect(summary.linguisticReview).toBe('not performed');expect(summary).not.toHaveProperty('frames');
   await page.screenshot({path:'work/diagnostics-lab.png',fullPage:true});
+  // Reproduce the CI overflow with a wider Linux font fallback.
+  await page.addStyleTag({content:':root{font-family: "DejaVu Sans", sans-serif}'});
   await page.setViewportSize({width:390,height:844});await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth),{message:'The page must fit after responsive canvas/layout resize'}).toBeLessThanOrEqual(0);
   await page.getByRole('button',{name:'Use selected reconstruction'}).click();
   await page.getByLabel('Technical inspection mode').uncheck();
