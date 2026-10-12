@@ -9,7 +9,7 @@ test('upload-first UI, real rig and mobile layout',async({page})=>{
   await page.getByRole('button',{name:'side',exact:true}).click();await page.getByLabel('Skeleton', {exact:true}).check();
   await page.screenshot({path:'work/desktop.png',fullPage:true});
   await page.setViewportSize({width:390,height:844});await expect(page.getByRole('button',{name:'Choose video'})).toBeVisible();
-  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+  await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth),{message:'The page must fit after responsive canvas/layout resize'}).toBeLessThanOrEqual(0);
   await page.screenshot({path:'work/mobile.png',fullPage:true});expect(errors).toEqual([]);
 });
 test('motion import, scrubbing, correction and export preserve source data',async({page})=>{
@@ -39,7 +39,7 @@ test('technical laboratory compares stored detections, seeks exact frames and ex
   const download=page.waitForEvent('download');await page.getByRole('button',{name:'Export proxy summary'}).click();const stream=await(await download).createReadStream();const chunks:Buffer[]=[];for await(const chunk of stream!)chunks.push(chunk);const summary=JSON.parse(Buffer.concat(chunks).toString());
   expect(summary.paired.segments).toBe(90);expect(summary.improved.directionMeanDegrees).toBeLessThan(.00001);expect(summary.linguisticReview).toBe('not performed');expect(summary).not.toHaveProperty('frames');
   await page.screenshot({path:'work/diagnostics-lab.png',fullPage:true});
-  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+  await page.setViewportSize({width:390,height:844});await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth),{message:'The page must fit after responsive canvas/layout resize'}).toBeLessThanOrEqual(0);
   await page.getByRole('button',{name:'Use selected reconstruction'}).click();
   await page.getByLabel('Technical inspection mode').uncheck();
   await expect(page.getByText('Manual wrist correction',{exact:false})).toBeVisible();
