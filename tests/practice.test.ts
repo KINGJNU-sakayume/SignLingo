@@ -80,7 +80,7 @@ describe('technical motion comparison (synthetic geometry, not KSL validity)',()
     const a=practiceClip(),b=structuredClone(a);b.frames[15].bodyWorld[15].y+=1;
     expect(compare(a,b).feedback.some(f=>f.key==='low')).toBe(false);
     for(const f of b.frames){f.bodyWorld[15].visibility=.1;f.bodyWorld[15].y+=1;}
-    expect(frameFeature(b.frames[10],10).hands.left).toBeUndefined();expect(compare(a,b).feedback.filter(f=>f.side==='left').every(f=>f.kind==='tracking')).toBe(true);
+    expect(frameFeature(b.frames[10],10).hands.left?.position).toBeUndefined();expect(frameFeature(b.frames[10],10).hands.left?.shape).toHaveLength(15);expect(compare(a,b).feedback.filter(f=>f.side==='left').every(f=>f.kind==='tracking')).toBe(true);
   });
   it('detects a changed relative phase between both hands',()=>{
     const a=practiceClip(),b=structuredClone(a);

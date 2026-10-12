@@ -1,4 +1,6 @@
-# Practice Mode: technical evaluation, version 1
+# Practice Mode: technical evaluation
+
+Mobile update: see [MOBILE_PRACTICE.md](docs/MOBILE_PRACTICE.md) for the current device behavior and verification matrix. The original PR #3 validation results below are historical; they do not verify the new iOS adapter on a physical phone.
 
 Practice Mode adds local imitation and comparison to the existing Motion Lab. It does **not** establish whether a learner's Korean Sign Language is correct, whether two motions mean the same sign, or whether the reconstruction faithfully represents a real signer. There is no overall score, pass/fail threshold, curriculum or certified assessment.
 
@@ -6,7 +8,7 @@ Practice Mode adds local imitation and comparison to the existing Motion Lab. It
 
 Load a schema-1 MotionClip JSON, inspect the reference avatar, and optionally attach the original video with matching filename and size. This matching is a convenience, not cryptographic provenance. The JSON contains no video. Enable the camera explicitly, check framing, start the three-second countdown, sign, then stop. Recordings stop automatically after 20 seconds. The camera releases immediately on stop, cancel, camera failure, tab hiding, page exit and mode exit. Late-arriving permission streams are stopped too. Retries create a new detector, reconstruction state and recorder.
 
-Webcam frames go through the **existing `LandmarkDetector` / MediaPipe Pose + Hand Tasks and `Reconstructor`**, one frame at a time, targeting 15 Hz at up to 640 pixels on the longest edge. No second tracking model or paid backend is introduced. Sampling slows if CPU inference is slow; actual capture timestamps are retained. MediaRecorder records video concurrently. This avoids trying to seek an unfinished WebM with infinite duration metadata. Recorded playback uses the aligned frame times and known capture duration. The recording has no audio.
+Webcam frames go through the **existing `LandmarkDetector` / MediaPipe Pose + Hand Tasks and `Reconstructor`**, one frame at a time, targeting 15 Hz at up to 960 pixels on the longest edge. No second tracking model or paid backend is introduced. Sampling slows if CPU inference is slow; actual capture timestamps are retained. MediaRecorder records video concurrently. This avoids trying to seek an unfinished WebM with infinite duration metadata. Recorded playback uses the aligned frame times and known capture duration. The recording has no audio.
 
 Reference and learner clips retain the existing `signlingo.motion` version 1 interchange format and reconstruction pipeline version. A separate in-memory `signlingo.practice` version 1 session holds the attempt number, clips, selected intervals, alignment, component evidence and `linguisticValidation: not-performed`. Nothing is automatically persisted or uploaded. Blob URLs are revoked on replacement/unmount. Model and WASM assets are downloaded from the existing public hosts. No microphone, server inference, API key or GPU server is required.
 
@@ -14,12 +16,12 @@ Imported learner MotionClips support repeatable offline inspection. They must al
 
 ## Coordinates, anatomy and evidence
 
-- The existing pose-wrist association defines anatomical left and right. Comparison never searches for a cheaper left/right swap. Crossing ambiguities withheld by the existing reconstructor remain unavailable.
+- The existing pose-wrist association defines anatomical left and right when pose is available. When body detection is entirely absent, a unique hand label at confidence ≥0.9 can support hand-only shape, with an explicit identity limitation. Comparison never searches for a cheaper left/right swap. Crossing ambiguities withheld by the existing reconstructor remain unavailable.
 - Selfie preview mirroring is CSS only. Both detectors receive the original camera pixels. For a virtual camera that already supplies mirrored pixels, the separate input option reverses the canvas **before both detectors**. `source.mirrored` records that operation; stored coordinates are canonical and must not be flipped again at comparison time.
 - The body frame uses the shoulder midpoint, the anatomical shoulder axis and the shoulder-to-hip-midpoint up direction. Wrist and nose positions are expressed in that frame. Horizontal/depth displacement is divided by shoulder width, vertical displacement by torso height. Translation, a shared camera rotation, global size, and different shoulder/torso proportions are thereby factored out under the estimated 3D model.
-- Each hand's 15 measured phalanx directions are normalized to unit length and expressed in its palm frame. Individual finger lengths are not compared. Full palm orientation is expressed relative to the torso.
-- Evidence requires body image/world visibility or presence ≥0.6 at both shoulders, both hips and the respective wrist, a tracked (not held/missing) hand, hand score and reconstruction quality ≥0.6, finite 21-point hand geometry, palm conditioning ≥0.3 and segment lengths 3–100 mm. Face-relative measurements additionally require a visible nose. Missing coordinates are **not** replaced by zeros or synthesized poses.
-- MediaPipe hand handedness confidence is **not** landmark accuracy. Per-finger confidence is unavailable. Monocular depth, occlusion and hand/body coordinate agreement remain uncertain even when these engineering gates pass. Torso/hip occlusion may suppress comparison; frame the upper body down to the hips.
+- Each hand's 15 measured phalanx directions are normalized to unit length and expressed in its palm frame. Individual finger lengths are not compared. Palm orientation uses the measured torso frame, or an explicitly approximate shoulder/camera-up frame when hips are unavailable. Different frame types are not compared.
+- Evidence is per component: handshape requires a reliable raw hand (score ≥0.6), reliable identity, finite 21-point geometry, palm conditioning ≥0.6 and segment lengths 3–100 mm. It does not require hips or a reconstructable arm. Torso-relative positions require image/world confidence ≥0.6 at both shoulders, both hips and the respective wrist; face position also requires the nose. No held avatar pose is used as evidence and missing coordinates are never synthesized.
+- Without hips, the shoulder frame uses camera-up and is sensitive to camera tilt; it supports approximate palm orientation, not torso-normalized position. MediaPipe handedness confidence is not landmark accuracy, and per-finger confidence is unavailable. Monocular depth, occlusion and hand/body agreement remain uncertain even when the engineering gates pass.
 
 No claim of invariance to arbitrary perspective, severe foreshortening, arbitrary arm proportions, disabilities or all valid signing styles is supported. Body normalization and angle-based features remove specific geometric nuisances; remaining residuals are observations, not penalties for anatomy.
 
@@ -31,16 +33,16 @@ These are movement heuristics, **not linguistic sign boundaries**. Holds can be 
 
 ## Alignment and component metrics
 
-Selected frames are uniformly subsampled to at most 180 per clip without interpolating across missing tracking. Intervals must contain at least three samples. Dynamic Time Warping uses a monotonic path through both selected endpoints, a ±45% normalized index-progress band, and a 0.025 repeat-step cost. It matches geometry rather than equal timestamps. The cost per valid hand is:
+Selected frames are uniformly subsampled to at most 180 per clip without interpolating across missing tracking. Intervals must contain at least three samples. Dynamic Time Warping uses a monotonic path through both selected endpoints, a ±45% normalized index-progress band, and a 0.025 repeat-step cost. It matches geometry rather than equal timestamps. When all components are available, the cost per valid hand is:
 
 `(3 × handshape_degrees/90 + 2 × palm_degrees/180 + min(2, position_residual)) / 6`
 
-Contributions from both hands share **one** temporal alignment, preserving bilateral sequence relationships. A missing hand contributes cost 0.75 with weight 1, not a perfect match. These weights emphasize hand features for engineering reasons; they are **not clinically or linguistically calibrated**. They affect alignment only; no aggregate score is presented. Larger speed ratios can align because progress is normalized, but the band and endpoint constraints limit arbitrary warping. Short/incomplete gestures can still align to some degree: inspect endpoint discrepancies and component residuals; this is not an automatic completeness classifier.
+Unavailable palm/position terms and their weights are omitted; they do not become zero residuals. Contributions from both hands share **one** temporal alignment, preserving bilateral sequence relationships. A missing hand contributes cost 0.75 with weight 1, not a perfect match. These weights emphasize hand features for engineering reasons; they are **not clinically or linguistically calibrated**. They affect alignment only; no aggregate score is presented. Larger speed ratios can align because progress is normalized, but the band and endpoint constraints limit arbitrary warping. Short/incomplete gestures can still align to some degree: inspect endpoint discrepancies and component residuals; this is not an automatic completeness classifier.
 
 | Component | Displayed measurement |
 |---|---|
 | Finger articulation, each hand | Mean angular difference of all 15 unit phalanx directions in their palm frames (degrees); includes flexion and spread |
-| Palm orientation, each hand | Quaternion geodesic angle in torso coordinates (degrees) |
+| Palm orientation, each hand | Quaternion geodesic angle in matching torso or approximate shoulder frames (degrees) |
 | Hand / torso position | Euclidean residual in the normalized body coordinate system |
 | Hand / face position | Residual of the normalized wrist-minus-nose vector; not facial grammar |
 | Movement path | Residual of displacement from each selected interval's first wrist position; unavailable if that anchor is missing |
@@ -65,9 +67,9 @@ Specific difference messages require sufficient overall hand evidence and three 
 
 Messages identify the anatomical hand and both time positions. They deliberately describe observations rather than prescribe a supposedly correct sign. Tracking gaps receive their own messages (below 90% coverage or insufficient sample support). Lack of an observed-difference message does not establish equivalence. Significant handshape/location/timing differences **may** carry meaning, but their interpretation requires a qualified KSL reviewer and the full linguistic context.
 
-## Automated validation performed
+## Original PR #3 automated validation (historical)
 
-Commands run on this branch:
+Commands run for the original desktop Practice Mode implementation:
 
 ```sh
 npm run typecheck
@@ -88,8 +90,8 @@ Routine CI discovers all new unit and browser tests automatically; external-asse
 
 ## Safari/mobile investigation and outstanding validation
 
-Before implementation, inspected pending [Safari PR #2](https://github.com/KINGJNU-sakayume/SignLingo/pull/2), head `458cb4c8ca9c10f12fa1e9762fe476a6cbda63db`. It adds iOS/iPadOS main-thread routing and targeted worker-initialization fallback without changing `LandmarkDetector`. This feature reuses that interface and **does not modify the MediaPipe runtime**, so the pending fix can be integrated independently. Until that fix lands, iOS worker inference may fail. This feature does not claim to have fixed Safari. Main-thread inference also needs hardware testing for responsiveness during recording.
+The mobile update integrates [PR #2](https://github.com/KINGJNU-sakayume/SignLingo/pull/2), head `458cb4c8ca9c10f12fa1e9762fe476a6cbda63db`, against main after PR #3. iOS/iPadOS inference runs on the document-owning thread with Canvas input; supported platforms retain worker inference and targeted DOM-error fallback. Missing ImageBitmap no longer prevents the main-thread path.
 
-The responsive interface was checked at 390×844 in Chromium. Recording selects a supported WebM/MP4 MIME rather than requiring WebM. HTTPS/localhost, camera APIs, MediaRecorder, ImageBitmap and WebGL2 are needed. Physical iOS Safari, Android cameras, camera orientation changes, thermal throttling, long-session memory behavior and real permission prompts remain unverified.
+Practice also offers native phone-video capture/selection followed by local processing with the same motion pipeline. This fallback does not need MediaRecorder or live inference throughput. App/model downloads are still required; offline model caching is not promised. The [mobile verification report](docs/MOBILE_PRACTICE.md) distinguishes synthetic automated checks from outstanding physical iPhone/Android tests, real permissions, codec support, thermal behavior and tracking accuracy.
 
 Next validity work requires consented full-motion reference/learner recordings, diverse bodies and camera setups, expert KSL annotation, explicit nonmanual review, held-out evaluation, and analysis of false feedback from tracking errors. No such corpus, calibrated weights, certified judgment or linguistic success rate is claimed here.

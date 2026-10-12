@@ -13,7 +13,7 @@ A client-side video → MediaPipe landmarks → articulated mannequin proof of c
 7. Compare source and 3D playback. Scrub, choose 0.25×/0.5×/1×, orbit, zoom, switch front/side/rear, show the skeleton/joints, and jump to flagged frames. Turquoise is anatomical left; amber is right.
 8. Export motion JSON. Reimport it later without rerunning inference. To compare again, attach the matching original filename/size and duration. JSON does **not** contain the video. Filename/size/duration matching is a convenience, not cryptographic source verification.
 
-No video, extracted landmarks or motion JSON are uploaded by the application. Model/CDN hosts receive ordinary asset requests. JSON exports contain source filenames and motion data; share deliberately. Live HTTPS and WebGL2 are required; recent desktop Chrome/Edge is the tested browser target.
+No video, extracted landmarks or motion JSON are uploaded by the application. Model/CDN hosts receive ordinary asset requests. JSON exports contain source filenames and motion data; share deliberately. Live HTTPS and WebGL2 are required; recent desktop Chrome/Edge is the tested browser target. On iOS/iPadOS, Tasks Vision runs on the main thread to avoid a WebKit worker canvas incompatibility; processing can be slower and briefly use more battery. Other browsers retain worker inference, with a main-thread retry only for worker DOM/canvas errors. This compatibility route is not yet validated on physical iOS hardware.
 
 ## What the viewer means
 
@@ -59,7 +59,7 @@ MediaPipe code is Apache 2.0; consult upstream model cards/terms for selected mo
 | Module | Responsibility |
 |---|---|
 | `src/motion/video.ts` | Bounded local video decoding, frame seeks, sampling, pixel unmirroring, progress/cancel |
-| `detector.ts`, `detector.worker.ts` | Replaceable detector contract; real Pose + Hand Tasks inference in a worker |
+| `detector.ts`, `detector.worker.ts` | Replaceable detector contract; real Pose + Hand Tasks inference in a worker or iOS document-backed CPU adapter |
 | `math.ts` | Explicit coordinate conversion, hand registration, two-bone IK, quaternion frames and wrist limits |
 | `tracking.ts` | Unique anatomical wrist association, confidence gating, ambiguous-crossing rejection |
 | `reconstruct.ts` | Torso/head estimation, fixed-length rig retargeting, finger constraints, adaptive filtering and diagnostics |
@@ -84,7 +84,7 @@ See [the reproducible consented evaluation workflow](docs/EVALUATION.md) for sep
 Select **Practice Mode** in the workspace navigation. Motion Lab remains available and retains its loaded state when switching; its playback and processing pause/cancel on exit.
 
 1. Load an existing MotionClip JSON. Watch the reference avatar; attach the matching original video when available.
-2. Select English or 한국어. Enable the camera explicitly and keep shoulders, hips and both hands in view. Selfie preview mirroring does not change anatomical left/right. Use the separate input-unmirror option only if actual camera pixels are already mirrored.
+2. Select English or 한국어. Enable the camera explicitly and keep shoulders and hands in view. Hips improve torso-relative measurements but are not required for handshape. Inspect the live FPS, landmark overlay, detection states and feature coverage. Selfie preview mirroring does not change anatomical left/right. Use the separate input-unmirror option only if actual camera pixels are already mirrored.
 3. Start the three-second countdown, imitate the sign, and stop recording (20-second maximum). Webcam frames use the existing MediaPipe detector and reconstruction pipeline locally. No audio is requested.
 4. Check the proposed active signing intervals. Adjust the reference and learner start/end times to include the entire sign and meaningful holds while removing surrounding idle time.
 5. Inspect DTW-aligned avatars/video, time mapping, wrist paths and separate articulation, palm, torso/face location, trajectory, direction and bilateral coordination residuals. Timing is descriptive, not a speed penalty. Click feedback to seek its evidence and highlight the hand.
@@ -92,4 +92,6 @@ Select **Practice Mode** in the workspace navigation. Motion Lab remains availab
 
 Lower residuals do not prove correct KSL. Missing tracking is not scored as an error or perfect match. Meaning changes require qualified linguistic review. See [PRACTICE_EVALUATION.md](PRACTICE_EVALUATION.md) for formulas, engineering thresholds, evidence gates, tested scenarios and unvalidated claims.
 
-Practice uses `src/practice/{capture,features,compare,types}.ts` plus a localized React view, with the existing MotionClip schema, reconstructor and avatar. The pending [iOS Safari runtime fix (#2)](https://github.com/KINGJNU-sakayume/SignLingo/pull/2) was inspected and is independent of this feature; the runtime files are unchanged. Physical mobile camera behavior remains unverified. An optional `PRACTICE_VISION_TEST=1` browser smoke test runs actual MediaPipe against a local public-photo canvas stream when the documented ignored assets are available.
+Practice uses `src/practice/{capture,features,compare,types}.ts` plus a localized React view, with the existing MotionClip schema, reconstructor and avatar. The [iOS Safari runtime fix (#2)](https://github.com/KINGJNU-sakayume/SignLingo/pull/2) is integrated on top of Practice Mode. iOS uses Canvas-backed main-thread inference; supported platforms keep workers. Use **Record or choose a phone video** to process a short native-camera recording locally when live inference is too slow or unsupported. Physical mobile camera behavior remains unverified. An optional `PRACTICE_VISION_TEST=1` browser smoke test runs actual MediaPipe against a local public-photo canvas stream when the documented ignored assets are available.
+
+See [mobile Practice behavior, evidence requirements and device verification](docs/MOBILE_PRACTICE.md) for partial-feature semantics, fallback limits and the automated versus physical-device test matrix.
