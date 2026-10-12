@@ -22,7 +22,7 @@ function Fingers({side,rotations,color,skeleton,markers}:{side:Side;rotations:Re
     </group>;
   })}</>;
 }
-function Mannequin({pose,skeleton,markers}:{pose:Pose|null;skeleton:boolean;markers:boolean}) {
+function Mannequin({pose,skeleton,markers,highlightSide}:{pose:Pose|null;skeleton:boolean;markers:boolean;highlightSide?:Side}) {
   const rotations=pose?.rotations??neutralRotations();
   const active=!pose || pose.quality.body>0;
   return <group position={pose?.root??[0,1.3,0]} quaternion={rotations.torso}>
@@ -37,7 +37,7 @@ function Mannequin({pose,skeleton,markers}:{pose:Pose|null;skeleton:boolean;mark
     {SIDES.map(side=>{
       const state=pose?.quality[`${side}State`]??'tracked';
       const visible=!pose || (active&&pose.quality[`${side}Arm`]>0);
-      const color=pose ? (state==='tracked'?(side==='left'?'#53d5c0':'#e6af68'):'#75808a'):'#82949f';
+      const color=highlightSide===side?'#ff79c6':pose ? (state==='tracked'?(side==='left'?'#53d5c0':'#e6af68'):'#75808a'):'#82949f';
       return <group key={side} position={[side==='left'?0.19:-0.19,0,0]} visible={visible} quaternion={rotations[`${side}.upper`]}>
         <Joint radius={0.052}/><Segment length={LENGTHS.upper} radius={0.042} {...{color,skeleton,markers}}/>
         <group position={[0,LENGTHS.upper,0]} quaternion={rotations[`${side}.lower`]}>
@@ -75,9 +75,9 @@ function DetectedSkeleton({frame}:{frame:MotionFrame}) {
     return <group key={side}>{indices.every(i=>body.points[i])&&<Line points={indices.map(i=>arr(body.points[i]!))} color="#ffd84c" lineWidth={2}/>}{points&&FINGERS.map((f,i)=><Line key={f} points={[points[0],...points.slice(1+i*4,5+i*4)].map(arr)} color="#ffd84c" lineWidth={2}/>)}</group>;
   })}</group>;
 }
-export function Avatar({pose,skeleton,markers,preset,inspection}:{pose:Pose|null;skeleton:boolean;markers:boolean;preset:string;inspection?:MotionFrame}) {
+export function Avatar({pose,skeleton,markers,preset,inspection,highlightSide}:{pose:Pose|null;skeleton:boolean;markers:boolean;preset:string;inspection?:MotionFrame;highlightSide?:Side}) {
   return <WebGLError><Canvas camera={{position:[0,1.45,2.6],fov:42}} dpr={[1,1.8]} gl={{antialias:true}} fallback={<div className="canvas-error">WebGL2 is required for the 3D viewer.</div>}>
     <color attach="background" args={['#111e29']}/><ambientLight intensity={1.2}/><directionalLight position={[3,5,4]} intensity={2.6}/><directionalLight position={[-3,2,-2]} color="#5fceb9" intensity={1.8}/>
-    <Suspense fallback={null}><Mannequin {...{pose,skeleton,markers}}/>{inspection&&<DetectedSkeleton frame={inspection}/>}<Grid position={[0,0.02,0]} args={[8,8]} cellSize={0.2} cellThickness={0.45} cellColor="#30434e" sectionColor="#3f5662" sectionSize={1} fadeDistance={6}/><ContactShadows position={[0,0.01,0]} opacity={0.35} scale={5} blur={2.5} far={3}/></Suspense><Camera preset={preset}/>
+    <Suspense fallback={null}><Mannequin {...{pose,skeleton,markers,highlightSide}}/>{inspection&&<DetectedSkeleton frame={inspection}/>}<Grid position={[0,0.02,0]} args={[8,8]} cellSize={0.2} cellThickness={0.45} cellColor="#30434e" sectionColor="#3f5662" sectionSize={1} fadeDistance={6}/><ContactShadows position={[0,0.01,0]} opacity={0.35} scale={5} blur={2.5} far={3}/></Suspense><Camera preset={preset}/>
   </Canvas></WebGLError>;
 }

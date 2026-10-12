@@ -6,7 +6,7 @@ export function frameIndex(clip: MotionClip, seconds: number) {
   while (lo<hi) { const mid=Math.ceil((lo+hi)/2); if (clip.frames[mid].timestamp<=ms) lo=mid; else hi=mid-1; }
   return lo;
 }
-function editedPose(clip: MotionClip, index: number): Pose {
+export function editedPose(clip: MotionClip, index: number): Pose {
   const original=clip.frames[index].pose;
   const pose={...original, rotations:{...original.rotations}};
   for (const edit of clip.edits) if (edit.frame===index) {

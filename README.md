@@ -1,6 +1,6 @@
-# SignLingo · Motion Lab
+# SignLingo · Motion Lab + Practice
 
-A client-side video → MediaPipe landmarks → articulated mannequin proof of concept for investigating Korean Sign Language (KSL) reconstruction. **This is an estimated motion tool, not a validated KSL instructor.** No curriculum, accounts, scoring, prerecorded gestures, or server inference.
+A client-side video → MediaPipe landmarks → articulated mannequin proof of concept for investigating Korean Sign Language (KSL) reconstruction. **This is an estimated motion tool, not a validated KSL instructor.** Includes local webcam practice with component-level movement residuals. No curriculum, accounts, definitive correctness score, prerecorded gestures, or server inference.
 
 ## Use without a local installation
 
@@ -78,3 +78,18 @@ The default 0.2.0 solver preserves source finger directions through the rendered
 Enable **Technical inspection mode** after processing or importing motion. Compare original 0.1.0 and improved 0.2.0 on identical detections, inspect detected/rendered joints, direction residuals, joint-angle timelines, coverage, abrupt rotations, identity clues, elbow instability and per-joint corrections. The optional lab preserves the main upload, playback, camera and manual-edit workflow. Summary numbers are proxies, never linguistic accuracy.
 
 See [the reproducible consented evaluation workflow](docs/EVALUATION.md) for separate handshape, palm, location, path, coordination, temporal and anatomical review. `npm run evaluate -- --motion private-data/clip.motion.json --consent` produces a local summary in `work/evaluation/`. No real KSL validation is claimed. Schema version 1 and all 38 local joint names remain compatible; the pipeline version identifies solver behavior.
+
+## Phase 3: webcam practice
+
+Select **Practice Mode** in the workspace navigation. Motion Lab remains available and retains its loaded state when switching; its playback and processing pause/cancel on exit.
+
+1. Load an existing MotionClip JSON. Watch the reference avatar; attach the matching original video when available.
+2. Select English or 한국어. Enable the camera explicitly and keep shoulders, hips and both hands in view. Selfie preview mirroring does not change anatomical left/right. Use the separate input-unmirror option only if actual camera pixels are already mirrored.
+3. Start the three-second countdown, imitate the sign, and stop recording (20-second maximum). Webcam frames use the existing MediaPipe detector and reconstruction pipeline locally. No audio is requested.
+4. Check the proposed active signing intervals. Adjust the reference and learner start/end times to include the entire sign and meaningful holds while removing surrounding idle time.
+5. Inspect DTW-aligned avatars/video, time mapping, wrist paths and separate articulation, palm, torso/face location, trajectory, direction and bilateral coordination residuals. Timing is descriptive, not a speed penalty. Click feedback to seek its evidence and highlight the hand.
+6. Choose **Try again** as often as needed. Camera tracks stop on recording stop, failure, cancellation, tab hiding and leaving Practice Mode. Clips and recordings stay in browser memory and are discarded on exit/reload. No automatic recording upload or persistence exists.
+
+Lower residuals do not prove correct KSL. Missing tracking is not scored as an error or perfect match. Meaning changes require qualified linguistic review. See [PRACTICE_EVALUATION.md](PRACTICE_EVALUATION.md) for formulas, engineering thresholds, evidence gates, tested scenarios and unvalidated claims.
+
+Practice uses `src/practice/{capture,features,compare,types}.ts` plus a localized React view, with the existing MotionClip schema, reconstructor and avatar. The pending [iOS Safari runtime fix (#2)](https://github.com/KINGJNU-sakayume/SignLingo/pull/2) was inspected and is independent of this feature; the runtime files are unchanged. Physical mobile camera behavior remains unverified. An optional `PRACTICE_VISION_TEST=1` browser smoke test runs actual MediaPipe against a local public-photo canvas stream when the documented ignored assets are available.
