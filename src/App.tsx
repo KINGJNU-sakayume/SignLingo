@@ -10,7 +10,7 @@ import { downloadMotion,importMotion } from './motion/serialization';
 import { frameIndex,playbackTime,samplePose } from './motion/player';
 import { SIDES,type MotionClip,type Side,type Vec3 } from './motion/types';
 const timeLabel=(s:number)=>`${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toFixed(2).padStart(5,'0')}`;
-export default function App(){
+export default function App({active=true}:{active?:boolean}){
   const [file,setFile]=useState<File|null>(null),[url,setUrl]=useState(''),[clip,setClip]=useState<MotionClip|null>(null);
   const [time,setTime]=useState(0),[duration,setDuration]=useState(0),[playing,setPlaying]=useState(false),[speed,setSpeed]=useState(1);
   const [overlay,setOverlay]=useState(true),[skeleton,setSkeleton]=useState(false),[markers,setMarkers]=useState(false),[preset,setPreset]=useState('front');
@@ -27,6 +27,7 @@ export default function App(){
   const suspects=useMemo(()=>displayedClip?.frames.flatMap((f,i)=>f.warnings.length?[i]:[])??[],[displayedClip]);
   const trackCounts=useMemo(()=>displayedClip?SIDES.map(side=>displayedClip.frames.filter(f=>f.pose.quality[`${side}State`]==='tracked').length):[0,0],[displayedClip]);
   useEffect(()=>()=>{abort.current?.abort();},[]);
+  useEffect(()=>{if(!active){video.current?.pause();setPlaying(false);abort.current?.abort();}},[active]);
   useEffect(()=>()=>{if(url)URL.revokeObjectURL(url);},[url]);
   useEffect(()=>{if(video.current)video.current.playbackRate=speed;},[speed,url]);
   useEffect(()=>{let request=0,last=performance.now();const tick=(now:number)=>{
