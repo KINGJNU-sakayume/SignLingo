@@ -12,7 +12,10 @@ function editedPose(clip: MotionClip, index: number): Pose {
   for (const edit of clip.edits) if (edit.frame===index) {
     const key=`${edit.side}.wrist`;
     const delta=eulerQuat(...edit.degrees.map(rad) as [number,number,number]);
-    pose.rotations[key]=qa(boundWrist(q(pose.rotations[key]).multiply(delta)).rotation);
+    const adjusted=q(pose.rotations[key]).multiply(delta).normalize();
+    // Keep schema-1/0.1 playback semantics, but do not re-clamp preserved 0.2 palms
+    // merely because the user saves an edit (including an explicit zero edit).
+    pose.rotations[key]=qa(clip.pipeline.version==='0.2.0'?adjusted:boundWrist(adjusted).rotation);
   }
   return pose;
 }

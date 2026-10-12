@@ -1,10 +1,10 @@
 import { Suspense, useEffect, useRef, Component, type ReactNode } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
-import { ContactShadows, Grid, OrbitControls } from '@react-three/drei';
+import { ContactShadows, Grid, OrbitControls, Line } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
-import { FINGERS, SIDES, type Pose, type Side, type Quat } from '../motion/types';
-import { fingerLengths, fingerOffsets, neutralRotations } from '../motion/reconstruct';
-import { LENGTHS } from '../motion/math';
+import { FINGERS, SIDES, type Pose, type Side, type Quat, type MotionFrame } from '../motion/types';
+import { fingerLengths, fingerOffsets, neutralRotations } from '../motion/rig';
+import { LENGTHS, normalizeBody, alignHand, arr } from '../motion/math';
 const ID: Quat=[0,0,0,1];
 function Joint({radius=0.023,color='#8b9ca6'}:{radius?:number;color?:string}) { return <mesh><sphereGeometry args={[radius,16,12]}/><meshStandardMaterial color={color} roughness={0.4}/></mesh>; }
 function Segment({length,radius,color,skeleton,markers}:{length:number;radius:number;color:string;skeleton:boolean;markers:boolean}) {
@@ -64,9 +64,20 @@ class WebGLError extends Component<{children:ReactNode},{failed:boolean}> {
   state={failed:false};static getDerivedStateFromError(){return {failed:true};}
   render(){return this.state.failed?<div className="canvas-error">3D rendering failed. Enable WebGL2 or try a current Chrome/Edge browser. Motion export is still available.</div>:this.props.children;}
 }
-export function Avatar({pose,skeleton,markers,preset}:{pose:Pose|null;skeleton:boolean;markers:boolean;preset:string}) {
+function DetectedSkeleton({frame}:{frame:MotionFrame}) {
+  const body=normalizeBody(frame.bodyWorld);
+  if(!body)return null;
+  return <group>{SIDES.map(side=>{
+    const indices=side==='left'?[11,13,15]:[12,14,16];
+    const anchor=body.points[indices[2]], index=frame.assignment[side];
+    const hand=index===undefined?null:frame.hands[index];
+    const points=hand&&anchor?alignHand(hand.world,anchor):null;
+    return <group key={side}>{indices.every(i=>body.points[i])&&<Line points={indices.map(i=>arr(body.points[i]!))} color="#ffd84c" lineWidth={2}/>}{points&&FINGERS.map((f,i)=><Line key={f} points={[points[0],...points.slice(1+i*4,5+i*4)].map(arr)} color="#ffd84c" lineWidth={2}/>)}</group>;
+  })}</group>;
+}
+export function Avatar({pose,skeleton,markers,preset,inspection}:{pose:Pose|null;skeleton:boolean;markers:boolean;preset:string;inspection?:MotionFrame}) {
   return <WebGLError><Canvas camera={{position:[0,1.45,2.6],fov:42}} dpr={[1,1.8]} gl={{antialias:true}} fallback={<div className="canvas-error">WebGL2 is required for the 3D viewer.</div>}>
     <color attach="background" args={['#111e29']}/><ambientLight intensity={1.2}/><directionalLight position={[3,5,4]} intensity={2.6}/><directionalLight position={[-3,2,-2]} color="#5fceb9" intensity={1.8}/>
-    <Suspense fallback={null}><Mannequin {...{pose,skeleton,markers}}/><Grid position={[0,0.02,0]} args={[8,8]} cellSize={0.2} cellThickness={0.45} cellColor="#30434e" sectionColor="#3f5662" sectionSize={1} fadeDistance={6}/><ContactShadows position={[0,0.01,0]} opacity={0.35} scale={5} blur={2.5} far={3}/></Suspense><Camera preset={preset}/>
+    <Suspense fallback={null}><Mannequin {...{pose,skeleton,markers}}/>{inspection&&<DetectedSkeleton frame={inspection}/>}<Grid position={[0,0.02,0]} args={[8,8]} cellSize={0.2} cellThickness={0.45} cellColor="#30434e" sectionColor="#3f5662" sectionSize={1} fadeDistance={6}/><ContactShadows position={[0,0.01,0]} opacity={0.35} scale={5} blur={2.5} far={3}/></Suspense><Camera preset={preset}/>
   </Canvas></WebGLError>;
 }
