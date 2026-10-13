@@ -1,71 +1,39 @@
-import { afterEach,beforeEach,describe,expect,it,vi } from 'vitest';
-import { WebcamCapture,cameraError,recordingMime,type CapturePlatform } from '../src/practice/capture';
-import { detection } from './fixtures';
-import { importMotion } from '../src/motion/serialization';
-function setup() {
-  const track=new EventTarget() as EventTarget&{stop:ReturnType<typeof vi.fn>};track.stop=vi.fn();
+// Mock camera/recorder lifecycle only; no claims about physical camera FPS.
+import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
+import {WebcamCapture,cameraError,recordingMime,type CapturePlatform} from '../src/practice/capture';
+import {cadence} from '../src/motion/timing';
+function setup(){
+  const track=new EventTarget() as EventTarget&{stop:ReturnType<typeof vi.fn>;getSettings:()=>MediaTrackSettings};track.stop=vi.fn();track.getSettings=()=>({frameRate:30});
   const stream={getTracks:()=>[track],getVideoTracks:()=>[track]} as unknown as MediaStream;
   const video={get currentTime(){return Date.now()/1000;},readyState:4,srcObject:null,videoWidth:320,videoHeight:240,play:vi.fn().mockResolvedValue(undefined)} as unknown as HTMLVideoElement;
-  const detector={id:'synthetic-detector',initialize:vi.fn().mockResolvedValue(undefined),detect:vi.fn(async(_bitmap:ImageBitmap,t:number)=>detection(t)),close:vi.fn()};
-  const recorder={state:'inactive',mimeType:'video/webm',onstop:null as null|(()=>void),onerror:null as null|(()=>void),ondataavailable:null as null|((e:{data:Blob})=>void),start:vi.fn(function(){recorder.state='recording';}),stop:vi.fn(function(){recorder.state='inactive';recorder.ondataavailable?.({data:new Blob(['synthetic-recording-not-real-video'])});recorder.onstop?.();})};
-  const platform:CapturePlatform={camera:vi.fn().mockResolvedValue(stream),detector:()=>detector,recorder:()=>recorder as unknown as MediaRecorder,bitmap:vi.fn().mockResolvedValue({close:vi.fn()}),now:()=>Date.now()};
-  const failure=vi.fn(),controller=new WebcamCapture(platform,failure);
-  return {track,stream,video,detector,recorder,platform,controller,failure};
+  const recorder={state:'inactive',mimeType:'video/webm',onstop:null as null|(()=>void),onerror:null as null|(()=>void),ondataavailable:null as null|((e:{data:Blob})=>void),start:vi.fn(()=>{recorder.state='recording';}),stop:vi.fn(()=>{recorder.state='inactive';recorder.ondataavailable?.({data:new Blob(['synthetic bytes, not a real recording'])});recorder.onstop?.();})};
+  const platform:CapturePlatform={camera:vi.fn().mockResolvedValue(stream),recorder:()=>recorder as unknown as MediaRecorder,now:()=>Date.now()};
+  const failure=vi.fn(),measurements=vi.fn(),controller=new WebcamCapture(platform,failure,measurements);
+  return {track,stream,video,recorder,platform,controller,failure,measurements};
 }
 beforeEach(()=>vi.useFakeTimers());afterEach(()=>vi.useRealTimers());
-describe('camera and recording lifecycle',()=>{
-  it('selects supported WebM/MP4 without assuming Safari has WebM',()=>{expect(recordingMime(t=>t==='video/mp4')).toBe('video/mp4');expect(recordingMime(()=>false)).toBeUndefined();});
-  it('records measured frames with the existing detector/reconstructor and releases every resource',async()=>{
-    const s=setup();await s.controller.open(s.video);const result=s.controller.record(true);
-    await vi.advanceTimersByTimeAsync(600);s.controller.stop();expect(s.track.stop).toHaveBeenCalled();expect(s.video.srcObject).toBeNull();
-    const recorded=await result;expect(recorded.clip.frames.length).toBeGreaterThan(3);expect(recorded.clip.frames[0].timestamp).toBe(0);expect(recorded.clip.source).toMatchObject({mirrored:true,width:320,height:240});
-    expect(s.platform.bitmap).toHaveBeenCalledWith(s.video,true);expect(s.detector.close).toHaveBeenCalled();expect(recorded.recording.size).toBeGreaterThan(0);
-    expect(importMotion(JSON.stringify(recorded.clip)).frames).toHaveLength(recorded.clip.frames.length);s.controller.cancel();expect(s.failure).not.toHaveBeenCalled();
+describe('recording-first capture, independent of inference',()=>{
+  it('selects supported WebM or MP4',()=>{expect(recordingMime(t=>t==='video/mp4')).toBe('video/mp4');expect(recordingMime(()=>false)).toBeUndefined();});
+  it('preserves video, measures delivery separately and releases camera before analysis',async()=>{
+    const s=setup();await s.controller.open(s.video);const result=s.controller.record();await vi.advanceTimersByTimeAsync(600);s.controller.stop();
+    const recorded=await result;expect(recorded.recording.size).toBeGreaterThan(0);expect(recorded).not.toHaveProperty('clip');
+    expect(recorded.measurements).toMatchObject({requestedCameraFps:30,reportedTrackFps:30,encodedRecordingFps:null,duration:.6,deliveryMethod:'video-clock-poll'});
+    expect(recorded.measurements.delivery.fps).toBeCloseTo(10); // poll rate, explicitly NOT encoded FPS
+    expect(s.track.stop).toHaveBeenCalled();expect(s.video.srcObject).toBeNull();s.controller.cancel();expect(s.failure).not.toHaveBeenCalled();
   });
-  it.each(['NotAllowedError','NotFoundError','NotReadableError'])('reports %s without starting capture',async name=>{
-    const s=setup();s.platform.camera=vi.fn().mockRejectedValue(new DOMException('failed',name));await expect(s.controller.open(s.video)).rejects.toMatchObject({name});expect(cameraError(new DOMException('',name))).not.toBe('');expect(s.detector.initialize).not.toHaveBeenCalled();
+  it.each(['NotAllowedError','NotFoundError','NotReadableError'])('reports %s',async name=>{const s=setup();s.platform.camera=vi.fn().mockRejectedValue(new DOMException('',name));await expect(s.controller.open(s.video)).rejects.toMatchObject({name});expect(cameraError(new DOMException('',name))).toBeTruthy();});
+  it('stops a stream that arrives after permission cancellation',async()=>{const s=setup();let resolve!:(s:MediaStream)=>void;s.platform.camera=()=>new Promise(r=>resolve=r);const opened=s.controller.open(s.video);s.controller.cancel();resolve(s.stream);await expect(opened).rejects.toMatchObject({name:'AbortError'});expect(s.track.stop).toHaveBeenCalled();});
+  it.each(['play','recorder'])('releases camera on %s setup failure',async stage=>{const s=setup();if(stage==='play')s.video.play=vi.fn().mockRejectedValue(new Error('play failed'));else s.platform.recorder=()=>{throw new Error('unsupported');};await expect(s.controller.open(s.video)).rejects.toThrow();expect(s.track.stop).toHaveBeenCalled();});
+  it('recorder errors release resources and permit a new attempt',async()=>{const s=setup();await s.controller.open(s.video);const rejected=expect(s.controller.record()).rejects.toThrow('recording failed');s.recorder.onerror?.();await rejected;expect(s.track.stop).toHaveBeenCalled();const retry=setup();await retry.controller.open(retry.video);retry.controller.cancel();expect(retry.track.stop).toHaveBeenCalled();});
+  it.each(['ended','mute','cancel'])('handles %s while recording',async action=>{const s=setup();await s.controller.open(s.video);const rejected=expect(s.controller.record()).rejects.toThrow();if(action==='cancel')s.controller.cancel();else s.track.dispatchEvent(new Event(action));await rejected;expect(s.track.stop).toHaveBeenCalled();});
+  it('times out recorder finalization while releasing camera immediately',async()=>{const s=setup();s.recorder.stop.mockImplementation(()=>{});await s.controller.open(s.video);const rejected=expect(s.controller.record()).rejects.toThrow('timed out');await vi.advanceTimersByTimeAsync(400);s.controller.stop();expect(s.track.stop).toHaveBeenCalled();await vi.advanceTimersByTimeAsync(5000);await rejected;});
+  it('rejects short and empty files and caps duration',async()=>{
+    const s=setup();await s.controller.open(s.video);const rejected=expect(s.controller.record()).rejects.toThrow('too short');await vi.advanceTimersByTimeAsync(1);s.controller.stop();await rejected;
+    const empty=setup();empty.recorder.stop.mockImplementation(()=>{empty.recorder.state='inactive';empty.recorder.onstop?.();});await empty.controller.open(empty.video);const failed=expect(empty.controller.record()).rejects.toThrow('empty');await vi.advanceTimersByTimeAsync(500);empty.controller.stop();await failed;
+    const cap=setup();await cap.controller.open(cap.video);const result=cap.controller.record();await vi.advanceTimersByTimeAsync(20001);expect((await result).measurements.duration).toBe(20);
   });
-  it('stops a stream that arrives after permission was canceled',async()=>{
-    const s=setup();let resolve!:(v:MediaStream)=>void;s.platform.camera=()=>new Promise(r=>{resolve=r;});const opened=s.controller.open(s.video);s.controller.cancel();resolve(s.stream);await expect(opened).rejects.toMatchObject({name:'AbortError'});expect(s.track.stop).toHaveBeenCalled();expect(s.video.srcObject).toBeNull();
+  it('rejects frozen video and orientation changes',async()=>{
+    for(const orientation of [false,true]){const s=setup();if(!orientation)Object.defineProperty(s.video,'currentTime',{value:0});await s.controller.open(s.video);const rejected=expect(s.controller.record()).rejects.toThrow(orientation?'orientation changed':'no new camera frames');if(orientation)Object.defineProperty(s.video,'videoWidth',{value:240});await vi.advanceTimersByTimeAsync(3000);await rejected;expect(s.track.stop).toHaveBeenCalled();}
   });
-  it.each(['play','initialize','recorder'])('releases camera on %s setup failure',async stage=>{
-    const s=setup();if(stage==='play')s.video.play=vi.fn().mockRejectedValue(new Error('playback failed'));if(stage==='initialize')s.detector.initialize.mockRejectedValue(new Error('model failed'));if(stage==='recorder')s.platform.recorder=()=>{throw new Error('unsupported');};await expect(s.controller.open(s.video)).rejects.toThrow();expect(s.track.stop).toHaveBeenCalled();expect(s.video.srcObject).toBeNull();
-  });
-  it('rejects a recorder error and a retry uses a fresh camera controller',async()=>{
-    const s=setup();await s.controller.open(s.video);const result=s.controller.record();const rejected=expect(result).rejects.toThrow('recording failed');s.recorder.onerror?.();await rejected;expect(s.track.stop).toHaveBeenCalled();expect(s.detector.close).toHaveBeenCalled();
-    const retry=setup();await retry.controller.open(retry.video);expect(retry.video.srcObject).toBe(retry.stream);retry.controller.cancel();expect(retry.track.stop).toHaveBeenCalled();
-  });
-  it('releases camera on frame extraction failure',async()=>{
-    const s=setup();s.detector.detect.mockRejectedValue(new Error('inference failed'));await s.controller.open(s.video);const rejected=expect(s.controller.record()).rejects.toThrow('inference failed');await vi.advanceTimersByTimeAsync(1);await rejected;expect(s.track.stop).toHaveBeenCalled();
-  });
-  it('handles disconnect and cancel during recording',async()=>{
-    for(const action of ['disconnect','cancel']){const s=setup();await s.controller.open(s.video);const rejected=expect(s.controller.record()).rejects.toThrow();if(action==='disconnect')s.track.dispatchEvent(new Event('ended'));else s.controller.cancel();await rejected;expect(s.track.stop).toHaveBeenCalled();expect(s.detector.close).toHaveBeenCalled();}
-  });
-  it('times out a recorder that never stops and stops camera immediately',async()=>{
-    const s=setup();s.recorder.stop.mockImplementation(()=>{});await s.controller.open(s.video);const rejected=expect(s.controller.record()).rejects.toThrow('timed out');await vi.advanceTimersByTimeAsync(400);s.controller.stop();expect(s.track.stop).toHaveBeenCalled();await vi.advanceTimersByTimeAsync(5000);await rejected;
-  });
-  it('rejects too short and empty recordings, and caps recording time',async()=>{
-    const short=setup();await short.controller.open(short.video);const rejected=expect(short.controller.record()).rejects.toThrow('Not enough');await vi.advanceTimersByTimeAsync(1);short.controller.stop();await rejected;
-    const empty=setup();empty.recorder.stop.mockImplementation(()=>{empty.recorder.state='inactive';empty.recorder.onstop?.();});await empty.controller.open(empty.video);const rejectedEmpty=expect(empty.controller.record()).rejects.toThrow('empty video');await vi.advanceTimersByTimeAsync(500);empty.controller.stop();await rejectedEmpty;
-    const cap=setup();await cap.controller.open(cap.video);const result=cap.controller.record();await vi.advanceTimersByTimeAsync(20001);expect((await result).clip.source.duration).toBeCloseTo(20);expect(cap.track.stop).toHaveBeenCalled();
-  });
-});
-it('rejects temporary camera mute instead of returning a partial result',async()=>{
-  const s=setup();await s.controller.open(s.video);const rejected=expect(s.controller.record()).rejects.toThrow('interrupted');await vi.advanceTimersByTimeAsync(500);s.track.dispatchEvent(new Event('mute'));await rejected;expect(s.track.stop).toHaveBeenCalled();expect(s.detector.close).toHaveBeenCalled();
-});
-it('rejects frozen capture even when inference succeeded on the first frame',async()=>{
-  const s=setup();Object.defineProperty(s.video,'currentTime',{value:0});await s.controller.open(s.video);const rejected=expect(s.controller.record()).rejects.toThrow('no new camera frames');await vi.advanceTimersByTimeAsync(3000);await rejected;expect(s.detector.detect).toHaveBeenCalledTimes(1);
-});
-it('rejects orientation changes without mixing portrait and landscape coordinates',async()=>{
-  const s=setup();await s.controller.open(s.video);const rejected=expect(s.controller.record()).rejects.toThrow('orientation changed');await vi.advanceTimersByTimeAsync(300);Object.defineProperty(s.video,'videoWidth',{value:240});await vi.advanceTimersByTimeAsync(100);await rejected;
-});
-it('reports initialization failure separately and releases the camera',async()=>{
-  const s=setup();s.detector.initialize.mockRejectedValue(new Error('WASM download failed'));await expect(s.controller.open(s.video)).rejects.toThrow('Model initialization failure');expect(s.track.stop).toHaveBeenCalled();
-});
-it('reports processed FPS, body and hand evidence rather than a frame counter',async()=>{
-  const s=setup(),diagnostics=vi.fn(),controller=new WebcamCapture(s.platform,s.failure,diagnostics);await controller.open(s.video);const result=controller.record();await vi.advanceTimersByTimeAsync(600);controller.stop();await result;
-  const last=diagnostics.mock.calls.at(-1)![0];expect(last.model).toBe('ready');expect(last.fps).toBeGreaterThan(10);expect(last.coverage).toBeGreaterThan(0);expect(last.left).toBe('tracked');
-});
-it('does not present a severely undersampled live attempt as successful',async()=>{
-  const s=setup();s.detector.detect.mockImplementation(async(_frame,t)=>{await new Promise(r=>setTimeout(r,400));return detection(t);});await s.controller.open(s.video);const rejected=expect(s.controller.record()).rejects.toThrow('processed FPS was below 5');await vi.advanceTimersByTimeAsync(2200);s.controller.stop();await vi.advanceTimersByTimeAsync(500);await rejected;expect(s.track.stop).toHaveBeenCalled();
+  it('uses presentation timestamps and exposes skipped callbacks/irregular delivery',()=>{const c=cadence([0,1/30,2/30,2/30,.2,.233],[1,2,3,3,7,8]);expect(c).toMatchObject({duplicateTimes:1,callbackSkips:3,largeGaps:1});expect(c.fps).not.toBe(30);expect(c.irregularIntervals).toBeGreaterThan(0);});
 });

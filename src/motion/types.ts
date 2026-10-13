@@ -13,7 +13,7 @@ export type WristEdit = { frame: number; side: Side; degrees: Vec3 };
 export type MotionClip = {
   schema: 'signlingo.motion'; version: 1; language: 'ksl';
   pipeline: { version: string; detector: string; models: Record<string, string> };
-  source: { name: string; size: number; duration: number; width: number; height: number; mirrored: boolean; sampleHz: number };
+  source: { name: string; size: number; duration: number; timeOffset?:number; width: number; height: number; mirrored: boolean; sampleHz: number };
   spaces: { image: string; body: string; hand: string; avatar: string; alignment: string };
   nonmanual: { head: string; face: 'not-estimated'; linguisticValidation: 'not-performed' };
   frames: MotionFrame[]; edits: WristEdit[];
