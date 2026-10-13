@@ -1,7 +1,7 @@
 import { test,expect } from '@playwright/test';
 import { fixtureClip } from '../fixtures';
 test('upload-first UI, real rig and mobile layout',async({page})=>{
-  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/');
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/');await page.getByRole('button',{name:'동작 복원',exact:true}).click();
   await expect(page.getByRole('heading',{name:'수어 동작을 3D로 재현합니다.'})).toBeVisible();
   await expect(page.getByRole('button',{name:'동작 추출 및 복원'})).toBeDisabled();
   await expect(page.getByText('기본 자세 · 동작을 불러오지 않았습니다')).toBeVisible();
@@ -13,7 +13,7 @@ test('upload-first UI, real rig and mobile layout',async({page})=>{
   await page.screenshot({path:'work/mobile.png',fullPage:true});expect(errors).toEqual([]);
 });
 test('motion import, scrubbing, correction and export preserve source data',async({page})=>{
-  await page.goto('/');const clip=fixtureClip();await page.locator('input[accept="application/json,.json"]').setInputFiles({name:'synthetic.motion.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(clip))});
+  await page.goto('/');await page.getByRole('button',{name:'동작 복원',exact:true}).click();const clip=fixtureClip();await page.locator('input[accept="application/json,.json"]').setInputFiles({name:'synthetic.motion.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(clip))});
   await expect(page.getByText('동작만 재생 중')).toBeVisible();
   await expect(page.getByText('합성 테스트',{exact:true})).toBeVisible();
   await page.getByLabel('재생 위치').fill('0.1');await expect(page.getByText('프레임 2 / 3',{exact:true})).toBeVisible();
@@ -22,10 +22,10 @@ test('motion import, scrubbing, correction and export preserve source data',asyn
   await page.getByRole('button',{name:'재생',exact:true}).click();await expect(page.getByRole('button',{name:'일시정지',exact:true})).toBeVisible();await page.getByRole('button',{name:'일시정지',exact:true}).click();
 });
 test('invalid imported data fails visibly',async({page})=>{
-  await page.goto('/');await page.locator('input[accept="application/json,.json"]').setInputFiles({name:'bad.json',mimeType:'application/json',buffer:Buffer.from('{"schema":"fake"}')});await expect(page.getByRole('alert')).toContainText('불러오기 실패');await expect(page.getByText('기본 자세 · 동작을 불러오지 않았습니다')).toBeVisible();
+  await page.goto('/');await page.getByRole('button',{name:'동작 복원',exact:true}).click();await page.locator('input[accept="application/json,.json"]').setInputFiles({name:'bad.json',mimeType:'application/json',buffer:Buffer.from('{"schema":"fake"}')});await expect(page.getByRole('alert')).toContainText('불러오기 실패');await expect(page.getByText('기본 자세 · 동작을 불러오지 않았습니다')).toBeVisible();
 });
 test('technical laboratory compares stored detections, seeks exact frames and exports proxies',async({page})=>{
-  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/');const clip=fixtureClip();
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/');await page.getByRole('button',{name:'동작 복원',exact:true}).click();const clip=fixtureClip();
   await page.locator('input[accept="application/json,.json"]').setInputFiles({name:'analytic.motion.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(clip))});
   await page.getByLabel('기술 진단 모드').check();
   const lab=page.getByRole('region',{name:'복원 기술 진단'});await expect(lab).toBeVisible();

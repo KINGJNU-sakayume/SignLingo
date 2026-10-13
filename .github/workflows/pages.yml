@@ -12,8 +12,13 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    env:
+      # Compare PRs against their base, pushes against the previously published main.
+      CONTENT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -22,6 +27,8 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Check TypeScript
         run: npm run typecheck
+      - name: Verify content rights, reviews, assets and published compatibility
+        run: npm run content:validate
       - name: Test reconstruction geometry and data contracts
         run: npm test
       - name: Build for repository subpath
