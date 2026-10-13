@@ -48,11 +48,14 @@
 
   --tabbar-height: 68px;
   --topbar-height: 56px;
+  --band-h: 0px;
 }
+:root.sl-has-band { --band-h: 34px; }
 
-/* Unit accent rotation: leaf → sky → sun → grape → leaf. `--on` is the text colour on the face. */
-.unit-leaf { --face: var(--leaf); --deep: var(--leaf-deep); --tint: var(--leaf-tint); --on: #FFFFFF; }
-.unit-sky { --face: var(--sky); --deep: var(--sky-deep); --tint: var(--sky-tint); --on: #FFFFFF; }
-.unit-sun { --face: var(--sun); --deep: var(--sun-deep); --tint: var(--sun-tint); --on: var(--sun-on); }
-.unit-grape { --face: var(--grape); --deep: var(--grape-deep); --tint: var(--grape-tint); --on: #FFFFFF; }
-.unit-soon { --face: var(--locked); --deep: var(--locked-deep); --tint: var(--canvas-soft); --on: var(--ink-muted); }
+/* Unit accent rotation: leaf → sky → sun → grape → leaf. `--on` is the text colour on the face;
+   `--deep-ink` is the unit colour used for text on white. */
+.unit-leaf { --face: var(--leaf); --deep: var(--leaf-deep); --tint: var(--leaf-tint); --on: #FFFFFF; --deep-ink: var(--leaf-deep); }
+.unit-sky { --face: var(--sky); --deep: var(--sky-deep); --tint: var(--sky-tint); --on: #FFFFFF; --deep-ink: var(--sky-deep); }
+.unit-sun { --face: var(--sun); --deep: var(--sun-deep); --tint: var(--sun-tint); --on: var(--sun-on); --deep-ink: var(--sun-on); }
+.unit-grape { --face: var(--grape); --deep: var(--grape-deep); --tint: var(--grape-tint); --on: #FFFFFF; --deep-ink: var(--grape-deep); }
+.unit-soon { --face: var(--locked); --deep: var(--locked-deep); --tint: var(--canvas-soft); --on: var(--ink-muted); --deep-ink: var(--ink-muted); }

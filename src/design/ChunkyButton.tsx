@@ -1,6 +1,6 @@
 import { forwardRef, type ButtonHTMLAttributes } from 'react';
 
-export type ChunkyVariant = 'primary' | 'secondary' | 'sky' | 'danger' | 'sun' | 'ghost';
+export type ChunkyVariant = 'primary' | 'secondary' | 'sky' | 'danger' | 'sun' | 'ghost' | 'inverse';
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ChunkyVariant; size?: 'md' | 'sm'; block?: boolean };
 
 /** Tactile button: flat face with a solid lip that collapses when pressed. */

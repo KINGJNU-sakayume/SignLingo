@@ -1,4 +1,5 @@
 /* Base learning components. Only `.sl-*` classes; Motion Lab styles are untouched. */
+/* styles.css styles bare main/footer/h1/h2 for Motion Lab; learning screens set their own values on classes. */
 .sl-root { font-family: var(--font-body); color: var(--ink); font-size: 16px; line-height: 1.55; letter-spacing: 0; }
 .sl-root h1, .sl-root h2, .sl-root h3 { font-family: var(--font-display); font-weight: 700; letter-spacing: 0; line-height: 1.3; margin: 0; }
 .sl-root p { margin: 0; }
@@ -26,6 +27,8 @@
 .sl-btn-sun { --btn-face: var(--sun); --btn-lip: var(--sun-deep); --btn-ink: var(--sun-on); }
 .sl-btn-secondary { --btn-face: var(--canvas); --btn-lip: var(--line); --btn-ink: var(--ink-muted); --btn-border: var(--line); }
 .sl-btn-secondary:hover:not(:disabled) { filter: none; background: var(--canvas-soft); }
+.sl-btn-inverse { --btn-face: var(--canvas); --btn-lip: var(--line); --btn-ink: var(--deep-ink, var(--leaf-deep)); }
+.sl-btn-inverse:disabled { --btn-face: var(--canvas); --btn-lip: var(--locked-deep); --btn-ink: var(--locked-ink); }
 .sl-btn-ghost { --btn-face: transparent; --btn-lip: transparent; --btn-ink: var(--sky-deep); box-shadow: none; margin-bottom: 0; }
 .sl-btn-ghost:hover:not(:disabled) { filter: none; background: var(--sky-tint); }
 .sl-btn-ghost:active:not(:disabled) { transform: none; }
@@ -43,12 +46,14 @@
 .sl-choice.is-selected { border-color: var(--sky); background: var(--sky-tint); box-shadow: 0 var(--lip) 0 var(--sky); color: var(--sky-deep); }
 .sl-choice.is-correct { border-color: var(--leaf); background: var(--leaf-tint); box-shadow: 0 var(--lip) 0 var(--leaf); color: var(--leaf-deep); }
 .sl-choice.is-wrong { border-color: var(--coral); background: var(--coral-tint); box-shadow: 0 var(--lip) 0 var(--coral); color: var(--coral-deep); }
-.sl-choice:disabled { cursor: default; }
+.sl-choice:disabled { cursor: default; opacity: 1; }
 .sl-choice-key {
   flex: none; display: grid; place-items: center; width: 30px; height: 30px; border: 2px solid var(--line); border-radius: 9px;
   font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--ink-muted); background: var(--canvas);
 }
 .sl-choice.is-selected .sl-choice-key { border-color: var(--sky); color: var(--sky-deep); }
+.sl-choice.is-correct .sl-choice-key { border-color: var(--leaf); color: var(--leaf-deep); }
+.sl-choice.is-wrong .sl-choice-key { border-color: var(--coral); color: var(--coral-deep); }
 .sl-choice-body { flex: 1; min-width: 0; font-family: var(--font-display); font-weight: 700; overflow-wrap: anywhere; }
 
 /* ProgressBar */
@@ -98,11 +103,10 @@
 .sl-node:hover:not(:disabled) { filter: brightness(1.06); }
 .sl-node:active:not(:disabled) { transform: translateY(var(--lip-node)); box-shadow: 0 0 0 var(--node-lip); }
 .sl-node-locked, .sl-node-coming-soon { --node-face: var(--locked); --node-lip: var(--locked-deep); --node-ink: var(--locked-ink); }
-.sl-node-coming-soon { cursor: not-allowed; opacity: 1; }
+.sl-node.sl-node-coming-soon:disabled { cursor: not-allowed; opacity: .75; }
 .sl-node-kind-trophy.sl-node-completed { --node-face: var(--sun); --node-lip: var(--sun-deep); --node-ink: var(--sun-on); }
 .sl-node-review-due { --node-face: var(--sun); --node-lip: var(--sun-deep); --node-ink: var(--sun-on); }
 .sl-node-wrap.is-current::before { content: ''; position: absolute; inset: -9px -9px calc(var(--lip-node) - 9px); border-radius: 50%; border: 5px solid var(--line); pointer-events: none; }
-.sl-node-wrap.is-current .sl-node { animation: sl-bob 2.4s ease-in-out infinite; }
 .sl-node-bubble {
   position: absolute; bottom: calc(100% + 14px); left: 50%; transform: translateX(-50%); z-index: 2;
   padding: 8px 14px; border: 2px solid var(--line); border-radius: 12px; background: var(--canvas); color: var(--deep, var(--leaf-deep));
@@ -153,3 +157,30 @@
   .sl-sheet, .sl-dialog { animation: sl-fade var(--t-base) ease-out !important; animation-duration: var(--t-base) !important; }
   .sl-btn:active:not(:disabled), .sl-choice:active:not(:disabled), .sl-node:active:not(:disabled) { transform: none; }
 }
+
+/* Small controls shared by learning screens */
+.sl-toggle {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 6px 10px;
+  font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--ink-muted); background: var(--canvas);
+  border: 2px solid var(--line); border-radius: 12px; cursor: pointer; transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+}
+.sl-toggle:hover:not(:disabled) { background: var(--canvas-soft); }
+.sl-toggle[aria-pressed="true"] { color: var(--sky-deep); background: var(--sky-tint); border-color: var(--sky); }
+.sl-toggle:disabled { color: var(--locked-ink); background: var(--locked); cursor: not-allowed; opacity: 1; }
+.sl-segmented { display: inline-flex; border: 2px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--canvas); }
+.sl-segmented button {
+  min-height: 40px; min-width: 52px; padding: 6px 10px; border: 0; background: transparent; cursor: pointer;
+  font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--ink-muted);
+}
+.sl-segmented button + button { border-left: 2px solid var(--line); }
+.sl-segmented button[aria-pressed="true"] { color: var(--sky-deep); background: var(--sky-tint); }
+.sl-sheet-link {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin-top: 2px; padding: 0; border: 0; background: none; cursor: pointer;
+  font-family: var(--font-display); font-size: 18px; font-weight: 700; color: inherit; text-decoration: underline; text-underline-offset: 4px;
+}
+.sl-alert { display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: var(--radius-card); background: var(--coral-tint); color: var(--coral-deep); }
+.sl-alert p { margin-bottom: 10px; }
+.sl-loading { display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: var(--radius-card); background: var(--canvas-soft); color: var(--ink-muted); }
+.sl-state { display: grid; justify-items: center; gap: 14px; padding: 48px 16px; text-align: center; color: var(--ink-muted); font-size: 18px; }
+.sl-state.is-full { min-height: 100vh; min-height: 100dvh; align-content: center; background: var(--canvas); }
+.sl-state p { max-width: 420px; }

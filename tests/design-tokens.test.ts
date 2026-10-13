@@ -23,7 +23,8 @@ const pairs: [string, string, number, string][] = [
   ['leaf-deep', 'canvas', 4.5, 'current-node bubble text'], ['sun-on', 'sun', 4.5, 'sun buttons, banners and trophy'],
   ['#FFFFFF', 'sky', 4.5, 'sky buttons and banners'], ['#FFFFFF', 'grape', 4.5, 'grape banners'],
   ['#FFFFFF', 'leaf', 3, '19px bold primary buttons and leaf banners only'], ['#FFFFFF', 'coral', 3, '19px bold danger button only'],
-  ['locked-ink', 'locked', 3, 'locked node icons and disabled button labels'],
+  ['locked-ink', 'locked', 3, 'locked node icons and disabled button labels'], ['grape-deep', 'canvas', 4.5, 'grape popover button text'],
+  ['sun-on', 'canvas', 4.5, 'sun popover button text'], ['grape-deep', 'grape-tint', 4.5, 'grape tint cards'],
 ];
 describe('learning design tokens', () => {
   it('defines every colour referenced by the contrast table', () => {

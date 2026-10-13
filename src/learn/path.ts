@@ -5,7 +5,8 @@ import type { LearnStore } from './storage';
 
 export type UnitTheme = 'leaf' | 'sky' | 'sun' | 'grape';
 export const UNIT_THEMES: readonly UnitTheme[] = ['leaf', 'sky', 'sun', 'grape'];
-/** Zigzag offsets (px) around the path's centre line, repeated for each unit. */
+/** Zigzag offsets (px) around the path's centre line. Odd units swing the other way so the
+ *  unit mascot can sit on the open side. */
 export const NODE_OFFSETS = [0, 44, 64, 44, 0, -44, -64, -44] as const;
 
 export type PathNodeModel = {
@@ -31,6 +32,7 @@ export function groupSizes(n: number): number[] {
 export function nodeId(kind: 'lesson' | 'review', unitId: string, entries: readonly Expression[]) {
   return `${kind}:${unitId}:${entries.map(progressKey).join('+')}`;
 }
+const offsetAt = (index: number, unitIndex: number) => NODE_OFFSETS[index % NODE_OFFSETS.length] * (unitIndex % 2 ? -1 : 1);
 export function unitExpressions(catalog: Catalog, unitId: string) {
   return catalog.expressions.filter(entry => entry.lessonId === unitId).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 }
@@ -44,7 +46,7 @@ export function buildPath(catalog: Catalog, store: LearnStore, now = new Date())
     const theme = UNIT_THEMES[unitIndex % UNIT_THEMES.length];
     if (!expressions.length) {
       const nodes = [0, 1, 2].map((i): PathNodeModel => ({ id: `soon:${lesson.id}:${i}`, unitId: lesson.id, kind: 'soon', state: 'coming-soon',
-        offset: NODE_OFFSETS[i % NODE_OFFSETS.length], lessonNumber: i + 1, lessonCount: 3, expressions: [] }));
+        offset: offsetAt(i, unitIndex), lessonNumber: i + 1, lessonCount: 3, expressions: [] }));
       return { id: lesson.id, number: unitIndex + 1, title: lesson.title, category: lesson.category, description: lesson.description, theme, soon: true, expressions, nodes, completed: false };
     }
     const sizes = groupSizes(expressions.length);
@@ -58,7 +60,7 @@ export function buildPath(catalog: Catalog, store: LearnStore, now = new Date())
     nodes.push({ id: `trophy:${lesson.id}`, unitId: lesson.id, kind: 'trophy', state: 'locked', offset: 0, lessonNumber: 0, lessonCount: sizes.length, expressions: expressions.map(e => e.id) });
     const byId = new Map(expressions.map(e => [e.id, e]));
     for (const [i, node] of nodes.entries()) {
-      node.offset = NODE_OFFSETS[i % NODE_OFFSETS.length];
+      node.offset = offsetAt(i, unitIndex);
       if (node.kind === 'trophy') continue;
       const record = store.nodes[node.id];
       if (record) {

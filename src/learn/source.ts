@@ -13,6 +13,8 @@ import { LEARN_KEY } from './storage';
 export interface ContentSource {
   readonly kind: 'published' | 'demo';
   readonly storage: { progress: string; learn: string };
+  /** Always-visible notice for non-published content (the development demo). */
+  readonly banner?: string;
   loadCatalog(signal: AbortSignal): Promise<Catalog>;
   loadMotion(entry: Expression, signal?: AbortSignal): Promise<MotionClip>;
   /** Original video for the expression card, or null when none is published. */
