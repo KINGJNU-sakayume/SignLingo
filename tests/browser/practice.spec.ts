@@ -26,7 +26,7 @@ async function syntheticCamera(page:Page,photo=false) {
 const stopped=(page:Page)=>page.evaluate(()=>(window as unknown as {practiceTracks:MediaStreamTrack[]}).practiceTracks.every(t=>t.readyState==='ended'));
 test('reference playback, DTW inspection, localized feedback, trimming, retries and mobile layout',async({page})=>{
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await openPractice(page);
-  await page.getByRole('button',{name:'재생 comparison',exact:true}).click();await expect(page.getByRole('button',{name:'일시정지 comparison',exact:true})).toBeVisible();await page.getByRole('button',{name:'일시정지 comparison',exact:true}).click();
+  await page.getByRole('button',{name:'비교 재생',exact:true}).click();await expect(page.getByRole('button',{name:'비교 일시 정지',exact:true})).toBeVisible();await page.getByRole('button',{name:'비교 일시 정지',exact:true}).click();
   const learner=practiceClip();learner.frames.forEach(f=>{f.bodyWorld[15].y+=.25;});
   await page.getByText('기존 연습 MotionClip 불러오기 (선택)',{exact:true}).click();
   await page.getByLabel('기존 연습 MotionClip 불러오기 (선택)',{exact:true}).setInputFiles({name:'synthetic-learner.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(learner))});
@@ -84,7 +84,7 @@ test('native-phone video fallback preserves reference comparison without camera 
   await expect(page.getByText(reference.source.name,{exact:true})).toBeVisible();
 });
 
-for(const [mode,message] of [['init-fail','모델 초기화 실패'],['inference-fail','Inference failure'],['empty','tracking is insufficient']] as const){
+for(const [mode,message] of [['init-fail','모델 초기화 실패'],['inference-fail','AI 추론 실패'],['empty','안정적인 추적 프레임이 3개 미만']] as const){
   test(`mobile fallback reports ${mode} without a misleading comparison`,async({page,context})=>{
     await mockWorker(context,mode);await openPractice(page);
     await page.getByLabel('휴대폰으로 녹화하거나 영상 선택',{exact:true}).setInputFiles({name:'phone.mp4',mimeType:'video/mp4',buffer:phoneVideo});

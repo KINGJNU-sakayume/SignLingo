@@ -12,7 +12,9 @@ const exact:Record<string,string>={
 'Playback failed':'재생 실패','Import rejected':'불러오기 실패','Reconstruction failed':'동작 복원 실패',
 'Video decode failure':'영상 해독 실패','Model initialization failure':'모델 초기화 실패','Inference failure':'AI 추론 실패',
 'Video capture failure':'영상 녹화 실패','Camera permission failure':'카메라 권한 요청 실패',
-'Camera interrupted or muted. Reconnect and retry.':'카메라 연결이 끊겼습니다. 다시 연결한 후 시도해 주세요.',
+'Camera interrupted or muted. Reconnect and retry.':'카메라가 중단되었거나 음소거되었습니다. 다시 연결한 후 시도해 주세요.',
+'No new camera frames for 2.5 seconds. Retry.':'2.5초 동안 새 카메라 프레임이 없어 녹화를 중단했습니다. 다시 시도해 주세요.',
+'Model download failed':'모델 다운로드에 실패했습니다.',
 'Camera requires HTTPS and getUserMedia support.':'HTTPS 환경과 카메라를 지원하는 브라우저가 필요합니다.',
 'Camera permission was denied. Allow camera access in browser settings and retry.':'카메라 권한이 거부되었습니다. 브라우저 설정에서 허용한 후 다시 시도해 주세요.',
 'No camera was found. Connect a camera and retry.':'카메라를 찾지 못했습니다. 카메라를 연결한 뒤 다시 시도해 주세요.',
@@ -25,11 +27,16 @@ const exact:Record<string,string>={
 export function koMessage(input:string):string {
  if(!input)return input;
  if(exact[input])return exact[input];
+ // Errors are composed as "Stage failure: detail"; translate each part separately.
+ const split=/^([^:]+): ([\s\S]+)$/.exec(input);
+ if(split&&exact[split[1]])return `${exact[split[1]]}: ${koMessage(split[2])}`;
+ const capitalized=input[0].toUpperCase()+input.slice(1);
+ if(exact[capitalized])return exact[capitalized];
  let out=input;
  const replacements:[RegExp,string][]=[
- [/\\bleft\\b/gi,'왼손'],[/\\bright\\b/gi,'오른손'],
- [/\\bTorso\\b/g,'몸통'],[/\\bShoulders\\b/gi,'어깨'],[/\\bhips\\b/gi,'골반'],
- [/\\btracked\\b/gi,'정상 추적'],[/\\bmissing\\b/gi,'누락'],[/\\buncertain\\b/gi,'불확실'],
+ [/\bleft\b/gi,'왼손'],[/\bright\b/gi,'오른손'],
+ [/\bTorso\b/g,'몸통'],[/\bShoulders\b/gi,'어깨'],[/\bhips\b/gi,'골반'],
+ [/\btracked\b/gi,'정상 추적'],[/\bmissing\b/gi,'누락'],[/\buncertain\b/gi,'불확실'],
  [/no reliable wrist-associated hand/gi,'손목과 연결되는 신뢰할 수 있는 손을 찾지 못했습니다'],
  [/arm landmarks unreliable/gi,'팔 관절 좌표의 신뢰도가 낮습니다'],
  [/elbow plane underdetermined; confidence-weighted temporal pole used where available/gi,'팔꿈치 굽힘 방향이 불명확하여 가능한 경우 이전 관측을 사용했습니다'],

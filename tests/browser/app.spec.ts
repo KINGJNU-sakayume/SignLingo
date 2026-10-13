@@ -6,7 +6,7 @@ test('upload-first UI, real rig and mobile layout',async({page})=>{
   await expect(page.getByRole('button',{name:'동작 추출 및 복원'})).toBeDisabled();
   await expect(page.getByText('기본 자세 · 동작을 불러오지 않았습니다')).toBeVisible();
   await expect(page.locator('.avatar-stage canvas')).toBeVisible();
-  await page.getByRole('button',{name:'side',exact:true}).click();await page.getByLabel('뼈대 표시', {exact:true}).check();
+  await page.getByRole('button',{name:'측면',exact:true}).click();await page.getByLabel('뼈대 표시', {exact:true}).check();
   await page.screenshot({path:'work/desktop.png',fullPage:true});
   await page.setViewportSize({width:390,height:844});await expect(page.getByRole('button',{name:'영상 선택'})).toBeVisible();
   await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth),{message:'The page must fit after responsive canvas/layout resize'}).toBeLessThanOrEqual(0);
