@@ -14,6 +14,11 @@ describe('koMessage',()=>{
   it('applies word-boundary replacements',()=>{
     expect(koMessage('left wrist missing')).toBe('왼손 손목 누락');
   });
+  it('translates whole warning phrases before splitting them into words',()=>{
+    expect(koMessage('Ambiguous hand identity near crossing wrists; uncertain hands withheld.')).toBe('손목이 교차하여 좌우 손 구분이 모호합니다. 불확실한 손은 표시하지 않았습니다.');
+    expect(koMessage('right: elbow plane changed >60°')).toBe('오른손: 팔꿈치 굽힘 방향이 60° 넘게 바뀌었습니다');
+    expect(koMessage('Reconstruction failed: Use a video between 0 and 120 seconds.')).toBe('동작 복원 실패: 120초 이하의 영상을 사용해 주세요.');
+  });
   it('is stable when applied to already translated text',()=>{
     const once=koMessage('Video capture failure: no new camera frames for 2.5 seconds. Retry.');
     expect(koMessage(once)).toBe(once);

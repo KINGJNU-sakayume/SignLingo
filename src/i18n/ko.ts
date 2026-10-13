@@ -34,6 +34,11 @@ export function koMessage(input:string):string {
  if(exact[capitalized])return exact[capitalized];
  let out=input;
  const replacements:[RegExp,string][]=[
+ // Whole phrases first, before the word-level replacements below can split them.
+ [/Ambiguous hand identity near crossing wrists; uncertain hands withheld\./g,'손목이 교차하여 좌우 손 구분이 모호합니다. 불확실한 손은 표시하지 않았습니다.'],
+ [/elbow plane changed >60°/gi,'팔꿈치 굽힘 방향이 60° 넘게 바뀌었습니다'],
+ [/FK direction residual >5°; inspect reconstruction\./gi,'관절 방향 차이가 5°를 넘습니다. 복원 결과를 확인하세요.'],
+ [/Use a video between 0 and (\d+) seconds\./g,'$1초 이하의 영상을 사용해 주세요.'],
  [/\bleft\b/gi,'왼손'],[/\bright\b/gi,'오른손'],
  [/\bTorso\b/g,'몸통'],[/\bShoulders\b/gi,'어깨'],[/\bhips\b/gi,'골반'],
  [/\btracked\b/gi,'정상 추적'],[/\bmissing\b/gi,'누락'],[/\buncertain\b/gi,'불확실'],
