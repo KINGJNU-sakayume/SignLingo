@@ -5,7 +5,7 @@ import {practiceClip} from '../practice-fixtures';
 import {phoneVideo} from './phone-fixture';
 import {irregularVideo} from './irregular-fixture';
 const reference=practiceClip();
-async function open(page:Page){await page.goto('/');await page.getByRole('button',{name:'수어 연습',exact:true}).click();await page.getByLabel('표시 언어').selectOption('en');await page.getByLabel('기준 MotionClip JSON 불러오기',{exact:true}).setInputFiles({name:'synthetic.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(reference))});}
+async function open(page:Page){await page.goto('/');await page.getByRole('button',{name:'수어 연습',exact:true}).click();await page.getByLabel('표시 언어').selectOption('ko');await page.getByLabel('기준 MotionClip JSON 불러오기',{exact:true}).setInputFiles({name:'synthetic.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(reference))});}
 async function worker(context:BrowserContext,delay=0,hands=true){await context.route('**/detector.worker-*.js',route=>route.fulfill({contentType:'text/javascript',body:`const frames=${JSON.stringify(reference.frames)};self.onmessage=e=>{if(e.data.type==='init'){self.postMessage({type:'ready'});return;}setTimeout(()=>{const f=structuredClone(frames[Math.min(30,Math.floor(e.data.timestampMs/66))]);f.timestamp=e.data.timestampMs;if(!${hands}){f.hands=[];f.assignment={};}e.data.frame.close();self.postMessage({type:'result',result:f});},${delay});};`}));}
 const quality=(page:Page)=>page.getByLabel('녹화 및 분석 측정값');
 const observationCount=async(page:Page)=>Number((await quality(page).innerText()).match(/Distinct observations: (\d+)\//)![1]);
