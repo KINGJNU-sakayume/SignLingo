@@ -15,6 +15,7 @@ import type { MotionClip, Side } from '../motion/types';
 import { activeInterval, features } from './features';
 import { compareMotion } from './compare';
 import { WebcamCapture, cameraError } from './capture';
+import { koMessage } from '../i18n/ko';
 import { copy, feedbackText, metricRequirement, type Locale } from './copy';
 import type { Comparison, Interval, PracticeSession } from './types';
 import './practice.css';
@@ -47,7 +48,7 @@ function WristPaths({reference,learner,result,side,index,locale}:{reference:Moti
   </svg>;
 }
 export function PracticeMode() {
-  const [locale,setLocale]=useState<Locale>(()=>navigator.language.startsWith('ko')?'ko':'en'),t=copy[locale];
+  const [locale,setLocale]=useState<Locale>('ko'),t=copy[locale];
   const [reference,setReference]=useState<MotionClip|null>(null),[learner,setLearner]=useState<MotionClip|null>(null);
   const [ri,setRi]=useState<Interval|null>(null),[li,setLi]=useState<Interval|null>(null);
   const [referenceUrl,setReferenceUrl]=useState(''),[learnerUrl,setLearnerUrl]=useState('');
@@ -65,7 +66,7 @@ export function PracticeMode() {
   const busy=phase!=='idle'||checking, epoch=useRef(0);
   const comparison=useMemo(()=>{
     if(!reference||!learner||!ri||!li)return {result:null,error:''};
-    try{return {result:compareMotion(reference,learner,ri,li),error:''};}catch(e){return {result:null,error:cameraError(e)};}
+    try{return {result:compareMotion(reference,learner,ri,li),error:''};}catch(e){return {result:null,error:koMessage(cameraError(e))};}
   },[reference,learner,ri,li]);
   const result=comparison.result;
   const session:PracticeSession|null=reference&&learner&&result?{schema:'signlingo.practice',version:1,attempt,reference,learner,comparison:result,linguisticValidation:'not-performed'}:null;
@@ -78,7 +79,7 @@ export function PracticeMode() {
   useEffect(()=>()=>{epoch.current++;clearTimeout(timer.current);capture.current?.cancel();framing.current?.close();offline.current?.abort();},[]);
   useEffect(()=>()=>{if(referenceUrl)URL.revokeObjectURL(referenceUrl);},[referenceUrl]);
   useEffect(()=>()=>{if(learnerUrl)URL.revokeObjectURL(learnerUrl);},[learnerUrl]);
-  useEffect(()=>{const end=()=>{if(document.hidden){if(capture.current||offline.current)setError('Video capture / processing interrupted because the page was hidden. Any completed recording is retained. Retry analysis when the page is visible.');epoch.current++;clearTimeout(timer.current);capture.current?.cancel();framing.current?.close();setChecking(false);offline.current?.abort();offline.current=null;capture.current=null;setPhase('idle');setPlaying(false);}};const leave=()=>{if(capture.current||offline.current)setError('Video capture interrupted when leaving the page. Retry the attempt.');epoch.current++;clearTimeout(timer.current);capture.current?.cancel();framing.current?.close();setChecking(false);offline.current?.abort();offline.current=null;capture.current=null;setPhase('idle');setPlaying(false);};document.addEventListener('visibilitychange',end);window.addEventListener('pagehide',leave);return()=>{document.removeEventListener('visibilitychange',end);window.removeEventListener('pagehide',leave);};},[]);
+  useEffect(()=>{const end=()=>{if(document.hidden){if(capture.current||offline.current)setError('화면을 벗어나 영상 촬영 또는 분석이 중단되었습니다. 완료된 녹화는 보존되며 화면으로 돌아와 분석을 다시 시도할 수 있습니다.');epoch.current++;clearTimeout(timer.current);capture.current?.cancel();framing.current?.close();setChecking(false);offline.current?.abort();offline.current=null;capture.current=null;setPhase('idle');setPlaying(false);}};const leave=()=>{if(capture.current||offline.current)setError('페이지를 떠나 촬영이 중단되었습니다. 다시 시도해 주세요.');epoch.current++;clearTimeout(timer.current);capture.current?.cancel();framing.current?.close();setChecking(false);offline.current?.abort();offline.current=null;capture.current=null;setPhase('idle');setPlaying(false);};document.addEventListener('visibilitychange',end);window.addEventListener('pagehide',leave);return()=>{document.removeEventListener('visibilitychange',end);window.removeEventListener('pagehide',leave);};},[]);
   useEffect(()=>{setIndex(0);setPlaying(false);setHighlight(undefined);},[result]);
   useEffect(()=>{
     for(const [video,value] of [[referenceVideo.current,referenceMediaTime],[learnerVideo.current,learnerMediaTime]] as const)if(video&&video.readyState>=1&&Math.abs(video.currentTime-value)>.015)try{video.currentTime=value;}catch{/* The visible media error handler reports decoding failures. */}
@@ -103,7 +104,7 @@ export function PracticeMode() {
       setPlaying(false);setError('');setIndex(0);setTime(0);
       if(target==='reference'){resetAttempt();setReference(clip);setRi(activeInterval(clip));setReferenceUrl('');}
       else {resetAttempt();setLearner(clip);setLi(activeInterval(clip));setAttempt(n=>n+1);}
-    } catch(e){if(current===epoch.current)setError(cameraError(e));}
+    } catch(e){if(current===epoch.current)setError(koMessage(cameraError(e)));}
   }
   async function openCamera() {
     setError('');setDiagnostics(null);setPlaying(false);setPhase('opening');
@@ -113,7 +114,7 @@ export function PracticeMode() {
   }
   async function analyzeRecording(file:File,durationHint?:number) {
     const current=++epoch.current,controller=new AbortController();offline.current=controller;
-    setPhase('processing');setLearner(null);setLi(null);setProgress('Decoding saved video…');setError('');setAnalysis(null);setDiagnostics(null);
+    setPhase('processing');setLearner(null);setLi(null);setProgress('저장된 영상을 해독하는 중…');setError('');setAnalysis(null);setDiagnostics(null);
     try {
       const clip=await processPracticeVideo(file,{mirrored:unmirror,signal:controller.signal,sampleHz,maxDimension,durationHint,
         progress:p=>{if(current===epoch.current)setProgress(`${p.phase}${p.total?` · ${p.done}/${p.total}`:''}`);},
@@ -159,19 +160,19 @@ export function PracticeMode() {
     };timer.current=setTimeout(tick,1000);
   }
   return <main className="practice" lang={locale}>
-    <div className="practice-heading"><div><p className="eyebrow">SIGNLINGO / PRACTICE · 0.3</p><h1>{t.title}</h1><p>{t.intro}</p></div><label>Language / 언어 <select aria-label="Practice language" value={locale} onChange={e=>setLocale(e.target.value as Locale)}><option value="en">English</option><option value="ko">한국어</option></select></label></div>
+    <div className="practice-heading"><div><p className="eyebrow">SIGNLINGO / 수어 연습 · 0.3</p><h1>{t.title}</h1><p>{t.intro}</p></div><label>표시 언어 <select aria-label="표시 언어" value={locale} onChange={e=>setLocale(e.target.value as Locale)}><option value="en">English</option><option value="ko">한국어</option></select></label></div>
     <p className="practice-notice">{t.privacy}</p><p className="practice-notice">{t.caveat}</p>
-    {error&&<div role="alert" className="error-message"><div><strong>{t.failure}</strong><p>{locale==='ko'?`${t.details}: `:''}{error}</p></div></div>}
+    {error&&<div role="alert" className="error-message"><div><strong>{t.failure}</strong><p>{locale==='ko'?`${t.details}: `:''}{koMessage(error)}</p></div></div>}
     <section className="practice-card practice-files"><label>{t.load}<input aria-label={t.load} type="file" accept="application/json,.json" disabled={busy} onChange={e=>void load(e,'reference')}/></label>{reference&&<><span>{reference.source.name}</span><label>{t.video}<input aria-label={t.video} type="file" accept="video/*" disabled={busy} onChange={e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;if(f.name!==reference.source.name||f.size!==reference.source.size){setError(locale==='ko'?'기준 JSON의 파일명·크기와 일치하는 원본 영상을 선택하세요.':'Choose the original video matching the reference JSON filename and size.');return;}setReferenceUrl(URL.createObjectURL(f));setError('');}}/></label></>}</section>
-    <section className="practice-card"><h2>{t.learner}</h2><p>{phase==='opening'?t.loading:phase==='ready'?t.ready:phase==='recording'?`${t.recording} · ${elapsed.toFixed(1)} s · ${frames} ${t.frames}`:phase==='finishing'?t.finishing:phase==='processing'?progress:t.idle}</p>
-      <div className="practice-camera" hidden={phase==='idle'||phase==='processing'} style={{aspectRatio:captureQuality?.width?`${captureQuality.width}/${captureQuality.height}`:undefined}}><video ref={live} muted playsInline aria-label="Live camera preview" style={{transform:mirror?'scaleX(-1)':undefined}}/>{diagnostics?.frame&&<Overlay frame={diagnostics.frame} width={diagnostics.width} height={diagnostics.height} mirrored={mirror!==unmirror} minConfidence={.6}/ >}{phase==='countdown'&&<strong className="practice-countdown" role="status" aria-live="assertive">{countdown}</strong>}</div>
+    <section className="practice-card"><h2>{t.learner}</h2><p>{phase==='opening'?t.loading:phase==='ready'?t.ready:phase==='recording'?`${t.recording} · ${elapsed.toFixed(1)} s · ${frames} ${t.frames}`:phase==='finishing'?t.finishing:phase==='processing'?koMessage(progress):t.idle}</p>
+      <div className="practice-camera" hidden={phase==='idle'||phase==='processing'} style={{aspectRatio:captureQuality?.width?`${captureQuality.width}/${captureQuality.height}`:undefined}}><video ref={live} muted playsInline aria-label="실시간 카메라 미리보기" style={{transform:mirror?'scaleX(-1)':undefined}}/>{diagnostics?.frame&&<Overlay frame={diagnostics.frame} width={diagnostics.width} height={diagnostics.height} mirrored={mirror!==unmirror} minConfidence={.6}/ >}{phase==='countdown'&&<strong className="practice-countdown" role="status" aria-live="assertive">{countdown}</strong>}</div>
       {diagnostics&&<>{phase==='ready'&&<p>{locale==='ko'?'녹화 전 화면 확인 결과입니다. 녹화 중에는 추론하지 않습니다.':'Framing snapshot before recording. Inference is disabled during recording.'}</p>}<TrackingStatus value={diagnostics} locale={locale}/></>}
       <CaptureQuality capture={captureQuality} analysis={analysis} locale={locale}/>
-      <div className="practice-controls"><label>{locale==='ko'?'저장 영상 분석 속도':'Offline sampling request'}<select aria-label="Offline analysis sampling" value={sampleHz} disabled={busy} onChange={e=>setSampleHz(Number(e.target.value) as 15|30)}><option value={30}>30 Hz</option><option value={15}>15 Hz</option></select></label><label>{locale==='ko'?'분석 해상도':'Analysis maximum dimension'}<select aria-label="Analysis maximum dimension" value={maxDimension} disabled={busy} onChange={e=>setMaxDimension(Number(e.target.value) as 640|960)}><option value={960}>960 px</option><option value={640}>640 px</option></select></label></div>
+      <div className="practice-controls"><label>{locale==='ko'?'저장 영상 분석 속도':'Offline sampling request'}<select aria-label="저장 영상 분석 속도" value={sampleHz} disabled={busy} onChange={e=>setSampleHz(Number(e.target.value) as 15|30)}><option value={30}>30 Hz</option><option value={15}>15 Hz</option></select></label><label>{locale==='ko'?'분석 해상도':'Analysis maximum dimension'}<select aria-label="분석 해상도" value={maxDimension} disabled={busy} onChange={e=>setMaxDimension(Number(e.target.value) as 640|960)}><option value={960}>960 px</option><option value={640}>640 px</option></select></label></div>
       {saved&&!busy&&<div className="practice-controls"><button className="button secondary" onClick={()=>void analyzeRecording(saved.file,saved.duration)}>{locale==='ko'?'저장 영상 다시 분석':'Analyze saved recording again'}</button><a className="button secondary" href={learnerUrl} download={saved.file.name}>{locale==='ko'?'녹화 원본 저장':'Save original recording'}</a></div>}
       <div className="practice-controls"><label><input type="checkbox" checked={mirror} onChange={e=>setMirror(e.target.checked)}/>{t.preview}</label><label><input type="checkbox" checked={unmirror} disabled={busy&&phase!=='ready'} onChange={e=>setUnmirror(e.target.checked)}/>{t.pixels}</label></div><p>{t.previewNote}</p>
       <div className="practice-controls">{phase==='idle'&&<button className="button primary" disabled={!reference} onClick={()=>void openCamera()}>{t.camera}</button>}{phase==='ready'&&<><button className="button secondary" disabled={checking} onClick={()=>void checkFraming()}>{checking?(locale==='ko'?'화면 확인 중…':'Checking framing…'):(locale==='ko'?'손·상체 화면 확인 (선택)':'Check framing (optional)')}</button><button className="button primary" disabled={checking} onClick={beginCountdown}>{t.start}</button></>}{phase==='recording'&&<button className="button primary" onClick={()=>{setPhase('finishing');capture.current?.stop();}}>{t.stop}</button>}{busy&&<button className="button secondary" onClick={endCamera}>{t.cancel}</button>}{learner&&!busy&&<button className="button secondary" onClick={resetAttempt}>{t.retry}</button>}</div>
-      {reference&&!busy&&<div className="practice-fallback"><label>{locale==='ko'?'휴대폰으로 녹화하거나 영상 선택':'Record or choose a phone video'}<input aria-label="Record or choose a phone video" type="file" accept="video/*" capture="user" onChange={e=>void loadPhoneVideo(e)}/></label><p>{locale==='ko'?'최대 20초 · 100 MB. 휴대폰 카메라로 녹화한 뒤 브라우저에서 처리합니다. 모델은 첫 사용 시 다운로드되며 영상은 업로드하지 않습니다.':'Up to 20 seconds · 100 MB. Record with the phone camera, then process locally. Both capture methods analyze after recording. Models download on first use; video is never uploaded.'}</p></div>}
+      {reference&&!busy&&<div className="practice-fallback"><label>{locale==='ko'?'휴대폰으로 녹화하거나 영상 선택':'Record or choose a phone video'}<input aria-label="휴대폰으로 녹화하거나 영상 선택" type="file" accept="video/*" capture="user" onChange={e=>void loadPhoneVideo(e)}/></label><p>{locale==='ko'?'최대 20초 · 100 MB. 휴대폰 카메라로 녹화한 뒤 브라우저에서 처리합니다. 모델은 첫 사용 시 다운로드되며 영상은 업로드하지 않습니다.':'Up to 20 seconds · 100 MB. Record with the phone camera, then process locally. Both capture methods analyze after recording. Models download on first use; video is never uploaded.'}</p></div>}
       {reference&&!busy&&<details><summary>{t.loadAttempt}</summary><input aria-label={t.loadAttempt} type="file" accept="application/json,.json" onChange={e=>void load(e,'learner')}/></details>}
     </section>
     {reference&&<>
