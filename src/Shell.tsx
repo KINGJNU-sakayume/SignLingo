@@ -2,7 +2,7 @@ import { useEffect,useState } from 'react';
 import MotionLab from './App';
 import { PracticeMode } from './practice/PracticeMode';
 import { LessonHub } from './lessons/LessonHub';
-import { PROGRESS_KEY, readProgress, saveProgress, type LessonProgress } from './lessons/catalog';
+import { readProgress, saveProgress, type LessonProgress } from './lessons/catalog';
 import type { MotionClip } from './motion/types';
 
 const LESSON_ID='first-expression';
