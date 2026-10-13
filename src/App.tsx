@@ -21,7 +21,7 @@ export default function App({active=true}:{active?:boolean}){
   const comparisons=useMemo(()=>technical&&clip?{stored:clip,original:reconstructClip(clip,'original'),improved:reconstructClip(clip,'improved')}:null,[technical,clip]);
   const displayedClip=comparisons?comparisons[pipelineView]:clip;
   const clock=useRef(0);const busy=!!progress;
-  const length=clip?.source.duration??duration;
+  const length=clip?.source.duration??duration;const offset=clip?.source.timeOffset??0;
   const index=clip?frameIndex(clip,time):0,frame=displayedClip?.frames[index];
   const pose=useMemo(()=>technical?frame?.pose??null:clip?samplePose(clip,time):null,[clip,time,technical,frame]);
   const suspects=useMemo(()=>displayedClip?.frames.flatMap((f,i)=>f.warnings.length?[i]:[])??[],[displayedClip]);
@@ -32,14 +32,14 @@ export default function App({active=true}:{active?:boolean}){
   useEffect(()=>{if(video.current)video.current.playbackRate=speed;},[speed,url]);
   useEffect(()=>{let request=0,last=performance.now();const tick=(now:number)=>{
     if(playing){
-      const current=video.current?playbackTime(video.current,0):Math.min(length,clock.current+(now-last)/1000*speed);
+      const current=video.current?Math.max(0,playbackTime(video.current,0)-offset):Math.min(length,clock.current+(now-last)/1000*speed);
       clock.current=current;setTime(current);if(current>=length)setPlaying(false);
     }
     last=now;request=requestAnimationFrame(tick);
-  };request=requestAnimationFrame(tick);return()=>cancelAnimationFrame(request);},[playing,speed,length,url]);
+  };request=requestAnimationFrame(tick);return()=>cancelAnimationFrame(request);},[playing,speed,length,url,offset]);
   useEffect(()=>{setEdit(clip?.edits.find(e=>e.frame===index&&e.side===correctionSide)?.degrees??[0,0,0]);},[index,correctionSide,clip]);
-  const seek=(value:number)=>{const t=Math.max(0,Math.min(value,length));clock.current=t;setTime(t);if(video.current)video.current.currentTime=t;};
-  const pause=()=>{if(video.current){video.current.pause();clock.current=video.current.currentTime;setTime(video.current.currentTime);}setPlaying(false);};
+  const seek=(value:number)=>{const t=Math.max(0,Math.min(value,length));clock.current=t;setTime(t);if(video.current)video.current.currentTime=t+offset;};
+  const pause=()=>{if(video.current){video.current.pause();clock.current=Math.max(0,video.current.currentTime-offset);setTime(clock.current);}setPlaying(false);};
   async function toggle(){if(playing){pause();return;}if(time>=length)seek(0);try{if(video.current)await video.current.play();setPlaying(true);}catch(e){setError(`Playback failed: ${e instanceof Error?e.message:e}`);}}
   function selectVideo(selected:File|undefined){
     if(!selected)return;pause();setError('');
@@ -61,7 +61,7 @@ export default function App({active=true}:{active?:boolean}){
     const input=event.target.files?.[0];event.target.value='';if(!input)return;pause();setError('');
     try{if(input.size>100*1024*1024)throw new Error('File exceeds 100 MB.');const motion=importMotion(await input.text());
       if(!file||file.name!==motion.source.name||file.size!==motion.source.size){setFile(null);setUrl('');}
-      setClip(motion);setMirrored(motion.source.mirrored);setDuration(motion.source.duration);setTime(0);clock.current=0;if(video.current)video.current.currentTime=0;
+      setClip(motion);setMirrored(motion.source.mirrored);setDuration(motion.source.duration);setTime(0);clock.current=0;if(video.current)video.current.currentTime=motion.source.timeOffset??0;
     }catch(e){setError(`Import rejected: ${e instanceof Error?e.message:String(e)}`);}
   }
   function saveEdit(){if(!clip)return;pause();setClip({...clip,edits:[...clip.edits.filter(e=>e.frame!==index||e.side!==correctionSide),{frame:index,side:correctionSide,degrees:edit}]});}
@@ -78,7 +78,7 @@ export default function App({active=true}:{active?:boolean}){
         <section className="viewer-panel"><div className="panel-heading"><div><span className="panel-number">01</span><h2>Original video</h2></div><span className="tag">SOURCE</span></div>
           <div className={`video-stage ${url?'has-video':''}`} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();if(!busy)selectVideo(e.dataTransfer.files[0]);}}>
             {url?<div className="video-fit" style={{aspectRatio:clip?`${clip.source.width}/${clip.source.height}`:undefined}}>
-              <video ref={video} src={url} playsInline preload="auto" muted onLoadedMetadata={e=>{const el=e.currentTarget;if(!Number.isFinite(el.duration)||el.duration>120){setError('This prototype accepts clips up to 120 seconds.');setDuration(0);return;}setDuration(el.duration);el.playbackRate=speed;el.parentElement!.style.aspectRatio=`${el.videoWidth}/${el.videoHeight}`;if(clip&&Math.abs(el.duration-clip.source.duration)>0.15){setError('Attached video duration does not match the imported motion. Reprocess this video.');setClip(null);}}} onPlay={()=>setPlaying(true)} onPause={e=>{clock.current=e.currentTarget.currentTime;setTime(e.currentTarget.currentTime);setPlaying(false);}} onEnded={()=>{setPlaying(false);setTime(length);}} onSeeked={e=>{setTime(e.currentTarget.currentTime);clock.current=e.currentTarget.currentTime;}} onError={()=>setError('The browser cannot decode this video. Try H.264 MP4 or VP8/VP9 WebM.')} />
+              <video ref={video} src={url} playsInline preload="auto" muted onLoadedMetadata={e=>{const el=e.currentTarget;if(!Number.isFinite(el.duration)||el.duration>120){setError('This prototype accepts clips up to 120 seconds.');setDuration(0);return;}setDuration(el.duration);el.playbackRate=speed;el.parentElement!.style.aspectRatio=`${el.videoWidth}/${el.videoHeight}`;if(clip&&Math.abs(el.duration-clip.source.duration-offset)>0.15){setError('Attached video duration does not match the imported motion. Reprocess this video.');setClip(null);}}} onPlay={()=>setPlaying(true)} onPause={e=>{clock.current=Math.max(0,e.currentTarget.currentTime-offset);setTime(clock.current);setPlaying(false);}} onEnded={()=>{setPlaying(false);setTime(length);}} onSeeked={e=>{clock.current=Math.max(0,e.currentTarget.currentTime-offset);setTime(clock.current);}} onError={()=>setError('The browser cannot decode this video. Try H.264 MP4 or VP8/VP9 WebM.')} />
               {overlay&&clip&&<Overlay frame={frame} width={clip.source.width} height={clip.source.height} mirrored={clip.source.mirrored}/>}
             </div>:<div className="upload-empty"><div className="upload-illustration"><FileVideo size={31}/><span className="mini-plus">+</span></div><h3>{clip?'Attach the original video':'Start with a signing video'}</h3><p>{clip?`Select “${clip.source.name}” to compare.`:'Drop a video here to reconstruct the movement.'}</p><button className="button primary" onClick={()=>upload.current?.click()}><Upload size={16}/>{clip?'Attach video':'Choose video'}</button><span className="upload-hint">MP4 or WebM · up to 120 s / 250 MB</span></div>}
             {url&&<><div className="stage-label"><span className="status-dot"/>{file?.name}</div><button className="replace-video" disabled={busy} onClick={()=>upload.current?.click()}><Upload size={13}/> Replace</button></>}

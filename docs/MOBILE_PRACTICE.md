@@ -1,5 +1,7 @@
 # Mobile Practice Mode: behavior and verification
 
+> Historical report for mobile PR #4. The live-inference capture and hip-dependent position sections below describe that baseline. Current recording-first behavior, upper-body coordinates and new measurements are documented in [UPPER_BODY_CAPTURE.md](UPPER_BODY_CAPTURE.md). The user has since reported working inference (~6.6 FPS) on iPhone 15 Pro / iOS 27.0.1 / Safari; encoded recording rate was not measured.
+
 This change integrates the detector routing from PR #2 on main after PR #3
 (`2bb8145`), preserving Practice Mode, MotionClip v1, model versions, the
 reconstructor, hand association algorithm, DTW algorithm and Pages deployment.

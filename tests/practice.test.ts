@@ -26,10 +26,10 @@ describe('technical motion comparison (synthetic geometry, not KSL validity)',()
     const a=practiceClip(),b=structuredClone(a);b.frames.forEach((f,i)=>f.timestamp=Math.pow(i/(b.frames.length-1),.65)*2000);
     const r=compare(a,b);expect(value(r,'handshape')).toBeLessThan(1e-5);expect(r.maxWarp).toBeGreaterThan(.1);
   });
-  it('normalizes shoulder/torso proportions, finger lengths, camera translation and rotation',()=>{
+  it('normalizes shoulder scale, finger lengths, camera translation and rotation',()=>{
     const a=practiceClip(),b=structuredClone(a),q=new Quaternion().setFromAxisAngle(new Vector3(0,1,0),.4);
     for(const f of b.frames){
-      for(const p of f.bodyWorld){p.x*=1.3;p.y*=.8;p.z*=1.3;const v=new Vector3(p.x,p.y,p.z).applyQuaternion(q).add(new Vector3(2,-3,4));Object.assign(p,v);}
+      for(const p of f.bodyWorld){p.x*=1.3;p.y*=1.3;p.z*=1.3;const v=new Vector3(p.x,p.y,p.z).applyQuaternion(q).add(new Vector3(2,-3,4));Object.assign(p,v);}
       for(const hand of f.hands){
         // Each phalanx gets its own length; preserve independent measured directions.
         const original=structuredClone(hand.world);
@@ -53,7 +53,7 @@ describe('technical motion comparison (synthetic geometry, not KSL validity)',()
   it('missing and held hands produce uncertainty, never a perfect match or a handshape claim',()=>{
     const a=practiceClip(),b=structuredClone(a);
     for(const f of b.frames){f.hands=[];f.assignment={};f.pose.quality.leftState='held';f.pose.quality.rightState='missing';}
-    const r=compare(a,b);expect(r.metrics.every(m=>m.value===null&&m.coverage===0)).toBe(true);expect(r.feedback.every(f=>f.kind==='tracking')).toBe(true);expect(r.evidence).toBe('limited');
+    const r=compare(a,b);expect(r.metrics.filter(m=>m.component==='handshape'||m.component==='palm').every(m=>m.value===null&&m.coverage===0)).toBe(true);expect(value(r,'position')).toBe(0);expect(r.feedback.every(f=>f.kind==='tracking')).toBe(true);expect(r.evidence).toBe('limited');
   });
   it('an incomplete gesture retains mismatching endpoints and geometric residuals',()=>{
     const a=practiceClip(),b=practiceClip({endPhase:.4}),r=compare(a,b);
