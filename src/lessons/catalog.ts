@@ -19,7 +19,7 @@ export function readProgress():ProgressRecord{
     for(const [key,value] of Object.entries(data)){
       if(!value||typeof value!=='object'||Array.isArray(value))continue;
       const x=value as Record<string,unknown>;
-      if(typeof x.viewed!=='boolean'||!Number.isInteger(x.attempts)||typeof x.attempts!=='number'||x.attempts<0||x.attempts>100000)continue;
+      if(typeof x.viewed!=='boolean'||typeof x.attempts!=='number'||!Number.isInteger(x.attempts)||x.attempts<0||x.attempts>100000)continue;
       record[key]={viewed:x.viewed,attempts:x.attempts,...(typeof x.lastAttempt==='string'?{lastAttempt:x.lastAttempt}:{}),
         ...((x.lastEvidence==='sufficient'||x.lastEvidence==='limited')?{lastEvidence:x.lastEvidence}:{})};
     }
