@@ -7,7 +7,7 @@ import { BOX_DAYS, dueExpressions, nextReviewDate, relativeDay, scheduleReview }
 import { seededRng } from '../src/learn/rng';
 import {
   applySession, buildLessonSession, buildReviewSession, completeStep, currentStep, expressionOutcomes, gradeAnswer, isFinished,
-  isGraded, MAX_STEPS, MIN_STEPS, pickOptions, recordAnswer, requeueWrong, sessionProgress, sessionSummary, skipCamera, startSession, type Step,
+  isGraded, MAX_STEPS, MIN_STEPS, pickOptions, recordAnswer, requeueWrong, rotate, sessionProgress, sessionSummary, skipCamera, startSession, type Step,
 } from '../src/learn/session';
 import { koreanStems, similarExpressions } from '../src/learn/similarity';
 import { emptyStore, LEARN_KEY, parseLearnStore, readLearnStore, saveLearnStore } from '../src/learn/storage';
@@ -135,15 +135,15 @@ describe('lesson sessions', () => {
     let state = startSession(plan, 0);
     state = completeStep(state, currentStep(state)!.id);
     const question = currentStep(state)!; expect(isGraded(question)).toBe(true);
-    state = recordAnswer(state, question.id, false, seededRng(1));
+    state = recordAnswer(state, question.id, false);
     expect(sessionProgress(state).done).toBe(1); expect(state.queue.at(-1)).toBe(question.id);
-    expect(state.order[question.id]?.slice().sort()).toEqual((question as { options: string[] }).options.slice().sort());
+    expect(state.order[question.id]).toEqual(rotate((question as { options: string[] }).options));
     while (state.queue[0] !== question.id) {
       const step = currentStep(state)!;
-      state = isGraded(step) ? recordAnswer(state, step.id, true, seededRng(2)) : completeStep(state, step.id);
+      state = isGraded(step) ? recordAnswer(state, step.id, true) : completeStep(state, step.id);
     }
     const before = sessionProgress(state).done;
-    state = recordAnswer(state, question.id, true, seededRng(3));
+    state = recordAnswer(state, question.id, true);
     expect(sessionProgress(state).done).toBe(before + 1); expect(isFinished(state)).toBe(true);
     expect(state.firstTry[question.id]).toBe(false);
     expect(sessionSummary(state, 192_000)).toMatchObject({ firstTryCorrect: plan.steps.filter(isGraded).length - 1, durationMs: 192_000, newExpressions: 2 });
@@ -207,7 +207,7 @@ describe('Leitner review schedule', () => {
       const step = currentStep(state)!;
       if (!isGraded(step)) { state = completeStep(state, step.id); continue; }
       const wrong: boolean = !missed && step.target === catalog.expressions[1].id; missed ||= wrong;
-      state = recordAnswer(state, step.id, !wrong, seededRng(1));
+      state = recordAnswer(state, step.id, !wrong);
     }
     const store = applySession(emptyStore(), state, catalog, NOW);
     expect(store.nodes['lesson:x']).toEqual({ completedAt: NOW.toISOString(), runs: 1 });

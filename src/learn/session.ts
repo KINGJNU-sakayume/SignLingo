@@ -30,7 +30,7 @@ export type SessionState = {
   plan: Plan; queue: string[]; completed: string[];
   /** First answer to each graded step; requeued retries never overwrite it. */
   firstTry: Record<string, boolean>; mistakes: number;
-  /** Option order per step. Reshuffled when a missed question returns. */
+  /** Option order per step. Rotated by one place when a missed question returns, so the answer moves. */
   order: Record<string, string[]>;
   cameraSkipped: boolean; cameraResults: CameraResult[]; startedAt: number;
 };
@@ -142,13 +142,14 @@ export function startSession(plan: Plan, now = Date.now()): SessionState {
 export function currentStep(state: SessionState): Step | null {
   return state.plan.steps.find(step => step.id === state.queue[0]) ?? null;
 }
+export const rotate = <T>(items: readonly T[]): T[] => items.length > 1 ? [...items.slice(1), items[0]] : [...items];
 /** Records an answer after the learner continues past the feedback sheet. */
-export function recordAnswer(state: SessionState, stepId: string, correct: boolean, rng: Rng): SessionState {
+export function recordAnswer(state: SessionState, stepId: string, correct: boolean): SessionState {
   const step = state.plan.steps.find(s => s.id === stepId);
   if (!step || state.queue[0] !== stepId) return state;
   const firstTry = stepId in state.firstTry ? state.firstTry : { ...state.firstTry, [stepId]: correct };
   if (correct) return { ...state, firstTry, queue: state.queue.slice(1), completed: [...state.completed, stepId] };
-  const order = state.order[stepId] ? { ...state.order, [stepId]: shuffle(state.order[stepId], rng) } : state.order;
+  const order = state.order[stepId] ? { ...state.order, [stepId]: rotate(state.order[stepId]) } : state.order;
   return { ...state, firstTry, order, mistakes: state.mistakes + 1, queue: requeueWrong(state.queue, stepId) };
 }
 export function completeStep(state: SessionState, stepId: string, camera?: Omit<CameraResult, 'stepId'>): SessionState {

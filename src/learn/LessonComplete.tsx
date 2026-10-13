@@ -34,7 +34,7 @@ export function LessonComplete({ kind, summary, onContinue }: { kind: 'lesson' |
       <div className="lc-hero"><Confetti /><Mascot mood="cheer" size={150} /></div>
       <h1 id="lc-title">{kind === 'lesson' ? '레슨 완료!' : '복습 완료!'}</h1>
       <p className="lc-sub">{kind === 'lesson' ? '새 표현을 경로에 담았어요.' : '다음 복습 날짜를 다시 정했어요.'}</p>
-      <ul className="lc-cards">{cards.map(card => <li key={card.label} className={`lc-card is-${card.tone}`}><span>{card.label}</span><strong>{card.value}</strong></li>)}</ul>
+      <ul className={`lc-cards${cards.length === 4 ? ' is-four' : ''}`}>{cards.map(card => <li key={card.label} className={`lc-card is-${card.tone}`}><span>{card.label}</span><strong>{card.value}</strong></li>)}</ul>
     </div>
     <footer className="lc-footer"><div className="lc-footer-inner"><ChunkyButton ref={button} block onClick={onContinue}>계속</ChunkyButton></div></footer>
   </main>;

@@ -91,7 +91,7 @@ export function LessonPlayer({ session, catalog, clips, sound, cameraReturn, onS
   function proceed() {
     if (!step) return;
     if (camera) { onSession(completeStep(session, step.id, { evidence: camera.evidence, feedback: camera.feedback })); onCameraAcknowledged(); return; }
-    if (checked) { onSession(recordAnswer(session, checked.stepId, checked.correct, Math.random)); return; }
+    if (checked) { onSession(recordAnswer(session, checked.stepId, checked.correct)); return; }
     if (step.kind === 'intro') { onViewed(step.target); onSession(completeStep(session, step.id)); }
   }
   function replayAnswer() {

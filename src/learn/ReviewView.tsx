@@ -45,8 +45,8 @@ export function RightRail(props: Omit<Props, 'onOpen'>) {
     <section className="rail-card" aria-labelledby="rail-due"><h2 id="rail-due">오늘 복습할 표현</h2><DueSummary {...props} compact /></section>
     <section className="rail-card" aria-labelledby="rail-guide"><h2 id="rail-guide">학습 안내</h2>
       <ul className="rail-notes">
-        <li>한국수어는 한국어와 다른 고유한 언어예요. 표정도 의미를 바꿔요.</li>
-        <li>표현 이름은 한국어 대응 표현이에요. 출처와 검수 정보는 각 단원의 가이드북에 있어요.</li>
+        <li>한국수어는 고유한 언어예요. 표정도 뜻을 바꿔요.</li>
+        <li>출처와 검수 정보는 단원 가이드북에 있어요.</li>
         <li>학습 기록은 이 브라우저에만 저장돼요.</li>
       </ul>
       <a href="https://sldict.korean.go.kr/" target="_blank" rel="noreferrer">국립국어원 한국수어사전 <ExternalLink size={15} strokeWidth={2.5} aria-hidden="true" /></a>

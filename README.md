@@ -102,4 +102,6 @@ Read [the upper-body and capture report](docs/UPPER_BODY_CAPTURE.md) for hip-ind
 
 Learning Mode now starts from `public/content/manifest.json`. Approved expressions load their reviewed MotionClip automatically and continue into the existing Practice Mode. Current release: **10 researched candidates, 0 published expressions**; rights and expert reviews are still required. Upcoming courses are not playable.
 
+**학습하기** is a Duolingo-style learning path: units of 3–5 minute lessons, one question per screen, a feedback sheet, a completion screen and Leitner review. Recognition questions are graded; camera imitation only shows observed differences and is never graded. Streaks, XP, hearts and leagues are intentionally absent. Run `npm run dev` and open `/?demo=1` to try the flow with development-only synthetic demo motions (never bundled into production builds). See [the learning design](docs/LEARNING_DESIGN.md) for tokens, screens, grading principles, the demo mode and what was left out.
+
 See [source and rights research](docs/KSL_CONTENT_RESEARCH.md) and [content preparation, review and publishing](docs/CONTENT_PUBLISHING.md). `npm run content:validate` checks rights, separate reviews, evidence documents, asset integrity and published-version compatibility; production builds run it automatically. Motion Lab and its local inspection flow remain available.

@@ -14,12 +14,12 @@ export function Guidebook({ unit, onBack, onOpen }: Props) {
       <h1 id="gb-title">{unit.title}</h1>
       <p>{unit.description}</p>
     </header>
-    <p className="gb-note">표현 이름은 한국수어에 대응하는 <strong>한국어 대응 표현</strong>이에요. 한국어 단어와 수어가 언제나 일대일로 맞지는 않아요.</p>
+    <p className="gb-note">표현 이름은 수어의 뜻을 옮긴 <strong>한국어 대응 표현</strong>이에요. 단어와 수어가 늘 일대일로 맞지는 않아요.</p>
     {unit.expressions.length ? <section aria-labelledby="gb-list">
       <h2 id="gb-list">이 단원의 표현</h2>
       <ul className="gb-list">{unit.expressions.map(entry => <li key={entry.id}>
         <button type="button" className="gb-item" onClick={() => onOpen(entry.id)}>
-          <span><strong>{entry.displayName}</strong><small>{entry.meaning}</small></span>
+          <span><strong>{entry.displayName}</strong><small>{entry.meaning}</small><small className="gb-source">출처: {entry.source.owner}</small></span>
           <ChevronRight size={24} strokeWidth={2.5} aria-hidden="true" />
         </button>
       </li>)}</ul>

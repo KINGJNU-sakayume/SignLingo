@@ -47,7 +47,8 @@ function Popover({ unit, node, id, onStart }: { unit: UnitModel; node: PathNodeM
 export function PathView({ path, catalog, celebrate, onStart, onGuidebook }: Props) {
   const [open, setOpen] = useState<string | null>(null);
   const currentRef = useRef<HTMLButtonElement>(null), root = useRef<HTMLDivElement>(null);
-  const toCurrent = (behavior: ScrollBehavior) => currentRef.current?.scrollIntoView({ block: 'center', behavior });
+  const toCurrent = (behavior: ScrollBehavior) => currentRef.current?.scrollIntoView({ block: 'center',
+    behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : behavior });
   useEffect(() => { if (path.current) toCurrent('auto'); }, [path.current?.id]);
   useEffect(() => {
     if (!open) return;
