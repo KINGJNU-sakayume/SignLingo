@@ -9,7 +9,7 @@ describe('per-component mobile evidence',()=>{
   it('retains handshape and an explicit shoulder frame with missing hips',()=>{
     const clip=cropped(),f=frameFeature(clip.frames[0],0),d=inspectTracking(clip.frames[0]);
     expect(f.hands.left?.shape).toHaveLength(15);expect(f.hands.left?.basis).toBe('upper-body');expect(f.hands.left?.palm).toBeDefined();expect(f.hands.left?.position).toBeDefined();expect(f.hands.left?.face).toBeDefined();
-    expect(d).toMatchObject({body:'upper body tracked (hips optional)',left:'tracked',right:'tracked',coverage:1});expect(d.reasons).toEqual([]);expect(()=>assertTracking(clip.frames)).not.toThrow();
+    expect(d).toMatchObject({body:'상체 추적 중 (골반 불필요)',left:'정상 추적',right:'정상 추적',coverage:1});expect(d.reasons).toEqual([]);expect(()=>assertTracking(clip.frames)).not.toThrow();
   });
   it('compares hip-visible references against cropped learners in the same frame',()=>{
     const result=compareMotion(practiceClip(),cropped());expect(result.metrics.filter(m=>m.component==='handshape').every(m=>m.value!==null)).toBe(true);
@@ -37,7 +37,7 @@ describe('per-component mobile evidence',()=>{
     expect(inspectTracking(clip.frames[10]).coverage).toBe(.5);
   });
   it('rejects zero and very low component coverage without calling it a successful attempt',()=>{
-    const clip=practiceClip();clip.frames.forEach(f=>{f.hands=[];f.assignment={};f.body=[];f.bodyWorld=[];});expect(()=>assertTracking(clip.frames)).toThrow('Inference succeeded');
+    const clip=practiceClip();clip.frames.forEach(f=>{f.hands=[];f.assignment={};f.body=[];f.bodyWorld=[];});expect(()=>assertTracking(clip.frames)).toThrow('AI 분석은 완료되었지만');
     clip.frames.splice(0,3,...practiceClip().frames.slice(0,3));expect(()=>assertTracking(clip.frames)).toThrow('20%');
     expect(inspectTracking(clip.frames[10]).coverage).toBe(0);
   });
