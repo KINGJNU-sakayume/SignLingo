@@ -33,7 +33,7 @@ test('30 Hz analysis of 15 FPS encoded video does not invent duplicate evidence'
 test('VFR gaps retain their timestamps instead of fabricating missing handshapes',async({page,context})=>{
   await worker(context);await open(page);await page.getByLabel('휴대폰으로 녹화하거나 영상 선택',{exact:true}).setInputFiles({name:'irregular.mp4',mimeType:'video/mp4',buffer:irregularVideo});
   await expect(page.getByRole('heading',{name:'항목별 움직임 차이',exact:true})).toBeVisible();expect(await observationCount(page)).toBe(48);
-  await expect(quality(page)).toContainText(/Duplicate \/ unconfirmed timestamp \/ irregular interval: 12 \/ 0 \/ 1/);
+  await expect(quality(page)).toContainText(/중복 \/ 시각 미확인 \/ 불규칙 간격: 12 \/ 0 \/ 1/);
 });
 test('Android user-agent keeps worker extraction and offers independent 15 Hz sampling',async({page,context})=>{
   await page.addInitScript(()=>Object.defineProperty(navigator,'userAgent',{value:'Mozilla/5.0 (Linux; Android 15; Pixel 9) Chrome/130 Mobile Safari/537.36'}));
