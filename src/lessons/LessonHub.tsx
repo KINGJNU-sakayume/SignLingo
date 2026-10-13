@@ -20,7 +20,7 @@ export function LessonHub({reference,progress,onReference,onViewed,onPractice}:P
   const url=useMemo(()=>videoFile?URL.createObjectURL(videoFile):'', [videoFile]);
   useEffect(()=>()=>{if(url)URL.revokeObjectURL(url);},[url]);
   useEffect(()=>{setPlaying(false);setTime(0);setVideoFile(null);},[reference]);
-  const duration=reference?.frames.at(-1)?.timestamp/1000??0;
+  const duration=(reference?.frames.at(-1)?.timestamp??0)/1000;
   const pose=useMemo(()=>reference?samplePose(reference,time):null,[reference,time]);
   const completed=(progress.viewed?1:0)+(progress.attempts>0?1:0);
   const seek=(value:number)=>{
