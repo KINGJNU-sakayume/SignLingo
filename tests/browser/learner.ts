@@ -20,7 +20,15 @@ export class Learner {
     const bar = this.page.getByRole('progressbar', { name: /진행도/ });
     return { done: Number(await bar.getAttribute('aria-valuenow')), total: Number(await bar.getAttribute('aria-valuemax')) };
   }
-  kind() { return this.page.locator('.lp').getAttribute('data-step-kind'); }
+  /**
+   * The current step kind, or null once the completion screen shows. Waits for one of the two:
+   * between the last answer and the completion screen the player renders without a step.
+   */
+  async kind() {
+    await this.page.locator('.lc, .lp[data-step-kind]').first().waitFor();
+    if (await this.page.locator('.lc').count()) return null;
+    return this.page.locator('.lp[data-step-kind]').getAttribute('data-step-kind');
+  }
   async answer() {
     const page = this.page, kind = await this.kind(), choices = page.locator('.lp-choices [data-choice]');
     const { done, total } = await this.progress();
@@ -53,22 +61,21 @@ export class Learner {
     } else {
       await page.getByRole('button', { name: '계속', exact: true }).click();
       // The last correct answer ends the lesson and replaces the player with the completion screen.
-      if (done + 1 < total) expect((await this.progress()).done).toBe(done + 1);
+      if (await this.kind() !== null) expect((await this.progress()).done).toBe(done + 1);
     }
   }
   /** Plays until the given step kind or the end of the lesson. */
   async until(stop: string | null, onCamera?: () => Promise<void>) {
     for (let guard = 0; guard < 40; guard++) {
-      if (await this.page.locator('.lc').count()) return;
       const kind = await this.kind();
-      if (kind === stop) return;
+      if (kind === null || kind === stop) return;
       await this.onStep?.(kind!);
       if (kind === 'intro') await this.page.getByRole('button', { name: '계속', exact: true }).click();
       else if (kind === 'camera') {
         if (onCamera) { await onCamera(); continue; }
         const before = await this.progress();
         await this.page.getByRole('button', { name: '지금은 카메라를 쓸 수 없어요' }).click();
-        await expect.poll(async () => (await this.progress()).total).toBe(before.total - 1);
+        if (await this.kind() !== null) await expect.poll(async () => (await this.progress()).total).toBe(before.total - 1);
       } else await this.answer();
     }
     throw new Error('Lesson did not finish');
