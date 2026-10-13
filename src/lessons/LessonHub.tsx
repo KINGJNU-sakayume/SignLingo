@@ -1,107 +1,54 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { Avatar } from '../components/Avatar';
-import { samplePose } from '../motion/player';
-import { importMotion } from '../motion/serialization';
+import { useEffect, useState } from 'react';
 import type { MotionClip } from '../motion/types';
-import { LESSONS, type LessonProgress } from './catalog';
+import { assetUrl } from '../content/assets';
+import { isPublished, parseCatalog } from '../content/validation';
+import type { Catalog, Expression } from '../content/schema';
+import { progressKey, type ProgressRecord } from './catalog';
+import { LessonDetail } from './LessonDetail';
 import './lessons.css';
 
-type Props={
-  reference:MotionClip|null;
-  progress:LessonProgress;
-  onReference:(clip:MotionClip)=>void;
-  onViewed:()=>void;
-  onPractice:()=>void;
-};
-export function LessonHub({reference,progress,onReference,onViewed,onPractice}:Props){
-  const [time,setTime]=useState(0),[playing,setPlaying]=useState(false),[error,setError]=useState('');
-  const [videoFile,setVideoFile]=useState<File|null>(null);
-  const video=useRef<HTMLVideoElement>(null);
-  const url=useMemo(()=>videoFile?URL.createObjectURL(videoFile):'', [videoFile]);
-  useEffect(()=>()=>{if(url)URL.revokeObjectURL(url);},[url]);
-  useEffect(()=>{setPlaying(false);setTime(0);setVideoFile(null);},[reference]);
-  const duration=(reference?.frames.at(-1)?.timestamp??0)/1000;
-  const pose=useMemo(()=>reference?samplePose(reference,time):null,[reference,time]);
-  const completed=(progress.viewed?1:0)+(progress.attempts>0?1:0);
-  const seek=(value:number)=>{
-    const target=Math.max(0,Math.min(duration,value));
-    setTime(target);
-    if(video.current&&reference&&video.current.readyState>=1)video.current.currentTime=target+(reference.source.timeOffset??0);
-  };
-  useEffect(()=>{
-    if(!playing||!reference)return;
-    const started=performance.now(),initial=time;
-    const handle=window.setInterval(()=>{
-      const sourceTime=video.current&&video.current.readyState>=1
-        ?video.current.currentTime-(reference.source.timeOffset??0)
-        :initial+(performance.now()-started)/1000;
-      const next=Math.max(0,Math.min(duration,sourceTime));setTime(next);
-      if(next>=duration){setPlaying(false);video.current?.pause();}
-    },50);
-    return()=>window.clearInterval(handle);
-  },[playing,reference,duration]);
-  const toggle=async()=>{
-    if(!reference)return;
-    if(playing){video.current?.pause();setPlaying(false);return;}
-    if(time>=duration)seek(0);
-    try{if(url&&video.current)await video.current.play();setPlaying(true);}
-    catch{setError('원본 영상을 재생할 수 없습니다. 원본 영상 연결을 해제하고 3D 동작을 확인해 주세요.');}
-  };
-  async function loadMotion(e:ChangeEvent<HTMLInputElement>){
-    const file=e.target.files?.[0];e.target.value='';if(!file)return;
-    try{
-      if(file.size>100*1024*1024)throw new Error('100MB 이하의 동작 JSON을 선택하세요.');
-      const clip=importMotion(await file.text());
-      if(clip.frames.length<3)throw new Error('학습용 동작에는 최소 3개 프레임이 필요합니다.');
-      setError('');onReference(clip);
-    }catch(e){setError('동작 JSON을 불러오지 못했습니다: '+(e instanceof Error?e.message:String(e)));}
-  }
-  function loadVideo(e:ChangeEvent<HTMLInputElement>){
-    const file=e.target.files?.[0];e.target.value='';if(!file||!reference)return;
-    if(file.name!==reference.source.name||file.size!==reference.source.size){
-      setError('원본 영상의 이름과 파일 크기가 연결된 동작 JSON과 다릅니다.');
-      return;
-    }
-    setError('');setVideoFile(file);setPlaying(false);setTime(0);
-  }
+type Props = { progress: ProgressRecord; selected: string | null; onSelect: (id: string | null) => void;
+  onViewed: (entry: Expression) => void; onPractice: (entry: Expression, clip: MotionClip) => void };
+
+export function LessonHub({ progress, selected, onSelect, onViewed, onPractice }: Props) {
+  const [catalog, setCatalog] = useState<Catalog | null>(null), [error, setError] = useState(''), [retry, setRetry] = useState(0);
+  const [reviewOnly, setReviewOnly] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController(); setError('');
+    fetch(assetUrl('content/manifest.json'), { signal: controller.signal }).then(async response => {
+      if (!response.ok) throw new Error();
+      const parsed = parseCatalog(await response.json());
+      if (parsed.expressions.some(entry => !isPublished(entry))) throw new Error();
+      if (!controller.signal.aborted) setCatalog(parsed);
+    }).catch(() => { if (!controller.signal.aborted) setError('학습 목록을 불러오지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.'); });
+    return () => controller.abort();
+  }, [retry]);
+  const entry = catalog?.expressions.find(item => item.id === selected);
+  const studied = catalog?.expressions.filter(item => progress[progressKey(item)]?.viewed || progress[progressKey(item)]?.attempts) ?? [];
+  const recent = [...studied].filter(item => progress[progressKey(item)]?.lastAttempt).sort((a, b) =>
+    (progress[progressKey(b)].lastAttempt ?? '').localeCompare(progress[progressKey(a)].lastAttempt ?? '')).slice(0, 5);
   return <main className="lesson-hub" lang="ko">
     <p className="eyebrow">SIGNLINGO / 한국수어 학습</p>
     <h1>수어를 보고, 따라 하고, 복습하세요.</h1>
-    <p className="lesson-intro">학습 과정의 첫 번째 버전입니다. 검증된 동작 자료를 연결해 시범부터 연습까지 진행할 수 있습니다.</p>
-    <div className="lesson-layout">
-      <aside className="lesson-courses" aria-label="학습 과정">
-        <h2>학습 과정</h2>
-        {LESSONS.map((item,i)=><button key={item.id} className={'lesson-course '+(i===0?'active':'')} disabled={item.status==='planned'} aria-current={i===0?'step':undefined}>
-          <span className="lesson-meta">{item.unit} · {String(i+1).padStart(2,'0')}</span>
-          <strong>{item.title}</strong><small>{item.status==='planned'?'준비 중':reference?'연습 자료 연결됨':'검증된 자료 연결 필요'}</small>
-        </button>)}
-        <div className="lesson-progressbar" role="progressbar" aria-label="첫 레슨 진행도" aria-valuemin={0} aria-valuemax={2} aria-valuenow={completed}><span style={{width:(completed/2*100)+'%'}}/></div>
-        <p className="lesson-note">첫 레슨 학습 흐름 {completed}/2단계 · 수어 정답률이 아닙니다.</p>
-      </aside>
-      <section className="lesson-workspace" aria-labelledby="lesson-title">
-        <span className="lesson-meta">첫걸음 · 레슨 01</span>
-        <h2 id="lesson-title">나의 첫 수어 표현</h2>
-        <p className="lesson-lead">관찰 → 따라 하기 → 결과 검토 순으로 진행합니다. 현재 저장소에는 전문가가 검증한 한국수어 정답 영상이 포함되지 않았습니다.</p>
-        <div className="lesson-steps"><span className={reference?'done':''}>1. 기준 동작 연결</span><span className={progress.viewed?'done':''}>2. 시범 관찰</span><span className={progress.attempts>0?'done':''}>3. 직접 연습</span></div>
-        <label className="lesson-file">기준 동작 JSON 연결
-          <input type="file" accept="application/json,.json" aria-label="레슨 기준 동작 JSON" onChange={e=>void loadMotion(e)}/>
-          <span className="lesson-note">동작 복원 화면에서 추출한 MotionClip JSON을 선택하세요. 파일은 서버에 업로드되지 않으며 현재 페이지에만 보관됩니다.</span>
-        </label>
-        {error&&<p className="lesson-error" role="alert">{error}</p>}
-        {reference?<><p className="lesson-progress-note">연결된 자료: {reference.source.name} · {reference.frames.length}프레임. 이 파일을 불러왔다고 언어적으로 올바른 한국수어가 인증되는 것은 아닙니다.</p>
-          <label className="lesson-file">일치하는 원본 수어 영상 연결 (선택)
-            <input type="file" accept="video/*" aria-label="레슨 원본 영상" onChange={loadVideo}/>
-          </label>
-          <div className="lesson-reference">
-            <section><h3>3D 동작 시범</h3><div className="practice-avatar"><Avatar pose={pose} skeleton={false} markers={false} preset="front"/></div></section>
-            <section><h3>원본 수어 영상</h3>{url?<video ref={video} src={url} muted playsInline preload="metadata" onEnded={()=>setPlaying(false)} onError={()=>setError('원본 영상을 읽을 수 없습니다. 다른 형식의 영상을 선택해 주세요.')}/>:<div className="lesson-empty">원본 영상을 연결하면 3D 시범과 나란히 비교할 수 있습니다. 연결하지 않아도 3D 동작은 확인할 수 있습니다.</div>}</section>
-          </div>
-          <div className="lesson-slider"><button className="button secondary" type="button" onClick={()=>void toggle()}>{playing?'일시정지':'시범 재생'}</button><input type="range" min={0} max={duration||1} step=".01" value={time} aria-label="시범 재생 위치" onChange={e=>seek(Number(e.target.value))}/><span>{time.toFixed(1)} / {duration.toFixed(1)}초</span></div>
-          <div className="lesson-actions"><button className="button secondary" type="button" onClick={onViewed}>{progress.viewed?'시범 관찰 기록됨':'시범 확인 완료'}</button><button className="button primary" type="button" onClick={onPractice}>카메라로 따라 하기 →</button></div>
-          <p className="lesson-progress-note">{progress.attempts>0? `이 레슨에서 ${progress.attempts}회 연습 결과를 검토했습니다. ${progress.lastEvidence==='limited'?'추적 정보가 부족한 부분도 있었습니다.':'관찰 가능한 동작 차이를 확인했습니다.'}`:'아직 이 레슨에 연결된 연습 기록이 없습니다.'}</p>
-        </>:<div className="lesson-empty">학습 자료를 연결하면 이곳에 3D 시범과 반복 재생, 웹캠 연습 버튼이 표시됩니다. 허위 수어 동작이나 임의의 정답 애니메이션은 제공하지 않습니다.</div>}
-        <p className="lesson-footer-note">학습 단계 완료는 시범 관찰과 연습 수행 기록입니다. 수어를 정확하게 표현했다는 판정이 아닙니다. 학습 진도는 이 브라우저에만 저장되고, 원본 영상과 동작 JSON은 저장되지 않습니다.</p>
-      </section>
-    </div>
+    <p className="lesson-intro">한국수어는 고유한 문법을 가진 언어입니다. 시범을 관찰하고 움직임을 반복해서 익혀 보세요.</p>
+    {error ? <div role="alert" className="lesson-error">{error} <button className="button secondary" onClick={() => setRetry(value => value + 1)}>다시 시도</button></div> : !catalog ? <p role="status">학습 목록을 불러오는 중입니다…</p> : <>
+      <div className="lesson-actions"><button className="button secondary" aria-pressed={!reviewOnly} onClick={() => { setReviewOnly(false); onSelect(null); }}>전체 학습 과정</button><button className="button secondary" aria-pressed={reviewOnly} onClick={() => { setReviewOnly(true); onSelect(null); }}>복습하기 · {studied.length}개</button></div>
+      {entry ? <LessonDetail key={entry.id} entry={entry} progress={progress} onBack={() => onSelect(null)} onViewed={() => onViewed(entry)} onPractice={clip => onPractice(entry, clip)} /> : <>
+        <section className="lesson-summary" aria-label="내 학습 기록"><p>학습 가능한 표현 <strong>{catalog.expressions.length}개</strong> · 관찰하거나 연습한 표현 <strong>{studied.length}개</strong></p><p className="lesson-note">기록은 이 브라우저에 저장됩니다. 학습 단계는 수어 정답률이 아닙니다.</p></section>
+        {reviewOnly ? <section className="lesson-workspace"><h2>다시 살펴볼 표현</h2>{studied.length ? studied.map(item => <ExpressionButton key={item.id} entry={item} onSelect={onSelect} />) : <p className="lesson-empty">시범을 관찰하거나 연습한 표현이 여기에 나타납니다.</p>}</section> : <section aria-label="초급 학습 과정" className="lesson-path">
+          {catalog.lessons.slice().sort((a, b) => a.order - b.order).map((lesson, i) => {
+            const available = catalog.expressions.filter(item => item.lessonId === lesson.id).sort((a, b) => a.order - b.order);
+            return <article className="lesson-workspace" key={lesson.id}><span className="lesson-meta">{String(i + 1).padStart(2, '0')} · {lesson.category}</span><h2>{lesson.title}</h2><p className="lesson-lead">{lesson.description}</p>
+              {available.length ? available.map(item => <ExpressionButton key={item.id} entry={item} onSelect={onSelect} />) : <><button className="lesson-course" disabled>준비 중 · 아직 시작할 수 없습니다</button><p className="lesson-note">이용 허락과 한국수어·3D 동작 검수를 마친 표현부터 공개합니다.</p></>}
+            </article>;
+          })}
+        </section>}
+        {!catalog.expressions.length && <p className="lesson-empty">현재 공개된 3D 레슨이 없습니다. 원본 영상과 전문가 검수를 준비하고 있습니다. <a href="https://sldict.korean.go.kr/" target="_blank" rel="noreferrer">국립국어원 한국수어사전 방문 ↗</a></p>}
+        <section className="lesson-workspace"><h2>최근 연습한 표현</h2>{recent.length ? recent.map(item => <ExpressionButton key={item.id} entry={item} onSelect={onSelect} />) : <p className="lesson-note">아직 연습 기록이 없습니다.</p>}</section>
+      </>}
+    </>}
   </main>;
+}
+function ExpressionButton({ entry, onSelect }: { entry: Expression; onSelect: (id: string) => void }) {
+  return <button className="lesson-course" onClick={() => onSelect(entry.id)}><strong>{entry.displayName}</strong><small>시범 보기 · 직접 연습하기 →</small></button>;
 }

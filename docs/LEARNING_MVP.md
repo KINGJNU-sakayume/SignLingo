@@ -1,3 +1,5 @@
+> Phase 4 historical implementation notes. The current learner flow and publishing procedure are documented in [CONTENT_PUBLISHING.md](CONTENT_PUBLISHING.md). The upload-based flow below is retained for local operator inspection.
+
 # SignLingo 학습 MVP — 첫 번째 레슨 흐름
 
 첫 버전의 학습 시스템은 기존 Motion Lab과 Practice Mode를 재사용하는 수직적인 기능 검증입니다.

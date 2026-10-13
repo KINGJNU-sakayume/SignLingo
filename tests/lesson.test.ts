@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import { LESSONS, PROGRESS_KEY, readProgress, saveProgress } from '../src/lessons/catalog';
+import { LESSONS, PROGRESS_KEY, readProgress, saveProgress, progressKey, recordPractice } from '../src/lessons/catalog';
+import { approvedFixture } from './content-fixtures';
 
 afterEach(()=>vi.unstubAllGlobals());
 function storage(){
@@ -26,5 +27,19 @@ describe('guided lesson progress',()=>{
     expect(readProgress()).toEqual({});
     data.set(PROGRESS_KEY,JSON.stringify({ok:{viewed:false,attempts:1},bad:{viewed:'no',attempts:-3}}));
     expect(readProgress()).toEqual({ok:{viewed:false,attempts:1}});
+  });
+  it('preserves legacy records and stores bounded feedback history separately for each content revision',async()=>{
+    storage(); const {entry}=await approvedFixture();
+    let progress={viewed:true,attempts:0};
+    for(let i=0;i<25;i++)progress=recordPractice(progress,'limited',['손 추적 정보를 확인해 주세요.']);
+    saveProgress({'first-expression':{viewed:true,attempts:2},[progressKey(entry)]:progress});
+    const restored=readProgress(); expect(restored['first-expression'].attempts).toBe(2);
+    expect(restored[progressKey(entry)].history).toHaveLength(20);
+    expect(restored[progressKey(entry)].attempts).toBe(25);
+    expect(restored[progressKey({...entry,revision:2})]).toBeUndefined();
+  });
+  it('continues working when browser storage is blocked',()=>{
+    vi.stubGlobal('window',{localStorage:{getItem:()=>{throw new Error('blocked');},setItem:()=>{throw new Error('full');}}});
+    expect(readProgress()).toEqual({});expect(()=>saveProgress({})).not.toThrow();
   });
 });

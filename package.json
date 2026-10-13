@@ -7,10 +7,12 @@
     "dev": "vite --host 0.0.0.0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "build": "tsc --noEmit && vite build",
+    "build": "npm run content:validate && tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test:browser": "playwright test",
-    "evaluate": "node scripts/evaluate.mjs"
+    "evaluate": "node scripts/evaluate.mjs",
+    "content": "node scripts/content.mjs",
+    "content:validate": "node scripts/content.mjs validate"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "1.1.0",

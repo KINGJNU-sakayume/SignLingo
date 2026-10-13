@@ -15,7 +15,7 @@ test('actual MediaPipe inference on uploaded video and video-clock synchronizati
     await route.fulfill({body:await readFile(join('node_modules/@mediapipe/tasks-vision/wasm',name)),contentType:name.endsWith('.wasm')?'application/wasm':'text/javascript',headers:{'Access-Control-Allow-Origin':'*'}});
   });
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto('/');await page.locator('input[accept="video/mp4,video/webm,.mp4,.webm"]').setInputFiles(process.env.VISION_TEST_VIDEO!);
+  await page.goto('/');await page.getByRole('button',{name:'동작 복원',exact:true}).click();await page.locator('input[accept="video/mp4,video/webm,.mp4,.webm"]').setInputFiles(process.env.VISION_TEST_VIDEO!);
   if(process.env.VISION_MIRRORED==='1')await page.getByLabel('원본 영상 좌우 반전').check();
   await page.getByLabel('프레임 추출 빈도').selectOption('15');
   await expect(page.getByRole('button',{name:'동작 추출 및 복원'})).toBeEnabled();
@@ -42,7 +42,7 @@ test('actual MediaPipe inference on uploaded video and video-clock synchronizati
 test('cancellation during model initialization releases the UI',async({page,context})=>{
   test.skip(!process.env.VISION_TEST_VIDEO,'Opt-in local video fixture required.');
   await context.route('https://cdn.jsdelivr.net/**',()=>new Promise(()=>{}));
-  await page.goto('/');await page.locator('input[accept="video/mp4,video/webm,.mp4,.webm"]').setInputFiles(process.env.VISION_TEST_VIDEO!);
+  await page.goto('/');await page.getByRole('button',{name:'동작 복원',exact:true}).click();await page.locator('input[accept="video/mp4,video/webm,.mp4,.webm"]').setInputFiles(process.env.VISION_TEST_VIDEO!);
   await page.getByRole('button',{name:'동작 추출 및 복원'}).click();await expect(page.getByText('신체 및 손 추적 모델을 불러오는 중',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'분석 취소'}).click();await expect(page.getByRole('alert')).toContainText('분석을 취소했습니다');
   await expect(page.getByRole('button',{name:'동작 추출 및 복원'})).toBeEnabled();

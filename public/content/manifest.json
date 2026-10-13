@@ -1,0 +1,43 @@
+{
+  "schema": "signlingo.content",
+  "version": 1,
+  "updatedAt": "2026-10-13",
+  "lessons": [
+    {
+      "id": "courtesy",
+      "title": "첫 만남과 예의",
+      "category": "인사와 예의",
+      "description": "고마움과 미안함, 만남에 관한 표현을 살펴봅니다.",
+      "order": 0
+    },
+    {
+      "id": "responses",
+      "title": "일상에서 답하기",
+      "category": "일상 소통",
+      "description": "상대의 말에 반응하는 표현을 살펴봅니다.",
+      "order": 1
+    },
+    {
+      "id": "questions",
+      "title": "질문과 도움",
+      "category": "간단한 질문",
+      "description": "묻거나 도움을 주고받는 표현을 살펴봅니다.",
+      "order": 2
+    },
+    {
+      "id": "introductions",
+      "title": "나를 소개하기",
+      "category": "자기소개",
+      "description": "이름과 자기소개는 정확한 원본과 변이를 확인한 뒤 준비합니다.",
+      "order": 3
+    },
+    {
+      "id": "fingerspelling",
+      "title": "한국수어 지문자",
+      "category": "지문자",
+      "description": "한국수어 지문자의 원본과 손 모양을 검수한 뒤 준비합니다.",
+      "order": 4
+    }
+  ],
+  "expressions": []
+}

@@ -97,3 +97,9 @@ Practice uses `src/practice/{capture,features,compare,types}.ts` plus a localize
 See [mobile Practice behavior, evidence requirements and device verification](docs/MOBILE_PRACTICE.md) for partial-feature semantics, fallback limits and the automated versus physical-device test matrix.
 
 Read [the upper-body and capture report](docs/UPPER_BODY_CAPTURE.md) for hip-independent coordinates, independent 2D/3D evidence, decoded-frame timestamps, capture/analysis measurements, actual benchmark results and remaining limitations. GPU delegation and MediaPipe runtime routing are unchanged.
+
+## Phase 5: content-driven KSL learning
+
+Learning Mode now starts from `public/content/manifest.json`. Approved expressions load their reviewed MotionClip automatically and continue into the existing Practice Mode. Current release: **10 researched candidates, 0 published expressions**; rights and expert reviews are still required. Upcoming courses are not playable.
+
+See [source and rights research](docs/KSL_CONTENT_RESEARCH.md) and [content preparation, review and publishing](docs/CONTENT_PUBLISHING.md). `npm run content:validate` checks rights, separate reviews, evidence documents, asset integrity and published-version compatibility; production builds run it automatically. Motion Lab and its local inspection flow remain available.

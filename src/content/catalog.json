@@ -1,0 +1,634 @@
+{
+  "schema": "signlingo.content",
+  "version": 1,
+  "updatedAt": "2026-10-13",
+  "lessons": [
+    {
+      "id": "courtesy",
+      "title": "첫 만남과 예의",
+      "category": "인사와 예의",
+      "description": "고마움과 미안함, 만남에 관한 표현을 살펴봅니다.",
+      "order": 0
+    },
+    {
+      "id": "responses",
+      "title": "일상에서 답하기",
+      "category": "일상 소통",
+      "description": "상대의 말에 반응하는 표현을 살펴봅니다.",
+      "order": 1
+    },
+    {
+      "id": "questions",
+      "title": "질문과 도움",
+      "category": "간단한 질문",
+      "description": "묻거나 도움을 주고받는 표현을 살펴봅니다.",
+      "order": 2
+    },
+    {
+      "id": "introductions",
+      "title": "나를 소개하기",
+      "category": "자기소개",
+      "description": "이름과 자기소개는 정확한 원본과 변이를 확인한 뒤 준비합니다.",
+      "order": 3
+    },
+    {
+      "id": "fingerspelling",
+      "title": "한국수어 지문자",
+      "category": "지문자",
+      "description": "한국수어 지문자의 원본과 손 모양을 검수한 뒤 준비합니다.",
+      "order": 4
+    }
+  ],
+  "expressions": [
+    {
+      "id": "ksl-thanks",
+      "revision": 1,
+      "displayName": "고맙다, 감사",
+      "gloss": null,
+      "category": "인사와 예의",
+      "lessonId": "courtesy",
+      "order": 0,
+      "difficulty": {
+        "level": "beginner",
+        "rationale": "일상에서 쓸 수 있는 어휘 후보입니다. 수형의 구별 가능성과 카메라 적합성은 전문가 검토 전입니다.",
+        "cameraSuitability": "unreviewed"
+      },
+      "description": "원본과 표현 변이를 확인하고 이용 허락 및 한국수어 검수를 마친 뒤 학습 자료를 공개합니다.",
+      "meaning": "고마움과 관련된 한국어 대응 표현입니다.",
+      "movementNotes": [],
+      "source": {
+        "title": "국립국어원 한국수어사전 — 고맙다, 감사",
+        "url": "https://sldict.korean.go.kr/front/sign/signContentsMoreView.do?origin_no=11920&top_category=CTE",
+        "owner": "국립국어원 (개별 영상 권리자는 확인 필요)",
+        "attribution": "어휘 항목 출처: 국립국어원 한국수어사전. 영상·수형 설명은 수록하지 않았습니다.",
+        "locator": "고맙다,감사",
+        "entryId": "origin_no:11920",
+        "checkedAt": "2026-10-13",
+        "videoAvailability": "listed"
+      },
+      "license": {
+        "type": "항목 표시: 저작자표시·비영리·변경금지",
+        "policyUrl": "https://sldict.korean.go.kr/front/main/copyRightPolicy.do",
+        "notes": "개별 항목 페이지에서 비영리·변경금지 표시를 확인했습니다. 3D 변환 및 파생 동작 공개에는 별도 허락이 필요합니다. 영상 파일은 받지 않았습니다.",
+        "permissions": {
+          "importVideo": "unknown",
+          "deriveMotion": "denied",
+          "publishMotion": "denied",
+          "publishVideo": "unknown",
+          "externalVideo": "unknown",
+          "publicRepository": "unknown",
+          "publicWebsite": "unknown"
+        }
+      },
+      "variant": {
+        "id": null,
+        "description": "사전 항목 ID는 확인했습니다. 지역·문맥·비수지 신호에 따른 표현 변이와 학습할 뜻은 전문가가 확인해야 합니다. 한국어 대응 표현은 언어학적 글로스가 아닙니다.",
+        "status": "unresolved"
+      },
+      "assets": {},
+      "reconstructionVersion": null,
+      "provenance": "unacquired",
+      "reviews": {
+        "reconstruction": {
+          "status": "pending"
+        },
+        "linguistic": {
+          "status": "pending"
+        }
+      },
+      "status": "rights-review-required",
+      "updatedAt": "2026-10-13"
+    },
+    {
+      "id": "ksl-sorry",
+      "revision": 1,
+      "displayName": "미안",
+      "gloss": null,
+      "category": "인사와 예의",
+      "lessonId": "courtesy",
+      "order": 1,
+      "difficulty": {
+        "level": "beginner",
+        "rationale": "일상에서 쓸 수 있는 어휘 후보입니다. 수형의 구별 가능성과 카메라 적합성은 전문가 검토 전입니다.",
+        "cameraSuitability": "unreviewed"
+      },
+      "description": "원본과 표현 변이를 확인하고 이용 허락 및 한국수어 검수를 마친 뒤 학습 자료를 공개합니다.",
+      "meaning": "미안함과 관련된 한국어 대응 표현입니다.",
+      "movementNotes": [],
+      "source": {
+        "title": "국립국어원 한국수어사전 — 미안",
+        "url": "https://sldict.korean.go.kr/front/sign/signContentsMoreView.do?origin_no=10985&top_category=CTE",
+        "owner": "국립국어원 (개별 영상 권리자는 확인 필요)",
+        "attribution": "어휘 항목 출처: 국립국어원 한국수어사전. 영상·수형 설명은 수록하지 않았습니다.",
+        "locator": "미안",
+        "entryId": "origin_no:10985",
+        "checkedAt": "2026-10-13",
+        "videoAvailability": "listed"
+      },
+      "license": {
+        "type": "항목 표시: 저작자표시·비영리·변경금지",
+        "policyUrl": "https://sldict.korean.go.kr/front/main/copyRightPolicy.do",
+        "notes": "개별 항목 페이지에서 비영리·변경금지 표시를 확인했습니다. 3D 변환 및 파생 동작 공개에는 별도 허락이 필요합니다. 영상 파일은 받지 않았습니다.",
+        "permissions": {
+          "importVideo": "unknown",
+          "deriveMotion": "denied",
+          "publishMotion": "denied",
+          "publishVideo": "unknown",
+          "externalVideo": "unknown",
+          "publicRepository": "unknown",
+          "publicWebsite": "unknown"
+        }
+      },
+      "variant": {
+        "id": null,
+        "description": "사전 항목 ID는 확인했습니다. 지역·문맥·비수지 신호에 따른 표현 변이와 학습할 뜻은 전문가가 확인해야 합니다. 한국어 대응 표현은 언어학적 글로스가 아닙니다.",
+        "status": "unresolved"
+      },
+      "assets": {},
+      "reconstructionVersion": null,
+      "provenance": "unacquired",
+      "reviews": {
+        "reconstruction": {
+          "status": "pending"
+        },
+        "linguistic": {
+          "status": "pending"
+        }
+      },
+      "status": "rights-review-required",
+      "updatedAt": "2026-10-13"
+    },
+    {
+      "id": "ksl-meet",
+      "revision": 1,
+      "displayName": "만나다, 직면",
+      "gloss": null,
+      "category": "인사와 예의",
+      "lessonId": "courtesy",
+      "order": 2,
+      "difficulty": {
+        "level": "beginner",
+        "rationale": "일상에서 쓸 수 있는 어휘 후보입니다. 수형의 구별 가능성과 카메라 적합성은 전문가 검토 전입니다.",
+        "cameraSuitability": "unreviewed"
+      },
+      "description": "원본과 표현 변이를 확인하고 이용 허락 및 한국수어 검수를 마친 뒤 학습 자료를 공개합니다.",
+      "meaning": "만남과 관련된 한국어 대응 표현입니다. 문맥에 따른 뜻을 검토해야 합니다.",
+      "movementNotes": [],
+      "source": {
+        "title": "국립국어원 한국수어사전 — 만나다, 직면",
+        "url": "https://sldict.korean.go.kr/front/sign/signContentsMoreView.do?origin_no=12165&top_category=CTE",
+        "owner": "국립국어원 (개별 영상 권리자는 확인 필요)",
+        "attribution": "어휘 항목 출처: 국립국어원 한국수어사전. 영상·수형 설명은 수록하지 않았습니다.",
+        "locator": "만나다,직면",
+        "entryId": "origin_no:12165",
+        "checkedAt": "2026-10-13",
+        "videoAvailability": "listed"
+      },
+      "license": {
+        "type": "항목 표시: 저작자표시·비영리·변경금지",
+        "policyUrl": "https://sldict.korean.go.kr/front/main/copyRightPolicy.do",
+        "notes": "개별 항목 페이지에서 비영리·변경금지 표시를 확인했습니다. 3D 변환 및 파생 동작 공개에는 별도 허락이 필요합니다. 영상 파일은 받지 않았습니다.",
+        "permissions": {
+          "importVideo": "unknown",
+          "deriveMotion": "denied",
+          "publishMotion": "denied",
+          "publishVideo": "unknown",
+          "externalVideo": "unknown",
+          "publicRepository": "unknown",
+          "publicWebsite": "unknown"
+        }
+      },
+      "variant": {
+        "id": null,
+        "description": "사전 항목 ID는 확인했습니다. 지역·문맥·비수지 신호에 따른 표현 변이와 학습할 뜻은 전문가가 확인해야 합니다. 한국어 대응 표현은 언어학적 글로스가 아닙니다.",
+        "status": "unresolved"
+      },
+      "assets": {},
+      "reconstructionVersion": null,
+      "provenance": "unacquired",
+      "reviews": {
+        "reconstruction": {
+          "status": "pending"
+        },
+        "linguistic": {
+          "status": "pending"
+        }
+      },
+      "status": "rights-review-required",
+      "updatedAt": "2026-10-13"
+    },
+    {
+      "id": "ksl-okay",
+      "revision": 1,
+      "displayName": "괜찮다, 무방하다",
+      "gloss": null,
+      "category": "일상 소통",
+      "lessonId": "responses",
+      "order": 3,
+      "difficulty": {
+        "level": "beginner",
+        "rationale": "일상에서 쓸 수 있는 어휘 후보입니다. 수형의 구별 가능성과 카메라 적합성은 전문가 검토 전입니다.",
+        "cameraSuitability": "unreviewed"
+      },
+      "description": "원본과 표현 변이를 확인하고 이용 허락 및 한국수어 검수를 마친 뒤 학습 자료를 공개합니다.",
+      "meaning": "괜찮음과 관련된 한국어 대응 표현입니다.",
+      "movementNotes": [],
+      "source": {
+        "title": "국립국어원 한국수어사전 — 괜찮다, 무방하다",
+        "url": "https://sldict.korean.go.kr/front/sign/signContentsMoreView.do?origin_no=9466&top_category=CTE",
+        "owner": "국립국어원 (개별 영상 권리자는 확인 필요)",
+        "attribution": "어휘 항목 출처: 국립국어원 한국수어사전. 영상·수형 설명은 수록하지 않았습니다.",
+        "locator": "괜찮다,무방하다",
+        "entryId": "origin_no:9466",
+        "checkedAt": "2026-10-13",
+        "videoAvailability": "listed"
+      },
+      "license": {
+        "type": "항목 표시: 저작자표시·비영리·변경금지",
+        "policyUrl": "https://sldict.korean.go.kr/front/main/copyRightPolicy.do",
+        "notes": "개별 항목 페이지에서 비영리·변경금지 표시를 확인했습니다. 3D 변환 및 파생 동작 공개에는 별도 허락이 필요합니다. 영상 파일은 받지 않았습니다.",
+        "permissions": {
+          "importVideo": "unknown",
+          "deriveMotion": "denied",
+          "publishMotion": "denied",
+          "publishVideo": "unknown",
+          "externalVideo": "unknown",
+          "publicRepository": "unknown",
+          "publicWebsite": "unknown"
+        }
+      },
+      "variant": {
+        "id": null,
+        "description": "사전 항목 ID는 확인했습니다. 지역·문맥·비수지 신호에 따른 표현 변이와 학습할 뜻은 전문가가 확인해야 합니다. 한국어 대응 표현은 언어학적 글로스가 아닙니다.",
+        "status": "unresolved"
+      },
+      "assets": {},
+      "reconstructionVersion": null,
+      "provenance": "unacquired",
+      "reviews": {
+        "reconstruction": {
+          "status": "pending"
+        },
+        "linguistic": {
+          "status": "pending"
+        }
+      },
+      "status": "rights-review-required",
+      "updatedAt": "2026-10-13"
+    },
+    {
+      "id": "ksl-no",
+      "revision": 1,
+      "displayName": "아니다, 아니, 부인(하다)",
+      "gloss": null,
+      "category": "일상 소통",
+      "lessonId": "responses",
+      "order": 4,
+      "difficulty": {
+        "level": "beginner",
+        "rationale": "일상에서 쓸 수 있는 어휘 후보입니다. 수형의 구별 가능성과 카메라 적합성은 전문가 검토 전입니다.",
+        "cameraSuitability": "unreviewed"
+      },
+      "description": "원본과 표현 변이를 확인하고 이용 허락 및 한국수어 검수를 마친 뒤 학습 자료를 공개합니다.",
+      "meaning": "부정과 관련된 한국어 대응 표현입니다.",
+      "movementNotes": [],
+      "source": {
+        "title": "국립국어원 한국수어사전 — 아니다, 아니, 부인(하다)",
+        "url": "https://sldict.korean.go.kr/front/sign/signContentsMoreView.do?origin_no=11433&top_category=CTE",
+        "owner": "국립국어원 (개별 영상 권리자는 확인 필요)",
+        "attribution": "어휘 항목 출처: 국립국어원 한국수어사전. 영상·수형 설명은 수록하지 않았습니다.",
+        "locator": "아니다,아니,부인(하다)",
+        "entryId": "origin_no:11433",
+        "checkedAt": "2026-10-13",
+        "videoAvailability": "listed"
+      },
+      "license": {
+        "type": "항목 표시: 저작자표시·비영리·변경금지",
+        "policyUrl": "https://sldict.korean.go.kr/front/main/copyRightPolicy.do",
+        "notes": "개별 항목 페이지에서 비영리·변경금지 표시를 확인했습니다. 3D 변환 및 파생 동작 공개에는 별도 허락이 필요합니다. 영상 파일은 받지 않았습니다.",
+        "permissions": {
+          "importVideo": "unknown",
+          "deriveMotion": "denied",
+          "publishMotion": "denied",
+          "publishVideo": "unknown",
+          "externalVideo": "unknown",
+          "publicRepository": "unknown",
+          "publicWebsite": "unknown"
+        }
+      },
+      "variant": {
+        "id": null,
+        "description": "사전 항목 ID는 확인했습니다. 지역·문맥·비수지 신호에 따른 표현 변이와 학습할 뜻은 전문가가 확인해야 합니다. 한국어 대응 표현은 언어학적 글로스가 아닙니다.",
+        "status": "unresolved"
+      },
+      "assets": {},
+      "reconstructionVersion": null,
+      "provenance": "unacquired",
+      "reviews": {
+        "reconstruction": {
+          "status": "pending"
+        },
+        "linguistic": {
+          "status": "pending"
+        }
+      },
+      "status": "rights-review-required",
+      "updatedAt": "2026-10-13"
+    },
+    {
+      "id": "ksl-like",
+      "revision": 1,
+      "displayName": "마음에 들다",
+      "gloss": null,
+      "category": "일상 소통",
+      "lessonId": "responses",
+      "order": 5,
+      "difficulty": {
+        "level": "beginner",
+        "rationale": "일상에서 쓸 수 있는 어휘 후보입니다. 수형의 구별 가능성과 카메라 적합성은 전문가 검토 전입니다.",
+        "cameraSuitability": "unreviewed"
+      },
+      "description": "원본과 표현 변이를 확인하고 이용 허락 및 한국수어 검수를 마친 뒤 학습 자료를 공개합니다.",
+      "meaning": "선호와 관련된 한국어 대응 표현입니다.",
+      "movementNotes": [],
+      "source": {
+        "title": "국립국어원 한국수어사전 (시범) — 마음에 들다",
+        "url": "https://sldict.korean.go.kr/demondicKor/signKorDetail.do?sign_seq=4&search_translation=99&search_sign_seq=0",
+        "owner": "국립국어원 (개별 영상 권리자는 확인 필요)",
+        "attribution": "어휘 항목 출처: 국립국어원 한국수어사전. 영상·수형 설명은 수록하지 않았습니다.",
+        "locator": "마음에 들다",
+        "entryId": "pilot-sign_seq:4",
+        "checkedAt": "2026-10-13",
+        "videoAvailability": "listed"
+      },
+      "license": {
+        "type": "미확인 — 영상별 이용 조건 확인 필요",
+        "policyUrl": "https://sldict.korean.go.kr/front/main/copyRightPolicy.do",
+        "notes": "누리집 일반 정책과 개별 영상 권리는 다릅니다. 3D 변환과 공개 배포 허락을 확인하지 않았습니다.",
+        "permissions": {
+          "importVideo": "unknown",
+          "deriveMotion": "unknown",
+          "publishMotion": "unknown",
+          "publishVideo": "unknown",
+          "externalVideo": "unknown",
+          "publicRepository": "unknown",
+          "publicWebsite": "unknown"
+        }
+      },
+      "variant": {
+        "id": null,
+        "description": "사전 항목 ID는 확인했습니다. 지역·문맥·비수지 신호에 따른 표현 변이와 학습할 뜻은 전문가가 확인해야 합니다. 한국어 대응 표현은 언어학적 글로스가 아닙니다.",
+        "status": "unresolved"
+      },
+      "assets": {},
+      "reconstructionVersion": null,
+      "provenance": "unacquired",
+      "reviews": {
+        "reconstruction": {
+          "status": "pending"
+        },
+        "linguistic": {
+          "status": "pending"
+        }
+      },
+      "status": "rights-review-required",
+      "updatedAt": "2026-10-13"
+    },
+    {
+      "id": "ksl-absent",
+      "revision": 1,
+      "displayName": "없다",
+      "gloss": null,
+      "category": "일상 소통",
+      "lessonId": "responses",
+      "order": 6,
+      "difficulty": {
+        "level": "beginner",
+        "rationale": "일상에서 쓸 수 있는 어휘 후보입니다. 수형의 구별 가능성과 카메라 적합성은 전문가 검토 전입니다.",
+        "cameraSuitability": "unreviewed"
+      },
+      "description": "원본과 표현 변이를 확인하고 이용 허락 및 한국수어 검수를 마친 뒤 학습 자료를 공개합니다.",
+      "meaning": "일어나지 않는 상황, 물건·돈의 부재, 존재하지 않음, 경험·자신감의 부족이 구분된 항목입니다. 학습할 뜻을 먼저 선택해야 합니다.",
+      "movementNotes": [],
+      "source": {
+        "title": "국립국어원 한국수어사전 (시범) — 없다",
+        "url": "https://sldict.korean.go.kr/demondicKor/signKorDetail.do?sign_seq=8&search_translation=99&search_sign_seq=0",
+        "owner": "국립국어원 (개별 영상 권리자는 확인 필요)",
+        "attribution": "어휘 항목 출처: 국립국어원 한국수어사전. 영상·수형 설명은 수록하지 않았습니다.",
+        "locator": "없다 , (물건이나 돈이) 없다 , 없다 , (자신감이) 없다",
+        "entryId": "pilot-sign_seq:8",
+        "checkedAt": "2026-10-13",
+        "videoAvailability": "listed"
+      },
+      "license": {
+        "type": "미확인 — 영상별 이용 조건 확인 필요",
+        "policyUrl": "https://sldict.korean.go.kr/front/main/copyRightPolicy.do",
+        "notes": "누리집 일반 정책과 개별 영상 권리는 다릅니다. 3D 변환과 공개 배포 허락을 확인하지 않았습니다.",
+        "permissions": {
+          "importVideo": "unknown",
+          "deriveMotion": "unknown",
+          "publishMotion": "unknown",
+          "publishVideo": "unknown",
+          "externalVideo": "unknown",
+          "publicRepository": "unknown",
+          "publicWebsite": "unknown"
+        }
+      },
+      "variant": {
+        "id": null,
+        "description": "사전 항목 ID는 확인했습니다. 지역·문맥·비수지 신호에 따른 표현 변이와 학습할 뜻은 전문가가 확인해야 합니다. 한국어 대응 표현은 언어학적 글로스가 아닙니다.",
+        "status": "unresolved"
+      },
+      "assets": {},
+      "reconstructionVersion": null,
+      "provenance": "unacquired",
+      "reviews": {
+        "reconstruction": {
+          "status": "pending"
+        },
+        "linguistic": {
+          "status": "pending"
+        }
+      },
+      "status": "rights-review-required",
+      "updatedAt": "2026-10-13"
+    },
+    {
+      "id": "ksl-what",
+      "revision": 1,
+      "displayName": "무엇, 무슨",
+      "gloss": null,
+      "category": "간단한 질문",
+      "lessonId": "questions",
+      "order": 7,
+      "difficulty": {
+        "level": "beginner",
+        "rationale": "일상에서 쓸 수 있는 어휘 후보입니다. 수형의 구별 가능성과 카메라 적합성은 전문가 검토 전입니다.",
+        "cameraSuitability": "unreviewed"
+      },
+      "description": "원본과 표현 변이를 확인하고 이용 허락 및 한국수어 검수를 마친 뒤 학습 자료를 공개합니다.",
+      "meaning": "질문 등 여러 문맥을 가진 항목입니다. 한국어 의문문과 일대일로 대응하지 않습니다.",
+      "movementNotes": [],
+      "source": {
+        "title": "국립국어원 한국수어사전 (시범) — 무엇, 무슨",
+        "url": "https://sldict.korean.go.kr/demondicKor/signKorDetail.do?sign_seq=5&search_translation=99&search_sign_seq=0",
+        "owner": "국립국어원 (개별 영상 권리자는 확인 필요)",
+        "attribution": "어휘 항목 출처: 국립국어원 한국수어사전. 영상·수형 설명은 수록하지 않았습니다.",
+        "locator": "무엇, 무슨, 어디, 어떻게, 어떤, 어떠하다",
+        "entryId": "pilot-sign_seq:5",
+        "checkedAt": "2026-10-13",
+        "videoAvailability": "listed"
+      },
+      "license": {
+        "type": "미확인 — 영상별 이용 조건 확인 필요",
+        "policyUrl": "https://sldict.korean.go.kr/front/main/copyRightPolicy.do",
+        "notes": "누리집 일반 정책과 개별 영상 권리는 다릅니다. 3D 변환과 공개 배포 허락을 확인하지 않았습니다.",
+        "permissions": {
+          "importVideo": "unknown",
+          "deriveMotion": "unknown",
+          "publishMotion": "unknown",
+          "publishVideo": "unknown",
+          "externalVideo": "unknown",
+          "publicRepository": "unknown",
+          "publicWebsite": "unknown"
+        }
+      },
+      "variant": {
+        "id": null,
+        "description": "사전 항목 ID는 확인했습니다. 지역·문맥·비수지 신호에 따른 표현 변이와 학습할 뜻은 전문가가 확인해야 합니다. 한국어 대응 표현은 언어학적 글로스가 아닙니다.",
+        "status": "unresolved"
+      },
+      "assets": {},
+      "reconstructionVersion": null,
+      "provenance": "unacquired",
+      "reviews": {
+        "reconstruction": {
+          "status": "pending"
+        },
+        "linguistic": {
+          "status": "pending"
+        }
+      },
+      "status": "rights-review-required",
+      "updatedAt": "2026-10-13"
+    },
+    {
+      "id": "ksl-ask",
+      "revision": 1,
+      "displayName": "묻다, 질문하다",
+      "gloss": null,
+      "category": "간단한 질문",
+      "lessonId": "questions",
+      "order": 8,
+      "difficulty": {
+        "level": "beginner",
+        "rationale": "일상에서 쓸 수 있는 어휘 후보입니다. 수형의 구별 가능성과 카메라 적합성은 전문가 검토 전입니다.",
+        "cameraSuitability": "unreviewed"
+      },
+      "description": "원본과 표현 변이를 확인하고 이용 허락 및 한국수어 검수를 마친 뒤 학습 자료를 공개합니다.",
+      "meaning": "모르는 점을 질문하는 뜻과, 자신이 하지 않은 일을 확인해 보라는 항변의 뜻이 구분됩니다. 초급에서는 질문의 뜻부터 검토합니다.",
+      "movementNotes": [],
+      "source": {
+        "title": "국립국어원 한국수어사전 (시범) — 묻다, 질문하다",
+        "url": "https://sldict.korean.go.kr/demondicKor/signKorDetail.do?sign_seq=7&search_translation=99&search_sign_seq=0",
+        "owner": "국립국어원 (개별 영상 권리자는 확인 필요)",
+        "attribution": "어휘 항목 출처: 국립국어원 한국수어사전. 영상·수형 설명은 수록하지 않았습니다.",
+        "locator": "묻다, 질문하다, 질문을 받다",
+        "entryId": "pilot-sign_seq:7",
+        "checkedAt": "2026-10-13",
+        "videoAvailability": "listed"
+      },
+      "license": {
+        "type": "미확인 — 영상별 이용 조건 확인 필요",
+        "policyUrl": "https://sldict.korean.go.kr/front/main/copyRightPolicy.do",
+        "notes": "누리집 일반 정책과 개별 영상 권리는 다릅니다. 3D 변환과 공개 배포 허락을 확인하지 않았습니다.",
+        "permissions": {
+          "importVideo": "unknown",
+          "deriveMotion": "unknown",
+          "publishMotion": "unknown",
+          "publishVideo": "unknown",
+          "externalVideo": "unknown",
+          "publicRepository": "unknown",
+          "publicWebsite": "unknown"
+        }
+      },
+      "variant": {
+        "id": null,
+        "description": "사전 항목 ID는 확인했습니다. 지역·문맥·비수지 신호에 따른 표현 변이와 학습할 뜻은 전문가가 확인해야 합니다. 한국어 대응 표현은 언어학적 글로스가 아닙니다.",
+        "status": "unresolved"
+      },
+      "assets": {},
+      "reconstructionVersion": null,
+      "provenance": "unacquired",
+      "reviews": {
+        "reconstruction": {
+          "status": "pending"
+        },
+        "linguistic": {
+          "status": "pending"
+        }
+      },
+      "status": "rights-review-required",
+      "updatedAt": "2026-10-13"
+    },
+    {
+      "id": "ksl-help",
+      "revision": 1,
+      "displayName": "돕다, 도와주다",
+      "gloss": null,
+      "category": "간단한 질문",
+      "lessonId": "questions",
+      "order": 9,
+      "difficulty": {
+        "level": "beginner",
+        "rationale": "일상에서 쓸 수 있는 어휘 후보입니다. 수형의 구별 가능성과 카메라 적합성은 전문가 검토 전입니다.",
+        "cameraSuitability": "unreviewed"
+      },
+      "description": "원본과 표현 변이를 확인하고 이용 허락 및 한국수어 검수를 마친 뒤 학습 자료를 공개합니다.",
+      "meaning": "물질적 지원과 일을 거들어 주는 뜻이 구분됩니다. 역할과 방향을 원본 및 전문가 검수로 확인해야 합니다.",
+      "movementNotes": [],
+      "source": {
+        "title": "국립국어원 한국수어사전 (시범) — 돕다, 도와주다",
+        "url": "https://sldict.korean.go.kr/demondicKor/signKorDetail.do?sign_seq=18&search_translation=99&search_sign_seq=0",
+        "owner": "국립국어원 (개별 영상 권리자는 확인 필요)",
+        "attribution": "어휘 항목 출처: 국립국어원 한국수어사전. 영상·수형 설명은 수록하지 않았습니다.",
+        "locator": "돕다, 도와주다, 지원(하다), 도움을 받다",
+        "entryId": "pilot-sign_seq:18",
+        "checkedAt": "2026-10-13",
+        "videoAvailability": "listed"
+      },
+      "license": {
+        "type": "미확인 — 영상별 이용 조건 확인 필요",
+        "policyUrl": "https://sldict.korean.go.kr/front/main/copyRightPolicy.do",
+        "notes": "누리집 일반 정책과 개별 영상 권리는 다릅니다. 3D 변환과 공개 배포 허락을 확인하지 않았습니다.",
+        "permissions": {
+          "importVideo": "unknown",
+          "deriveMotion": "unknown",
+          "publishMotion": "unknown",
+          "publishVideo": "unknown",
+          "externalVideo": "unknown",
+          "publicRepository": "unknown",
+          "publicWebsite": "unknown"
+        }
+      },
+      "variant": {
+        "id": null,
+        "description": "사전 항목 ID는 확인했습니다. 지역·문맥·비수지 신호에 따른 표현 변이와 학습할 뜻은 전문가가 확인해야 합니다. 한국어 대응 표현은 언어학적 글로스가 아닙니다.",
+        "status": "unresolved"
+      },
+      "assets": {},
+      "reconstructionVersion": null,
+      "provenance": "unacquired",
+      "reviews": {
+        "reconstruction": {
+          "status": "pending"
+        },
+        "linguistic": {
+          "status": "pending"
+        }
+      },
+      "status": "rights-review-required",
+      "updatedAt": "2026-10-13"
+    }
+  ]
+}
