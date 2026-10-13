@@ -98,6 +98,16 @@ See [mobile Practice behavior, evidence requirements and device verification](do
 
 Read [the upper-body and capture report](docs/UPPER_BODY_CAPTURE.md) for hip-independent coordinates, independent 2D/3D evidence, decoded-frame timestamps, capture/analysis measurements, actual benchmark results and remaining limitations. GPU delegation and MediaPipe runtime routing are unchanged.
 
+## Open-license visual handshape study (Phase 5a)
+
+The Learning Mode now has a **32-photo Korean fingerspelling gallery**, independently of the reviewed MotionClip publishing pipeline. Click **공개 자료로 지문자 학습 시작 · 32개**. Select consonants/vowels, inspect the actual open-source photographs, step through them and mark them observed. Only the seen photo IDs are stored in browser localStorage.
+
+- Source: [Wikimedia Commons, Korean manual alphabet](https://commons.wikimedia.org/wiki/Category:Korean_manual_alphabet), individual files `KSL_<romanization>.jpg`. Photographs by Kwamikagami, with individual source and license links in the UI; checked examples are CC BY-SA 3.0. The gallery displays source images unmodified from Commons, does not copy them into the repository and needs network access for them.
+- **These are static handshape photos, not a vetted vocabulary/sentence video collection or motion data.** They cannot be represented as a MotionClip, passed off as a 3D demonstration, or compared by Practice Mode.
+- No existing `public/content/manifest.json` approval, entitlement or review state is changed. The ten candidate expressions and zero released 3D lessons remain unchanged.
+- Some KSL fingerspelling forms involve direction or movement not conveyed by a photo. A Deaf Korean Sign Language educator should validate pedagogical descriptions and variation before representing this as a complete curriculum.
+- For dynamic expressions, candidate sources remain AI-Hub (requires authorized access and separate redistribution review), NIKL (item-specific video rights), and [Yonsei KSL Depth Dataset](https://www.eis-lab.org/yonsei-ksl-dataset) (site states CC BY 4.0 but access is via request form and videos are depth-only; not directly compatible with RGB MediaPipe extraction).
+
 ## Phase 5: content-driven KSL learning
 
 Learning Mode now starts from `public/content/manifest.json`. Approved expressions load their reviewed MotionClip automatically and continue into the existing Practice Mode. Current release: **10 researched candidates, 0 published expressions**; rights and expert reviews are still required. Upcoming courses are not playable.
