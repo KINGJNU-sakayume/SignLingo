@@ -75,9 +75,12 @@ function DetectedSkeleton({frame}:{frame:MotionFrame}) {
     return <group key={side}>{indices.every(i=>body.points[i])&&<Line points={indices.map(i=>arr(body.points[i]!))} color="#ffd84c" lineWidth={2}/>}{points&&FINGERS.map((f,i)=><Line key={f} points={[points[0],...points.slice(1+i*4,5+i*4)].map(arr)} color="#ffd84c" lineWidth={2}/>)}</group>;
   })}</group>;
 }
-export const Avatar = memo(function Avatar({pose,skeleton,markers,preset,inspection,highlightSide}:{pose:Pose|null;skeleton:boolean;markers:boolean;preset:string;inspection?:MotionFrame;highlightSide?:Side}) {
+// The learning screens use a light stage; Motion Lab and Practice keep the default dark one.
+const THEMES={dark:{background:'#111e29',cell:'#30434e',section:'#3f5662',shadow:0.35},light:{background:'#eef3f1',cell:'#d5dfdb',section:'#bccbc6',shadow:0.22}};
+export const Avatar = memo(function Avatar({pose,skeleton,markers,preset,inspection,highlightSide,theme='dark'}:{pose:Pose|null;skeleton:boolean;markers:boolean;preset:string;inspection?:MotionFrame;highlightSide?:Side;theme?:'dark'|'light'}) {
+  const colors=THEMES[theme];
   return <WebGLError><Canvas frameloop="demand" camera={{position:[0,1.45,2.6],fov:42}} dpr={[1,1.8]} gl={{antialias:true}} fallback={<div className="canvas-error">WebGL2 is required for the 3D viewer.</div>}>
-    <color attach="background" args={['#111e29']}/><ambientLight intensity={1.2}/><directionalLight position={[3,5,4]} intensity={2.6}/><directionalLight position={[-3,2,-2]} color="#5fceb9" intensity={1.8}/>
-    <Suspense fallback={null}><Mannequin {...{pose,skeleton,markers,highlightSide}}/>{inspection&&<DetectedSkeleton frame={inspection}/>}<Grid position={[0,0.02,0]} args={[8,8]} cellSize={0.2} cellThickness={0.45} cellColor="#30434e" sectionColor="#3f5662" sectionSize={1} fadeDistance={6}/><ContactShadows position={[0,0.01,0]} opacity={0.35} scale={5} blur={2.5} far={3}/></Suspense><Camera preset={preset}/>
+    <color attach="background" args={[colors.background]}/><ambientLight intensity={1.2}/><directionalLight position={[3,5,4]} intensity={2.6}/><directionalLight position={[-3,2,-2]} color="#5fceb9" intensity={1.8}/>
+    <Suspense fallback={null}><Mannequin {...{pose,skeleton,markers,highlightSide}}/>{inspection&&<DetectedSkeleton frame={inspection}/>}<Grid position={[0,0.02,0]} args={[8,8]} cellSize={0.2} cellThickness={0.45} cellColor={colors.cell} sectionColor={colors.section} sectionSize={1} fadeDistance={6}/><ContactShadows position={[0,0.01,0]} opacity={colors.shadow} scale={5} blur={2.5} far={3}/></Suspense><Camera preset={preset}/>
   </Canvas></WebGLError>;
 });

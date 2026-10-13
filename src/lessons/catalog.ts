@@ -13,9 +13,9 @@ export type PracticeRecord={at:string;evidence:'sufficient'|'limited';feedback:s
 export type LessonProgress={viewed:boolean;attempts:number;lastAttempt?:string;lastEvidence?:'sufficient'|'limited';history?:PracticeRecord[]};
 export type ProgressRecord=Record<string,LessonProgress>;
 export const PROGRESS_KEY='signlingo.lessons.progress.v1';
-export function readProgress():ProgressRecord{
+export function readProgress(key=PROGRESS_KEY):ProgressRecord{
   try{
-    const raw=window.localStorage.getItem(PROGRESS_KEY);if(!raw)return {};
+    const raw=window.localStorage.getItem(key);if(!raw)return {};
     const data:unknown=JSON.parse(raw);if(!data||typeof data!=='object'||Array.isArray(data))return {};
     const record:ProgressRecord=Object.create(null);
     for(const [key,value] of Object.entries(data)){
@@ -29,7 +29,7 @@ export function readProgress():ProgressRecord{
     return record;
   }catch{return {};}
 }
-export function saveProgress(data:ProgressRecord){try{window.localStorage.setItem(PROGRESS_KEY,JSON.stringify(data));}catch{/* Local storage may be unavailable. */}}
+export function saveProgress(data:ProgressRecord,key=PROGRESS_KEY){try{window.localStorage.setItem(key,JSON.stringify(data));}catch{/* Local storage may be unavailable. */}}
 function validPractice(value:unknown):value is PracticeRecord{
   if(!value||typeof value!=='object')return false;
   const x=value as PracticeRecord;

@@ -1,0 +1,80 @@
+/* App shell: bottom tabs (<768px), icon rail (768–1023px), labelled sidebar (≥1024px).
+   Motion Lab and Practice render inside .sl-content with their own styles. */
+.sl-shell[hidden], .sl-root[hidden] { display: none !important; }
+.sl-boot { padding: 48px 16px; text-align: center; }
+.sl-has-band body { padding-top: var(--band-h); }
+.sl-demo-band {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 90; height: var(--band-h); margin: 0; display: grid; place-items: center;
+  background: var(--sun); color: var(--sun-on); font-family: var(--font-display); font-size: 17px; font-weight: 700;
+}
+.sl-shell { min-height: 100vh; min-height: 100dvh; }
+.sl-shell[data-mode="learn"], .sl-shell[data-mode="review"] { background: var(--canvas); }
+.sl-content { min-width: 0; padding-bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom)); }
+
+.sl-brand { display: flex; align-items: center; gap: 10px; margin: 0; }
+.sl-brand-name { font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--leaf-deep); }
+
+.sl-nav {
+  position: fixed; z-index: 30; left: 0; right: 0; bottom: 0; padding-bottom: env(safe-area-inset-bottom);
+  background: var(--canvas); border-top: 2px solid var(--line);
+}
+.sl-nav .sl-brand, .sl-nav-foot { display: none; }
+.sl-nav-items { list-style: none; margin: 0; padding: 0 4px; height: var(--tabbar-height); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.sl-nav-item {
+  width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  padding: 4px 2px; border: 0; background: none; cursor: pointer; color: var(--ink-muted);
+  font-family: var(--font-display); font-size: 14px; font-weight: 700; letter-spacing: 0;
+}
+.sl-nav-icon { position: relative; display: grid; place-items: center; width: 48px; height: 32px; border-radius: 12px; border: 2px solid transparent; }
+.sl-nav-item[aria-current="page"] { color: var(--sky-deep); }
+.sl-nav-item[aria-current="page"] .sl-nav-icon { background: var(--sky-tint); border-color: var(--sky); }
+.sl-nav-dot { position: absolute; top: -3px; right: 4px; width: 12px; height: 12px; border-radius: 50%; background: var(--coral); border: 2px solid var(--canvas); }
+.sl-nav-label { white-space: nowrap; }
+
+.sl-topbar {
+  position: sticky; top: var(--band-h); z-index: 20; display: flex; align-items: center; gap: 10px; height: var(--topbar-height);
+  padding: 0 8px 0 12px; background: var(--canvas); border-bottom: 2px solid var(--line);
+}
+.sl-topbar-title { flex: 1; min-width: 0; margin: 0; font-family: var(--font-display); font-size: 19px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sl-sound { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-width: 44px; min-height: 44px; padding: 0 8px; border: 0; border-radius: 12px; background: none; color: var(--ink-muted); cursor: pointer; font-family: var(--font-display); font-size: 17px; font-weight: 700; }
+.sl-sound:hover { background: var(--canvas-soft); }
+.sl-sound-label { display: none; }
+
+.sl-learn { padding: 16px 16px 32px; }
+.sl-learn-main { max-width: 600px; margin: 0 auto; padding: 0; min-width: 0; }
+.rail { display: none; }
+.sl-lesson-practice { min-height: 100vh; background: #f5f7f8; }
+
+@media (min-width: 768px) {
+  .sl-shell { display: grid; grid-template-columns: 96px minmax(0, 1fr); }
+  .sl-nav {
+    position: sticky; top: var(--band-h); align-self: start; height: calc(100vh - var(--band-h)); padding: 20px 12px;
+    display: flex; flex-direction: column; border-top: 0; border-right: 2px solid var(--line);
+  }
+  .sl-nav .sl-brand { display: flex; justify-content: center; }
+  .sl-nav .sl-brand-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .sl-nav-items { display: flex; flex-direction: column; gap: 8px; height: auto; margin-top: 28px; padding: 0; }
+  .sl-nav-item { flex-direction: row; height: 56px; border-radius: 14px; border: 2px solid transparent; }
+  .sl-nav-item:hover { background: var(--canvas-soft); }
+  .sl-nav-item[aria-current="page"] { background: var(--sky-tint); border-color: var(--sky); }
+  .sl-nav-item[aria-current="page"] .sl-nav-icon { background: none; border-color: transparent; }
+  .sl-nav-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .sl-nav-foot { display: block; margin-top: auto; text-align: center; }
+  .sl-topbar { display: none; }
+  .sl-content { padding-bottom: 0; }
+  .sl-learn { padding: 28px 24px 48px; }
+}
+@media (min-width: 1024px) {
+  .sl-shell { grid-template-columns: 248px minmax(0, 1fr); }
+  .sl-nav { padding: 24px 16px; }
+  .sl-nav .sl-brand { justify-content: flex-start; padding: 0 8px; }
+  .sl-nav .sl-brand-name { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+  .sl-nav-item { justify-content: flex-start; gap: 14px; padding: 0 12px; font-size: 19px; }
+  .sl-nav-icon { width: 32px; }
+  .sl-nav-label { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+  .sl-nav-foot { text-align: left; }
+  .sl-sound-label { display: inline; }
+  .sl-learn { display: grid; grid-template-columns: minmax(0, 600px) 320px; gap: 48px; justify-content: center; padding: 32px 32px 64px; }
+  .sl-learn-main { margin: 0; }
+  .rail { display: grid; align-content: start; gap: 20px; position: sticky; top: calc(var(--band-h) + 32px); align-self: start; }
+}
