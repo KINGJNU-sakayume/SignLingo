@@ -1,0 +1,58 @@
+@import './fonts.css';
+
+/* SignLingo learning design tokens. Used by the learning screens and the app shell only;
+   Motion Lab and Practice keep their own styles.css rules. Contrast pairs are checked by
+   tests/design-tokens.test.ts. */
+:root {
+  --leaf: #18A058;
+  --leaf-deep: #0E6B38;
+  --leaf-tint: #E3F8EA;
+  --coral: #E5484D;
+  --coral-deep: #B4232A;
+  --coral-tint: #FFE5E5;
+  --sky: #2F6FEB;
+  --sky-deep: #1A4FBF;
+  --sky-tint: #E6EEFF;
+  --sun: #F5A524;
+  --sun-deep: #C27C0E;
+  --sun-tint: #FFF3D6;
+  --sun-ink: #7A4B00;
+  --sun-on: #3D2800;
+  --grape: #7B4FE0;
+  --grape-deep: #5631B0;
+  --grape-tint: #EFE8FF;
+  --ink: #2B3A38;
+  --ink-muted: #5B6B69;
+  --line: #E2E8E6;
+  --canvas: #FFFFFF;
+  --canvas-soft: #F4F7F5;
+  --locked: #E5E9E8;
+  --locked-deep: #C9D1CF;
+  --locked-ink: #6E7D7B;
+
+  --font-display: 'SignLingo Display', 'SignLingo Body', system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  --font-body: 'SignLingo Body', system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+
+  --radius-button: 16px;
+  --radius-card: 20px;
+  --radius-sheet: 24px;
+  --lip: 4px;
+  --lip-node: 6px;
+
+  --t-fast: 120ms;
+  --t-base: 200ms;
+  --t-slow: 320ms;
+  --t-celebrate: 600ms;
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+  --ease-overshoot: cubic-bezier(.34, 1.56, .64, 1);
+
+  --tabbar-height: 68px;
+  --topbar-height: 56px;
+}
+
+/* Unit accent rotation: leaf → sky → sun → grape → leaf. `--on` is the text colour on the face. */
+.unit-leaf { --face: var(--leaf); --deep: var(--leaf-deep); --tint: var(--leaf-tint); --on: #FFFFFF; }
+.unit-sky { --face: var(--sky); --deep: var(--sky-deep); --tint: var(--sky-tint); --on: #FFFFFF; }
+.unit-sun { --face: var(--sun); --deep: var(--sun-deep); --tint: var(--sun-tint); --on: var(--sun-on); }
+.unit-grape { --face: var(--grape); --deep: var(--grape-deep); --tint: var(--grape-tint); --on: #FFFFFF; }
+.unit-soon { --face: var(--locked); --deep: var(--locked-deep); --tint: var(--canvas-soft); --on: var(--ink-muted); }
