@@ -117,3 +117,18 @@ test('reduced motion replaces movement with fades', async ({ page }) => {
   await page.getByRole('button', { name: '확인', exact: true }).click();
   await expect.poll(() => page.locator('.sl-sheet').evaluate(element => getComputedStyle(element).animationName)).toBe('sl-fade');
 });
+
+test('keyboard shortcuts work the moment the first step appears', async ({ page }) => {
+  // Dispatches Escape from a MutationObserver, before any later task: listeners must already be attached.
+  await page.addInitScript(() => {
+    new MutationObserver((_, observer) => {
+      if (!document.querySelector('.lp[data-step-kind]')) return;
+      observer.disconnect();
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    }).observe(document, { subtree: true, childList: true, attributes: true });
+  });
+  await routes(page); await page.goto('/');
+  await page.getByRole('button', { name: '단원 1 레슨 1 · 지금 할 차례' }).click();
+  await page.getByRole('button', { name: '시작', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '레슨을 나갈까요?' })).toBeVisible();
+});

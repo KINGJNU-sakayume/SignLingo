@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react';
+import { useId, useLayoutEffect, useRef } from 'react';
 import { ChunkyButton } from './ChunkyButton';
 
 type Props = { open: boolean; title: string; body: string; stayLabel: string; leaveLabel: string; onStay: () => void; onLeave: () => void };
@@ -7,7 +7,8 @@ type Props = { open: boolean; title: string; body: string; stayLabel: string; le
 export function ConfirmDialog({ open, title, body, stayLabel, leaveLabel, onStay, onLeave }: Props) {
   const box = useRef<HTMLDivElement>(null), stay = useRef<HTMLButtonElement>(null), id = useId();
   const keepLearning = useRef(onStay); keepLearning.current = onStay;
-  useEffect(() => {
+  // Layout effect: focus and the Escape/Tab trap are in place as soon as the dialog is shown.
+  useLayoutEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
     stay.current?.focus();

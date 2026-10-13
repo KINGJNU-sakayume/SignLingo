@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Camera, Check, Equal, EqualNot, Info, Play, RotateCcw, Turtle, Volume2, VolumeX, X } from 'lucide-react';
 import { Avatar } from '../components/Avatar';
 import type { Catalog, Expression } from '../content/schema';
@@ -100,8 +100,10 @@ export function LessonPlayer({ session, catalog, clips, sound, cameraReturn, onS
     player.play(0);
   }
 
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
+  // Layout effects run in the same task as the DOM update, so keys work the moment a step is shown.
+  const onKey = useRef<(event: KeyboardEvent) => void>(() => undefined);
+  useLayoutEffect(() => {
+    onKey.current = event => {
       if (leaving || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || !step) return;
       const element = event.target instanceof HTMLElement ? event.target : null;
       const onChoice = !!element?.closest('[data-choice]');
@@ -116,10 +118,13 @@ export function LessonPlayer({ session, catalog, clips, sound, cameraReturn, onS
       event.preventDefault();
       if (sheetOpen || step.kind === 'intro') proceed();
       else if (isGraded(step) && selected) check(selected);
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    };
   });
+  useLayoutEffect(() => {
+    const listener = (event: KeyboardEvent) => onKey.current(event);
+    window.addEventListener('keydown', listener);
+    return () => window.removeEventListener('keydown', listener);
+  }, []);
 
   if (!step || !target) return <div className="sl-root lp" />;
   const text = prompt(step, target);
