@@ -5,7 +5,7 @@ import { practiceClip } from '../practice-fixtures';
 const reference=practiceClip();
 async function openPractice(page:Page) {
   await page.goto('/');await page.getByRole('button',{name:'수어 연습',exact:true}).click();
-  await page.getByLabel('표시 언어').selectOption('en');
+  await page.getByLabel('표시 언어').selectOption('ko');
   await page.getByLabel('기준 MotionClip JSON 불러오기',{exact:true}).setInputFiles({name:'synthetic-reference.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(reference))});
 }
 async function syntheticCamera(page:Page,photo=false) {
