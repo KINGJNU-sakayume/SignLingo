@@ -5,6 +5,7 @@ import { isPublished, parseCatalog } from '../content/validation';
 import type { Catalog, Expression } from '../content/schema';
 import { progressKey, type ProgressRecord } from './catalog';
 import { LessonDetail } from './LessonDetail';
+import { FingerspellingLesson } from './FingerspellingLesson';
 import './lessons.css';
 
 type Props = { progress: ProgressRecord; selected: string | null; onSelect: (id: string | null) => void;
@@ -13,6 +14,7 @@ type Props = { progress: ProgressRecord; selected: string | null; onSelect: (id:
 export function LessonHub({ progress, selected, onSelect, onViewed, onPractice }: Props) {
   const [catalog, setCatalog] = useState<Catalog | null>(null), [error, setError] = useState(''), [retry, setRetry] = useState(0);
   const [reviewOnly, setReviewOnly] = useState(false);
+  const [showFingerspelling,setShowFingerspelling]=useState(false);
   useEffect(() => {
     const controller = new AbortController(); setError('');
     fetch(assetUrl('content/manifest.json'), { signal: controller.signal }).then(async response => {
@@ -31,7 +33,9 @@ export function LessonHub({ progress, selected, onSelect, onViewed, onPractice }
     <p className="eyebrow">SIGNLINGO / 한국수어 학습</p>
     <h1>수어를 보고, 따라 하고, 복습하세요.</h1>
     <p className="lesson-intro">한국수어는 고유한 문법을 가진 언어입니다. 시범을 관찰하고 움직임을 반복해서 익혀 보세요.</p>
-    {error ? <div role="alert" className="lesson-error">{error} <button className="button secondary" onClick={() => setRetry(value => value + 1)}>다시 시도</button></div> : !catalog ? <p role="status">학습 목록을 불러오는 중입니다…</p> : <>
+    <div className="lesson-actions"><button type="button" className="button primary" aria-expanded={showFingerspelling} aria-controls="open-fingerspelling-lesson" onClick={()=>setShowFingerspelling(!showFingerspelling)}>{showFingerspelling?'지문자 학습 닫기':'공개 자료로 지문자 학습 시작 · 32개'}</button></div>
+    {showFingerspelling?<div id="open-fingerspelling-lesson"><FingerspellingLesson/></div>:
+    error ? <div role="alert" className="lesson-error">{error} <button className="button secondary" onClick={() => setRetry(value => value + 1)}>다시 시도</button></div> : !catalog ? <p role="status">학습 목록을 불러오는 중입니다…</p> : <>
       <div className="lesson-actions"><button className="button secondary" aria-pressed={!reviewOnly} onClick={() => { setReviewOnly(false); onSelect(null); }}>전체 학습 과정</button><button className="button secondary" aria-pressed={reviewOnly} onClick={() => { setReviewOnly(true); onSelect(null); }}>복습하기 · {studied.length}개</button></div>
       {entry ? <LessonDetail key={entry.id} entry={entry} progress={progress} onBack={() => onSelect(null)} onViewed={() => onViewed(entry)} onPractice={clip => onPractice(entry, clip)} /> : <>
         <section className="lesson-summary" aria-label="내 학습 기록"><p>학습 가능한 표현 <strong>{catalog.expressions.length}개</strong> · 관찰하거나 연습한 표현 <strong>{studied.length}개</strong></p><p className="lesson-note">기록은 이 브라우저에 저장됩니다. 학습 단계는 수어 정답률이 아닙니다.</p></section>
