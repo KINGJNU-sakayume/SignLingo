@@ -3,8 +3,9 @@ import { approvedFixture } from '../content-fixtures';
 import { readFile } from 'node:fs/promises';
 import { extname } from 'node:path';
 import { reviewSubject } from '../../src/content/validation';
+import deployed from '../../public/content/manifest.json' with { type: 'json' };
 
-// Only intercepted responses contain fixtures. Production public/ remains empty.
+// Only intercepted responses contain fixtures; synthetic lessons never enter production public/.
 async function fixtureRoutes(page: Page) {
   const fixture = await approvedFixture();
   await page.route('**/content/manifest.json', route => route.fulfill({ json: fixture.manifest }));
@@ -18,6 +19,8 @@ async function openCard(page: Page, name: string) {
 const overflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
 
 test('learner home shows upcoming units without upload controls or fake playable lessons', async ({ page }) => {
+  // The empty state is still reachable for any deployment with no published expression.
+  await page.route('**/content/manifest.json', route => route.fulfill({ json: { ...deployed, expressions: [] } }));
   await page.goto('/');
   await expect(page.getByRole('heading', { name: '첫 레슨을 준비하고 있어요' })).toBeVisible();
   await expect(page.getByRole('link', { name: '한국수어사전 열기' })).toHaveAttribute('href', 'https://sldict.korean.go.kr/');

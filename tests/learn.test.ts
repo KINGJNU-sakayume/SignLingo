@@ -22,11 +22,13 @@ describe('learning path', () => {
   it('groups new expressions into lessons of two or three', () => {
     expect([0, 1, 2, 3, 4, 5, 6, 7, 10].map(groupSizes)).toEqual([[], [1], [2], [3], [2, 2], [3, 2], [3, 3], [3, 2, 2], [3, 3, 2, 2]]);
   });
-  it('shows five coming-soon units and nothing playable for the deployed manifest', () => {
+  it('opens the published courtesy unit and keeps the other four coming soon for the deployed manifest', () => {
     const path = buildPath(parseCatalog(manifest), emptyStore(), NOW);
-    expect(path.hasContent).toBe(false); expect(path.current).toBeNull();
+    expect(path.hasContent).toBe(true); expect(path.current).not.toBeNull();
     expect(path.units).toHaveLength(5);
-    expect(path.units.every(unit => unit.soon && unit.nodes.length === 3 && unit.nodes.every(node => node.state === 'coming-soon' && node.kind === 'soon'))).toBe(true);
+    const [courtesy, ...rest] = path.units;
+    expect(courtesy.soon).toBe(false); expect(courtesy.nodes[0].state).toBe('current');
+    expect(rest.every(unit => unit.soon && unit.nodes.length === 3 && unit.nodes.every(node => node.state === 'coming-soon' && node.kind === 'soon'))).toBe(true);
   });
   it('unlocks one node at a time and skips units without published expressions', () => {
     const catalog = learnCatalog(['ksl-thanks', 'ksl-sorry', 'ksl-what']);

@@ -5,8 +5,8 @@ import { reviewSubject, sha256 } from '../src/content/validation';
 import { practiceClip } from './practice-fixtures';
 import type { MotionClip } from '../src/motion/types';
 
-export async function approvedFixture() {
-  const entry = expressionSchema.parse(structuredClone(catalog.expressions[0]));
+export async function approvedFixture(id = catalog.expressions[0].id) {
+  const entry = expressionSchema.parse(structuredClone(catalog.expressions.find(item => item.id === id)!));
   // Simulate metadata of an authorized camera import to exercise the release contract.
   // This metadata is deliberately fictional; geometry remains synthetic test data.
   const clip = practiceClip(); clip.source.name = 'contract-camera.mp4'; clip.pipeline.detector = 'contract-camera-import';
