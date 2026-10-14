@@ -3,7 +3,7 @@ export type Vec3 = [number, number, number];
 export type Quat = [number, number, number, number];
 export type Landmark = { x: number; y: number; z: number; visibility?: number; presence?: number };
 export type HandDetection = { image: Landmark[]; world: Landmark[]; label: string; score: number };
-export type Detection = { timestamp: number; body: Landmark[]; bodyWorld: Landmark[]; hands: HandDetection[] };
+export type Detection = { timestamp: number; body: Landmark[]; bodyWorld: Landmark[]; hands: HandDetection[]; discontinuity?: 'cut' };
 export type TrackingState = 'tracked' | 'held' | 'missing';
 export type Quality = { body: number; left: number; right: number; leftArm: number; rightArm: number; leftState: TrackingState; rightState: TrackingState };
 export type Correction = { joint: string; kind: string; amount: number };
@@ -18,6 +18,20 @@ export type MotionClip = {
   nonmanual: { head: string; face: 'not-estimated'; linguisticValidation: 'not-performed' };
   frames: MotionFrame[]; edits: WristEdit[];
 };
+// A separate, disposable visualization product. Never a MotionClip or scoring input.
+export type EvidenceState = 'observed' | 'interpolated' | 'held' | 'unavailable';
+export type HandEvidence = {
+  state: EvidenceState;
+  position: EvidenceState;
+  orientation: EvidenceState;
+  fingers: EvidenceState;
+  identity: 'reliable' | 'ambiguous' | 'unavailable';
+  anchors?: [number, number];
+  reason?: string;
+};
+export type DisplayPose = Pose & { evidence?: Record<Side, HandEvidence> };
+export type TemporalFrame = { timestamp: number; pose: DisplayPose; assignment: Partial<Record<Side, number>> };
+export type TemporalMotion = { algorithm: 'conservative-bidirectional-v1'; frames: TemporalFrame[]; maxGapMs: number; elapsedMs: number };
 export const SIDES: Side[] = ['left', 'right'];
 export const FINGERS = ['thumb', 'index', 'middle', 'ring', 'pinky'] as const;
 export const PIPELINE_VERSION = '0.2.0';

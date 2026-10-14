@@ -13,7 +13,8 @@
     "evaluate": "node scripts/evaluate.mjs",
     "content": "node scripts/content.mjs",
     "content:validate": "node scripts/content.mjs validate",
-    "check:dist": "node scripts/check-dist.mjs"
+    "check:dist": "node scripts/check-dist.mjs",
+    "evaluate:temporal": "node scripts/evaluate-temporal.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "1.1.0",

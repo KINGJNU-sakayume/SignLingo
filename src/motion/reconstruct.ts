@@ -12,10 +12,10 @@ export class Reconstructor {
   private previous?: MotionFrame;
   private lastGood: Record<Side, number> = { left: -Infinity, right: -Infinity };
   private poles: Partial<Record<Side, Vector3>> = {};
-  reconstruct(frame: Detection): MotionFrame {
-    const { assignment, warnings } = assignHands(frame);
+  reconstruct(frame: Detection, associated?: ReturnType<typeof assignHands>): MotionFrame {
+    const { assignment, warnings } = associated ?? assignHands(frame);
     // Old poles/handshapes must not bridge cuts, tracking outages or nonmonotonic input.
-    if (this.previous && (frame.timestamp <= this.previous.timestamp || frame.timestamp - this.previous.timestamp > 200)) {
+    if (this.previous && (frame.discontinuity === 'cut' || frame.timestamp <= this.previous.timestamp || frame.timestamp - this.previous.timestamp > 200)) {
       this.previous = undefined; this.poles = {}; this.lastGood = { left: -Infinity, right: -Infinity };
     }
     const result: MotionFrame = { ...frame, assignment, warnings, corrections: [], pose: { root: [0,1.3,0], rotations: neutralRotations(), quality: { body: 0, left: 0, right: 0, leftArm: 0, rightArm: 0, leftState: 'missing', rightState: 'missing' } } };
