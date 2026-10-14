@@ -2,7 +2,7 @@ import { Suspense, memo, useEffect, useRef, Component, type ReactNode } from 're
 import { Canvas, useThree } from '@react-three/fiber';
 import { ContactShadows, Grid, OrbitControls, Line } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
-import { FINGERS, SIDES, type Pose, type Side, type Quat, type MotionFrame } from '../motion/types';
+import { FINGERS, SIDES, type DisplayPose as Pose, type Side, type Quat, type MotionFrame } from '../motion/types';
 import { fingerLengths, fingerOffsets, neutralRotations } from '../motion/rig';
 import { LENGTHS, normalizeBody, alignHand, arr } from '../motion/math';
 const ID: Quat=[0,0,0,1];
@@ -35,9 +35,10 @@ function Mannequin({pose,skeleton,markers,highlightSide}:{pose:Pose|null;skeleto
       {[-1,1].map(s=><mesh key={s} position={[s*0.033,0.126,0.077]}><sphereGeometry args={[0.007,12,8]}/><meshStandardMaterial color="#203642"/></mesh>)}
     </group>
     {SIDES.map(side=>{
-      const state=pose?.quality[`${side}State`]??'tracked';
-      const visible=!pose || (active&&pose.quality[`${side}Arm`]>0);
-      const color=highlightSide===side?'#ff79c6':pose ? (state==='tracked'?(side==='left'?'#53d5c0':'#e6af68'):'#75808a'):'#82949f';
+      const evidence=pose?.evidence?.[side];
+      const state=evidence ? (evidence.state==='unavailable'?'missing':evidence.state==='observed'?'tracked':evidence.state) : pose?.quality[`${side}State`]??'tracked';
+      const visible=!pose || (active&&(pose.quality[`${side}Arm`]>0||evidence?.position==='interpolated'));
+      const color=highlightSide===side?'#ff79c6':state==='interpolated'?'#b49bea':pose ? (state==='tracked'?(side==='left'?'#53d5c0':'#e6af68'):'#75808a'):'#82949f';
       return <group key={side} position={[side==='left'?0.19:-0.19,0,0]} visible={visible} quaternion={rotations[`${side}.upper`]}>
         <Joint radius={0.052}/><Segment length={LENGTHS.upper} radius={0.042} {...{color,skeleton,markers}}/>
         <group position={[0,LENGTHS.upper,0]} quaternion={rotations[`${side}.lower`]}>
@@ -46,7 +47,7 @@ function Mannequin({pose,skeleton,markers,highlightSide}:{pose:Pose|null;skeleto
             <Joint radius={0.022} color={state==='missing'?'#e57b7b':color}/>
             <group visible={state!=='missing'}>
               <mesh position={[0,0.042,0]} scale={[0.037,0.047,0.014]}><sphereGeometry args={[1,20,16]}/><meshStandardMaterial color={state==='held'?'#f4b65f':color} transparent opacity={state==='held'?0.45:skeleton?0.3:1}/></mesh>
-              <Fingers {...{side,rotations,skeleton,markers}} color={state==='held'?'#f4b65f':color}/>
+              {(!evidence||evidence.fingers!=='unavailable')&&<Fingers {...{side,rotations,skeleton,markers}} color={state==='held'?'#f4b65f':color}/>}
             </group>
           </group>
         </group>

@@ -1,6 +1,7 @@
 import { useEffect,useMemo,useRef,useState, type ChangeEvent } from 'react';
 import { Activity,ArrowDownToLine,ArrowUpFromLine,Box,Check,ChevronRight,FileVideo,Focus,Hand,Info,LoaderCircle,Pause,Play,RotateCcw,ScanLine,Upload,X } from 'lucide-react';
 import { DiagnosticsLab, type PipelineView } from './components/DiagnosticsLab';
+import { reconstructTemporalAsync } from './motion/temporalReconstruction';
 import { reconstructClip } from './motion/comparison';
 import { Avatar } from './components/Avatar';
 import { Overlay } from './components/Overlay';
@@ -8,8 +9,9 @@ import { MediaPipeDetector } from './motion/detector';
 import { processVideo,type Progress } from './motion/video';
 import { downloadMotion,importMotion } from './motion/serialization';
 import { frameIndex,playbackTime,samplePose } from './motion/player';
-import { SIDES,type MotionClip,type Side,type Vec3 } from './motion/types';
+import { SIDES,type DisplayPose,type MotionClip,type TemporalMotion,type Side,type Vec3 } from './motion/types';
 import { koMessage, koState } from './i18n/ko';
+const evidenceLabel={observed:'관측',interpolated:'시간 보간',held:'임시 유지',unavailable:'사용 불가'};
 const timeLabel=(s:number)=>`${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toFixed(2).padStart(5,'0')}`;
 export default function App({active=true}:{active?:boolean}){
   const [file,setFile]=useState<File|null>(null),[url,setUrl]=useState(''),[clip,setClip]=useState<MotionClip|null>(null);
@@ -18,17 +20,26 @@ export default function App({active=true}:{active?:boolean}){
   const [mirrored,setMirrored]=useState(false),[sampleHz,setSampleHz]=useState(30),[progress,setProgress]=useState<Progress|null>(null),[error,setError]=useState('');
   const [correctionSide,setCorrectionSide]=useState<Side>('left'),[edit,setEdit]=useState<Vec3>([0,0,0]);
   const video=useRef<HTMLVideoElement>(null),upload=useRef<HTMLInputElement>(null),jsonInput=useRef<HTMLInputElement>(null),abort=useRef<AbortController|null>(null);
+  const [temporal,setTemporal]=useState<TemporalMotion|null>(null),[temporalView,setTemporalView]=useState('enhanced'),[temporalProgress,setTemporalProgress]=useState<Progress|null>(null),[temporalRequest,setTemporalRequest]=useState(0);
+  const temporalAbort=useRef<AbortController|null>(null);
+  useEffect(()=>{
+    setTemporal(null);setTemporalProgress(null);if(!clip||!active)return;
+    const controller=new AbortController();temporalAbort.current=controller;
+    reconstructTemporalAsync(clip,{signal:controller.signal,progress:setTemporalProgress}).then(result=>{if(!controller.signal.aborted)setTemporal(result);}).catch(e=>{if(!controller.signal.aborted)setError(`시간 복원 실패: ${koMessage(e instanceof Error?e.message:String(e))}`);}).finally(()=>{if(!controller.signal.aborted)setTemporalProgress(null);});
+    return()=>controller.abort();
+    // Edits are applied at playback, after either reconstruction.
+  },[clip?.frames,active,temporalRequest]);
   const [technical,setTechnical]=useState(false),[pipelineView,setPipelineView]=useState<PipelineView>('stored');
   const comparisons=useMemo(()=>technical&&clip?{stored:clip,original:reconstructClip(clip,'original'),improved:reconstructClip(clip,'improved')}:null,[technical,clip]);
   const displayedClip=comparisons?comparisons[pipelineView]:clip;
   const clock=useRef(0);const busy=!!progress;
   const length=clip?.source.duration??duration;const offset=clip?.source.timeOffset??0;
   const index=clip?frameIndex(clip,time):0,frame=displayedClip?.frames[index];
-  const pose=useMemo(()=>technical?frame?.pose??null:clip?samplePose(clip,time):null,[clip,time,technical,frame]);
+  const pose=useMemo<DisplayPose|null>(()=>technical?frame?.pose??null:clip?samplePose(clip,time,temporalView==='enhanced'?temporal??undefined:undefined):null,[clip,time,technical,frame,temporal,temporalView]);
   const suspects=useMemo(()=>displayedClip?.frames.flatMap((f,i)=>f.warnings.length?[i]:[])??[],[displayedClip]);
   const trackCounts=useMemo(()=>displayedClip?SIDES.map(side=>displayedClip.frames.filter(f=>f.pose.quality[`${side}State`]==='tracked').length):[0,0],[displayedClip]);
   useEffect(()=>()=>{abort.current?.abort();},[]);
-  useEffect(()=>{if(!active){video.current?.pause();setPlaying(false);abort.current?.abort();}},[active]);
+  useEffect(()=>{if(!active){video.current?.pause();setPlaying(false);abort.current?.abort();temporalAbort.current?.abort();setTemporalProgress(null);}},[active]);
   useEffect(()=>()=>{if(url)URL.revokeObjectURL(url);},[url]);
   useEffect(()=>{if(video.current)video.current.playbackRate=speed;},[speed,url]);
   useEffect(()=>{let request=0,last=performance.now();const tick=(now:number)=>{
@@ -92,6 +103,12 @@ export default function App({active=true}:{active?:boolean}){
           <div className="panel-toolbar"><div className="toolbar-checks"><label className="check"><input type="checkbox" checked={skeleton} onChange={e=>setSkeleton(e.target.checked)}/>뼈대 표시</label><label className="check"><input type="checkbox" checked={markers} onChange={e=>setMarkers(e.target.checked)}/>관절 표시</label></div><span>고정 길이 관절형 아바타</span></div>
         </section>
       </div>
+      {clip&&!technical&&<div className="technical-toggle" aria-label="시간 복원 비교">
+        <label>복원 비교 <select aria-label="시간 복원 선택" value={temporalView} onChange={e=>{pause();setTemporalView(e.target.value);}}><option value="original">원본 복원</option><option value="enhanced" disabled={!temporal}>시간 복원</option></select></label>
+        {temporalProgress?<span role="status">{temporalProgress.phase} · {temporalProgress.done}/{temporalProgress.total} <button className="text-button" onClick={()=>{temporalAbort.current?.abort();setTemporalProgress(null);setTemporalView('original');}}>시간 복원 취소</button></span>:<span aria-live="polite">{SIDES.map(side=>{const e=pose?.evidence?.[side];const state=e?.state??(frame?.pose.quality[`${side}State`]==='tracked'?'observed':frame?.pose.quality[`${side}State`]==='held'?'held':'unavailable');return <span key={side} title={e?`손목 위치: ${evidenceLabel[e.position]} · 방향: ${evidenceLabel[e.orientation]} · 손가락: ${evidenceLabel[e.fingers]}`:undefined}>{side==='left'?'왼손':'오른손'}: {evidenceLabel[state]}{e?.state==='interpolated'&&e.fingers==='unavailable'?' (손가락 사용 불가)':''}　</span>;})}</span>}
+        {!temporal&&!temporalProgress&&<button className="text-button" onClick={()=>{setTemporalView('enhanced');setTemporalRequest(n=>n+1);}}>시간 복원 실행</button>}
+        <span>시간 보간은 추정된 표시이며 연습 점수의 관측 근거가 아닙니다.</span>
+      </div>}
       <section className="transport" aria-label="영상과 동작 동기화 재생"><button className="play-button" aria-label={playing?'일시정지':'재생'} onClick={toggle} disabled={!length||busy}>{playing?<Pause size={18}/>:<Play size={18}/>}</button><span className="time-readout">{timeLabel(time)} <span>/ {timeLabel(length)}</span></span><div className="timeline-container"><input aria-label="재생 위치" type="range" min={0} max={length||1} step={0.001} value={time} disabled={!length||busy} onChange={e=>seek(Number(e.target.value))}/><div className="timeline-flags">{suspects.filter((_,i)=>i%Math.max(1,Math.ceil(suspects.length/250))===0).map(i=><i key={i} style={{left:`${clip!.frames[i].timestamp/(length*1000)*100}%`}}/>)}</div></div><div className="speed-controls" aria-label="재생 속도">{[0.25,0.5,1].map(s=><button key={s} className={speed===s?'selected':''} aria-pressed={speed===s} onClick={()=>setSpeed(s)}>{s}×</button>)}</div><span className="sync-label"><span className={`status-dot ${clip?'':'inactive'}`}/>{clip?(url?'영상과 동기화됨':'동작만 재생 중'):'동작 대기 중'}</span></section>
       <div className="bottom-grid"><section className="settings-card"><div className="section-title"><Activity size={17}/><h2>동작 복원</h2><span className="small-tag">기기 내 처리</span></div><div className="settings-row"><div><label htmlFor="sampleHz">프레임 추출 빈도</label><p>30Hz는 짧은 손가락 움직임을 더 자세히 기록합니다.</p></div><select id="sampleHz" disabled={busy} value={sampleHz} onChange={e=>setSampleHz(Number(e.target.value))}><option value={15}>15프레임/초</option><option value={30}>30프레임/초</option></select></div><div className="settings-row"><div><label htmlFor="mirrored">원본 영상 좌우 반전</label><p>저장된 영상 자체가 좌우 반전된 경우 켜세요.</p></div><input id="mirrored" type="checkbox" disabled={busy} checked={mirrored} onChange={e=>setMirrored(e.target.checked)}/></div><button className="button primary process-button" onClick={reconstruct} disabled={!file||!duration||busy}>{busy?<LoaderCircle className="spin" size={17}/>:<ScanLine size={17}/>} {busy?'프레임 분석 중…':clip?'영상 다시 분석':'동작 추출 및 복원'}<ChevronRight size={17}/></button><p className="settings-footnote">한 명의 수어 동작자와 어깨·양손이 보이는 영상을 사용하세요. 모델 파일은 외부 저장소에서 내려받으며, 계정이나 별도 분석 서버는 필요하지 않습니다.</p></section>
       <section className="diagnostics-card"><div className="section-title"><ScanLine size={17}/><h2>추적 진단</h2><span className={`diagnostic-status ${clip?'has-data':''}`}>{clip?'현재 프레임':'데이터 없음'}</span></div><div className="quality-grid">{[['몸통',frame?.pose.quality.body],['왼손',frame?.pose.quality.left],['오른손',frame?.pose.quality.right]].map(([label,value])=><div className="quality-cell" key={String(label)}><span>{label}</span><strong>{typeof value==='number'?value.toFixed(2):'—'}<small>{label==='몸통'?'가시성':'추정 신뢰도'}</small></strong><div className="quality-meter"><i style={{width:`${typeof value==='number'?value*100:0}%`}}/></div></div>)}</div><div className="diagnostic-details">{frame?<><div className="diagnostic-summary"><span>왼손: {koState(frame.pose.quality.leftState)} · 오른손: {koState(frame.pose.quality.rightState)}</span><span>{frame.corrections.length}건의 보정</span></div>{frame.warnings.length?<ul className="warning-list">{frame.warnings.map((w,i)=><li key={i}>{koMessage(w)}</li>)}</ul>:<p className="no-warnings"><Check size={14}/> 현재 프레임에서 발견된 주의 사항이 없습니다. 이는 정확성을 보장하지 않습니다.</p>}<div className="diagnostic-summary"><span>손 추적: 왼손 {trackCounts[0]} · 오른손 {trackCounts[1]} / 전체 {clip!.frames.length}프레임</span><button className="text-button" disabled={!suspects.length} onClick={()=>{pause();const next=suspects.find(i=>i>index)??suspects[0];seek(clip!.frames[next].timestamp/1000);}}>다음 주의 프레임 →</button></div></>:<div className="diagnostic-empty"><Info size={18}/><div><strong>아직 분석 결과가 없습니다.</strong><p>영상을 올리면 인식 누락, 양손 구분, 깊이 추정 및 관절 제약 문제를 확인할 수 있습니다.</p></div></div>}</div><p className="confidence-note">추정 신뢰도는 팔 가시성, 양손 분류 점수, 손바닥 형태의 안정성을 반영합니다. 실제 3D 정확도나 개별 손가락의 정확도를 뜻하지 않습니다.</p></section></div>

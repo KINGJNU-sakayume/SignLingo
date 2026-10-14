@@ -31,6 +31,8 @@ jobs:
         run: npm run content:validate
       - name: Test reconstruction geometry and data contracts
         run: npm test
+      - name: Evaluate controlled temporal occlusion on synthetic observations
+        run: npm run evaluate:temporal -- --synthetic --output work/evaluation/temporal-synthetic.json
       - name: Build for repository subpath
         run: npm run build
       - name: Install Chromium for UI validation

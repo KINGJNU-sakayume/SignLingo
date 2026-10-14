@@ -43,6 +43,9 @@ export function frameFeature(frame:MotionFrame,index:number,body?:UpperBodyFrame
   }
   return feature;
 }
+// Scoring consumes only original MotionClip observations and assignments.
+// TemporalMotion/DisplayPose is a separate visualization product and never
+// participates in coverage, active boundaries, alignment, or similarity.
 export function features(clip:MotionClip) {
   const calibration=calibratedUp(clip),tracker=new UpperBodyTracker(calibration.up,calibration.source);
   return clip.frames.map((f,i)=>frameFeature(f,i,tracker.frame(f,clip.source.width,clip.source.height),clip.source.width,clip.source.height));
