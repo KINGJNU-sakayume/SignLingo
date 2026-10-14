@@ -110,10 +110,18 @@ Learning Mode now starts from `public/content/manifest.json`. Approved expressio
 
 See [source and rights research](docs/KSL_CONTENT_RESEARCH.md) and [content preparation, review and publishing](docs/CONTENT_PUBLISHING.md). `npm run content:validate` checks rights, separate reviews, evidence documents, asset integrity and published-version compatibility; production builds run it automatically. Motion Lab and its local inspection flow remain available.
 
-## Pipeline 0.3.0 and batch processing
+## Batch processing and the experimental pipeline 0.3.0
 
-Motion Lab now extracts with pipeline **0.3.0**: after the unchanged full-frame pass, each pose wrist predicts a square around its hand (sized from the image-space forearm). The square is cut from the decoded frame, upscaled to 320 px, and given to an IMAGE-mode HandLandmarker. The result is mapped back to frame coordinates and fused with the full-frame hands by handedness score. Duplicate estimates of the same hand are dropped by landmark correspondence, so touching hands are kept. Left/right assignment still uses the existing wrist rules. The 0.2.0 solver is unchanged.
+Motion Lab and `npm run motion:batch` extract with pipeline **0.2.0** by default. Pipeline **0.3.0** is an opt-in experiment: Motion Lab's **실험: 손 영역 재검출** checkbox or `--pipeline 0.3.0`.
 
-Clips record `pipeline.handRegions` (all parameters), a learner-display temporal policy, and each hand's `origin`, all within schema 1. The `learner` display preset runs temporal reconstruction first for clips that record the policy. Published v1 (0.2.0) clips, Practice analysis (still 0.2.0) and stored data are unchanged.
+- After the unchanged full-frame pass, 0.3.0 re-detects each hand in a pose-predicted crop sized from the image-space forearm. The crop is upscaled to 320 px and run through an IMAGE-mode HandLandmarker.
+- Region hands are fused with full-frame hands by handedness score. Duplicates are recognized by landmark correspondence, and left/right assignment keeps the existing wrist rules.
+- 0.3.0 clips record `pipeline.handRegions`, a learner-display temporal policy, and each hand's `origin`, all within schema 1.
 
-`npm run motion:batch`, `motion:compare` and `motion:report` process local videos in headless Chromium through the same `extractMotion()` path, with all off-machine requests blocked. They write per-clip reports to `work/`. See [batch processing and 0.3.0](docs/MOTION_BATCH.md) and the [recording guide](docs/RECORDING_GUIDE.md) for contributors. Real-video comparisons run locally only; private videos and derived JSON are never committed.
+On the private real-video evaluation (run-2), 0.3.0 did not reduce missing hands and cost more than 2× throughput, so it stays experimental.
+
+The learner display's hand filling now has a safeguard: hands with too little observed evidence in the signing interval, or with off-screen wrists, are hidden rather than filled. On published course 1, this changes 2 frames per hand in ksl-meet.
+
+`npm run motion:batch`, `motion:compare` (with `--trace <file>` for frame-by-frame diagnostics) and `motion:report` process local videos in headless Chromium through the same `extractMotion()` path, with all off-machine requests blocked. Reports go to `work/` and contain numbers and coordinates only.
+
+See [batch processing and 0.3.0](docs/MOTION_BATCH.md) and the [recording guide](docs/RECORDING_GUIDE.md) for contributors. Real-video comparisons run privately; private videos and derived JSON are never committed.

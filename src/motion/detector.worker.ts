@@ -30,8 +30,9 @@ self.onmessage=async (event: MessageEvent)=>{
       try {
         const p=pose.detectForVideo(frame,timestampMs), h=hands.detectForVideo(frame,timestampMs);
         const body=clean(p.landmarks[0]??[]);
-        const detected=regionHands&&regions&&surface?await detectWithRegions({body,frameHands:handsFrom(h),source:detail??frame,surface,landmarker:regionHands,settings:regions}):handsFrom(h);
-        self.postMessage({type:'result',result:{timestamp:timestampMs,body,bodyWorld:clean(p.worldLandmarks[0]??[]),hands:detected}});
+        const refined=regionHands&&regions&&surface?await detectWithRegions({body,frameHands:handsFrom(h),source:detail??frame,surface,landmarker:regionHands,settings:regions}):undefined;
+        // The fusion trace (counts, boxes, scores) travels beside the detection, never inside it.
+        self.postMessage({type:'result',result:{timestamp:timestampMs,body,bodyWorld:clean(p.worldLandmarks[0]??[]),hands:refined?.hands??handsFrom(h)},fusion:refined?.trace});
       } finally { frame.close();detail?.close(); }
     }
   } catch(error) { self.postMessage({type:'error',message:error instanceof Error ? error.message : String(error)}); }

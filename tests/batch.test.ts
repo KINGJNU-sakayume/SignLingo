@@ -16,9 +16,10 @@ import { MODELS, SIDES, type MotionClip } from '../src/motion/types';
 
 describe('arguments', () => {
   it('defaults to 0.2.0 at 30 Hz and the documented report path; 0.3.0 only when asked', () => {
-    expect(parseArgs(['batch', 'a.webm', 'videos', '--out', 'private-data/exports'])).toEqual({ command: 'batch', inputs: ['a.webm', 'videos'], out: 'private-data/exports', report: 'work/batch-report.json', hz: 30, pipeline: '0.2.0', mirrored: false });
+    expect(parseArgs(['batch', 'a.webm', 'videos', '--out', 'private-data/exports'])).toEqual({ command: 'batch', inputs: ['a.webm', 'videos'], out: 'private-data/exports', report: 'work/batch-report.json', hz: 30, pipeline: '0.2.0', mirrored: false, trace: [] });
     expect(parseArgs(['batch', 'a.mp4', '--out', 'o', '--hz', '15', '--pipeline', '0.3.0', '--mirrored', '--channel', 'chrome'])).toMatchObject({ hz: 15, pipeline: '0.3.0', mirrored: true, channel: 'chrome' });
-    expect(parseArgs(['compare', 'private-data/videos'])).toMatchObject({ out: 'work/compare', report: 'work/compare-report.json' });
+    expect(parseArgs(['compare', 'private-data/videos'])).toMatchObject({ out: 'work/compare', report: 'work/compare-report.json', trace: [] });
+    expect(parseArgs(['compare', 'private-data/videos', '--trace', 'ksl-no.webm', '--trace', 'ksl-ask.mp4']).trace).toEqual(['ksl-no.webm', 'ksl-ask.mp4']);
   });
   it.each([
     [['batch', 'a.webm'], '--out'],
@@ -30,6 +31,8 @@ describe('arguments', () => {
     [['batch', 'a.webm', '--fast'], '알 수 없는 옵션'],
     [['batch', '--out', 'o'], '입력이 없습니다'],
     [['publish', 'x'], '사용법'],
+    [['batch', 'a.webm', '--out', 'o', '--trace', 'a.webm'], 'motion:compare에서만'],
+    [['compare', 'videos', '--trace'], '값이 필요'],
   ])('rejects %j', (argv, message) => expect(() => parseArgs(argv)).toThrow(message));
   it('expands folders itself (Windows shells do not glob) and refuses duplicate output names', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'batch-args-'));
@@ -135,9 +138,12 @@ describe('clip metrics', () => {
     const markdown = compareMarkdown({ format: 'signlingo.motion-compare', version: 1, environment: { generatedAt: '2026-10-14T00:00:00Z' }, sampleHz: 30, mirrored: false, versions: ['0.2.0', '0.3.0'], notice: NOTICE,
       clips: [{ file: 'clip-01.webm', bytes: 1, sha256: 'a'.repeat(64), runs: { '0.2.0': entry('0.2.0', clip('0.2.0', hidden)), '0.3.0': entry('0.3.0', clip('0.3.0', hidden)) } },
         { file: 'clip-02.mp4', bytes: 1, sha256: 'b'.repeat(64), runs: { '0.2.0': entry('0.2.0', undefined, 'Video decode failure'), '0.3.0': entry('0.3.0', undefined, 'Video decode failure') } }] });
-    expect(markdown).toContain('| 클립 | 버전 | 프레임 | 왼손 누락률 | 오른손 누락률 | held 왼/오 | 보간 왼/오 | 채움 왼손 앞·중간·뒤 | 채움 오른손 앞·중간·뒤 |');
-    expect(markdown).toMatch(/\| clip-01\.webm \| 0\.2\.0 \| 30 \| [\d.]+% \| [\d.]+% \| \d+ \/ \d+ \| 0 \/ 0 \| 0·3·0 \| 0·3·0 \|/);
-    expect(markdown).toMatch(/\| clip-01\.webm \| 0\.3\.0 \| 30 \| [\d.]+% \| [\d.]+% \| \d+ \/ \d+ \| 3 \/ 3 \| 0·0·0 \| 0·0·0 \|/);
+    expect(markdown).toContain('| 클립 | 버전 | 프레임 | 왼손 누락률 | 오른손 누락률 | held 왼/오 | 보간 왼/오 | 채움 왼손 앞·중간·뒤 | 채움 오른손 앞·중간·뒤 | 채움 대신 숨김 왼/오 |');
+    expect(markdown).toMatch(/\| clip-01\.webm \| 0\.2\.0 \| 30 \| [\d.]+% \| [\d.]+% \| \d+ \/ \d+ \| 0 \/ 0 \| 0·3·0 \| 0·3·0 \| 0 \/ 0 \|/);
+    expect(markdown).toMatch(/\| clip-01\.webm \| 0\.3\.0 \| 30 \| [\d.]+% \| [\d.]+% \| \d+ \/ \d+ \| 3 \/ 3 \| 0·0·0 \| 0·0·0 \| 0 \/ 0 \|/);
+    expect(markdown).toContain('| 클립 | 버전 | 구간 | 프레임 | 왼손 누락률 | 오른손 누락률 | 화면 밖 왼/오 | 화면 안 실패 왼/오 |');
+    expect(markdown).toContain('| 클립 | 버전 | 저장 frame/region | 배정 frame/region | 버림 (frame/region) | 주요 버림 사유 | 중복 쌍 |');
+    expect(markdown).toMatch(/\| clip-01\.webm \| 0\.3\.0 \| [\d.]+–[\d.]+ s \| \d+ \| [\d.]+% \| [\d.]+% \| \d+ \/ \d+ \| \d+ \/ \d+ \|/);
     expect(markdown).toContain('## 실패 (합계에서 제외)\n- clip-02.mp4 (0.2.0): Video decode failure');
     expect(markdown).toContain('| 0.3.0 | 30 |');
     const batch = batchMarkdown({ format: 'signlingo.motion-batch', version: 1, environment: { generatedAt: 'now' }, notice: NOTICE, clips: [entry('0.3.0', clip('0.3.0', hidden))] });

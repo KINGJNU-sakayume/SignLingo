@@ -1,6 +1,7 @@
 import type { HandLandmarker, PoseLandmarker } from '@mediapipe/tasks-vision';
 import { MODELS } from './types';
 import type { Detection, HandRegionSettings } from './types';
+import type { FusionTrace } from './handRegions';
 import { cleanLandmarks, detectWithRegions, handsFrom, regionLandmarkerOptions } from './visionResult';
 export type VisionFrame = ImageBitmap | HTMLCanvasElement;
 export function releaseFrame(frame: VisionFrame) { if ('close' in frame) frame.close(); }
@@ -10,6 +11,8 @@ export interface LandmarkDetector {
   readonly id: string;
   /** Present when hands are also re-detected in pose-predicted crops (pipeline 0.3.0). */
   readonly handRegions?: HandRegionSettings;
+  /** Diagnostics of the latest detect() with hand regions; not part of the Detection or any MotionClip. */
+  readonly lastFusion?: FusionTrace;
   initialize(): Promise<void>;
   /** `detail` is the same decoded frame at higher resolution, used only for hand-region crops. Both frames are released. */
   detect(frame: VisionFrame, timestampMs: number, detail?: VisionFrame): Promise<Detection>;
@@ -20,6 +23,7 @@ type Pending = { resolve: (value: Detection) => void; reject: (reason: Error) =>
 class WorkerMediaPipeDetector implements LandmarkDetector {
   readonly id='mediapipe-tasks-vision@1.1.0';
   readonly handRegions?: HandRegionSettings;
+  lastFusion?: FusionTrace;
   constructor(options: DetectorOptions = {}) { this.handRegions=options.handRegions; }
   private worker?: Worker;
   private pending?: Pending;
@@ -39,12 +43,13 @@ class WorkerMediaPipeDetector implements LandmarkDetector {
     this.worker.onmessage=e=>{
       if (!this.pending) return;
       const pending=this.pending;this.pending=undefined;clearTimeout(pending.timer);
-      if (e.data.type==='result') pending.resolve(e.data.result);
+      if (e.data.type==='result') { this.lastFusion=e.data.fusion;pending.resolve(e.data.result); }
       else pending.reject(new Error(e.data.message || 'Unexpected detector response.'));
     };
     this.worker.onerror=e=>{ if (this.pending) { clearTimeout(this.pending.timer);this.pending.reject(new Error(e.message));this.pending=undefined; } };
   }
   detect(frame: ImageBitmap,timestampMs: number,detail?: ImageBitmap) {
+    this.lastFusion=undefined;
     if (!this.worker || this.pending) { frame.close();detail?.close();return Promise.reject(new Error('Detector is not ready for another frame.')); }
     return new Promise<Detection>((resolve,reject)=>{
       const timer=setTimeout(()=>{ this.pending=undefined;reject(new Error('Frame inference timed out. Try a smaller video or another browser.'));},45000);
@@ -75,6 +80,7 @@ export class MainThreadMediaPipeDetector implements LandmarkDetector {
   private hands?:HandLandmarker;
   private regionHands?:HandLandmarker;
   private surface?:HTMLCanvasElement;
+  lastFusion?:FusionTrace;
   private closed=false;
   constructor(options:DetectorOptions={}) {this.handRegions=options.handRegions;}
 
@@ -114,6 +120,7 @@ export class MainThreadMediaPipeDetector implements LandmarkDetector {
     // Yield a macrotask before synchronous inference so Safari can paint
     // progress and process a Cancel click between sampled frames.
     await new Promise<void>(resolve=>setTimeout(resolve,0));
+    this.lastFusion=undefined;
     try {
       if(this.closed || !this.pose || !this.hands)throw new DOMException('Processing canceled','AbortError');
       const p=this.pose.detectForVideo(frame,timestampMs);
@@ -122,7 +129,8 @@ export class MainThreadMediaPipeDetector implements LandmarkDetector {
       let hands=handsFrom(h);
       if(this.regionHands&&this.handRegions){
         this.surface??=document.createElement('canvas');
-        hands=await detectWithRegions({body,frameHands:hands,source:detail??frame,surface:this.surface,landmarker:this.regionHands,settings:this.handRegions});
+        const refined=await detectWithRegions({body,frameHands:hands,source:detail??frame,surface:this.surface,landmarker:this.regionHands,settings:this.handRegions});
+        hands=refined.hands;this.lastFusion=refined.trace;
       }
       return {timestamp:timestampMs,body,bodyWorld:cleanLandmarks(p.worldLandmarks[0]??[]),hands};
     } finally {
@@ -152,6 +160,7 @@ export class MediaPipeDetector implements LandmarkDetector {
   ) {}
   get id():string {return this.backend?.id??'mediapipe-tasks-vision@1.1.0';}
   get handRegions():HandRegionSettings|undefined {return this.options.handRegions;}
+  get lastFusion():FusionTrace|undefined {return this.backend?.lastFusion;}
   private async initializeBackend(main:boolean) {
     if(this.closed)throw new DOMException('Processing canceled','AbortError');
     const backend=main?this.factories.main(this.options):this.factories.worker(this.options);this.backend=backend;

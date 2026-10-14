@@ -44,6 +44,8 @@ it('adds an IMAGE-mode crop landmarker for hand regions and fuses its hands into
     const result=await detector.detect(frame,7,detail);
     expect(context.drawImage.mock.calls[0][0]).toBe(detail);
     expect(result.hands).toHaveLength(1);expect(result.hands[0]).toMatchObject({origin:'region',label:'Left',score:.91});
+    expect(detector.lastFusion).toMatchObject({source:{width:1400,height:932},candidates:{frame:0,region:1},kept:[{origin:'region',label:'Left',score:.91}],dropped:[]});
+    expect(detector.lastFusion!.regions.left).not.toBeNull();expect(detector.lastFusion!.regions.right).toBeNull(); // no right wrist in this poseexpect('image' in result.hands[0]).toBe(true);
     expect(frame.close).toHaveBeenCalledOnce();expect(detail.close).toHaveBeenCalledOnce();
     detector.close();expect(regions.close).toHaveBeenCalledOnce();
   }finally{vi.unstubAllGlobals();}

@@ -95,27 +95,54 @@ export function handSeparation(a: HandDetection, b: HandDetection, width: number
  * landmarks nearly coincide, not overlapping boxes, so two touching hands both survive. The winner is kept
  * whole: averaging two estimates would produce a hand neither model saw.
  */
-export function fuseHands(frameHands: HandDetection[], regionHands: HandDetection[], width: number, height: number, fusion: HandRegionSettings['fusion'] = HAND_REGION_DEFAULTS.fusion): HandDetection[] {
-  const candidates = [...frameHands.map(h => ({ ...h, origin: 'frame' as const })), ...regionHands.map(h => ({ ...h, origin: 'region' as const }))]
-    .map((hand, order) => ({ hand, order })).filter(c => usable(c.hand));
+export type FusionDrop = { origin: 'frame' | 'region'; label: string; score: number; reason: 'invalid' | 'duplicate' | 'cap' };
+/** `fuseHands` plus every candidate it left out and why: malformed, the same hand as a kept one, or over `maxHands`. */
+export function fuseHandsDetailed(frameHands: HandDetection[], regionHands: HandDetection[], width: number, height: number, fusion: HandRegionSettings['fusion'] = HAND_REGION_DEFAULTS.fusion): { hands: HandDetection[]; dropped: FusionDrop[] } {
+  const all = [...frameHands.map(h => ({ ...h, origin: 'frame' as const })), ...regionHands.map(h => ({ ...h, origin: 'region' as const }))].map((hand, order) => ({ hand, order }));
+  const drop = (hand: HandDetection, reason: FusionDrop['reason']): FusionDrop => ({ origin: hand.origin ?? 'frame', label: hand.label, score: hand.score, reason });
+  const dropped = all.filter(c => !usable(c.hand)).map(c => drop(c.hand, 'invalid'));
+  const candidates = all.filter(c => usable(c.hand));
   candidates.sort((a, b) => b.hand.score - a.hand.score || (a.hand.origin === b.hand.origin ? 0 : a.hand.origin === 'frame' ? -1 : 1) || a.order - b.order);
   const kept: HandDetection[] = [];
   for (const { hand } of candidates) {
-    if (kept.length >= fusion.maxHands) break;
     const duplicate = kept.some(k => {
       const separation = handSeparation(k, hand, width, height);
       return separation < (k.label === hand.label ? fusion.sameHand : fusion.sameHandOppositeLabel);
     });
-    if (!duplicate) kept.push(hand);
+    if (duplicate) dropped.push(drop(hand, 'duplicate'));
+    else if (kept.length >= fusion.maxHands) dropped.push(drop(hand, 'cap'));
+    else kept.push(hand);
   }
-  return kept;
+  return { hands: kept, dropped };
 }
+/**
+ * Confidence fusion: candidates are ordered by handedness score (the only per-hand confidence Tasks Vision
+ * returns; a classification proxy, not localization accuracy), ties prefer the full-frame estimate, and a
+ * candidate is suppressed when it is the same physical hand as one already kept. Same hand means corresponding
+ * landmarks nearly coincide, not overlapping boxes, so two touching hands both survive. The winner is kept
+ * whole: averaging two estimates would produce a hand neither model saw.
+ */
+export function fuseHands(frameHands: HandDetection[], regionHands: HandDetection[], width: number, height: number, fusion: HandRegionSettings['fusion'] = HAND_REGION_DEFAULTS.fusion): HandDetection[] {
+  return fuseHandsDetailed(frameHands, regionHands, width, height, fusion).hands;
+}
+
+/**
+ * Numbers and coordinates only, for `motion:compare --trace`: candidate counts, predicted boxes (crop-source
+ * pixels), what fusion kept and what it dropped. Never stored in a MotionClip; no pixels.
+ */
+export type FusionTrace = {
+  source: { width: number; height: number };
+  candidates: { frame: number; region: number };
+  regions: Record<Side, { x0: number; y0: number; size: number } | null>;
+  kept: { origin: 'frame' | 'region'; label: string; score: number }[];
+  dropped: FusionDrop[];
+};
 
 /** Runs one frame's re-detection. `detectRegion` crops `region` from the source, upscales it and returns crop-normalized hands. */
 export async function refineHands(input: {
   body: Landmark[]; frameHands: HandDetection[]; width: number; height: number; settings?: HandRegionSettings;
   detectRegion: (region: HandRegion) => HandDetection[] | Promise<HandDetection[]>;
-}): Promise<{ hands: HandDetection[]; regions: Record<Side, HandRegion | null> }> {
+}): Promise<{ hands: HandDetection[]; regions: Record<Side, HandRegion | null>; trace: FusionTrace }> {
   const settings = input.settings ?? HAND_REGION_DEFAULTS;
   const regions = predictHandRegions(input.body, input.width, input.height, settings);
   const regional: HandDetection[] = [];
@@ -123,5 +150,8 @@ export async function refineHands(input: {
     if (!region) continue;
     for (const hand of await input.detectRegion(region)) regional.push(toFrameHand(hand, region, input.width, input.height));
   }
-  return { hands: fuseHands(input.frameHands, regional, input.width, input.height, settings.fusion), regions };
+  const { hands, dropped } = fuseHandsDetailed(input.frameHands, regional, input.width, input.height, settings.fusion);
+  const box = (r: HandRegion | null) => r && { x0: r.x0, y0: r.y0, size: r.size };
+  return { hands, regions, trace: { source: { width: input.width, height: input.height }, candidates: { frame: input.frameHands.length, region: regional.length },
+    regions: { left: box(regions.left), right: box(regions.right) }, kept: hands.map(h => ({ origin: h.origin ?? 'frame', label: h.label, score: h.score })), dropped } };
 }
