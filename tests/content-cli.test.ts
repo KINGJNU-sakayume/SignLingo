@@ -8,6 +8,7 @@ import catalog from '../src/content/catalog.json';
 import { approvedFixture } from './content-fixtures';
 import { reviewSubject, sha256 } from '../src/content/validation';
 import { expressionSchema } from '../src/content/schema';
+import { releaseDate } from '../src/content/package';
 
 const bundle = path.resolve('work/content-cli-tests/cli.mjs');
 // Run the release flow on a candidate that is not yet published; published entries are immutable.
@@ -25,6 +26,7 @@ afterAll(async () => { if (root) await rm(root, { recursive: true, force: true }
 function command(...args: string[]) {
   return execFileSync(process.execPath, [bundle, ...args], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
 }
+const git = (...args: string[]) => execFileSync('git', ['-c', 'user.name=contract-test', '-c', 'user.email=contract-test@example.invalid', ...args], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
 const readEntry = async () => expressionSchema.parse(JSON.parse(await readFile(path.join(root, `private-data/${ID}/entry.json`), 'utf8')));
 const saveEntry = async (value: unknown) => writeFile(path.join(root, `private-data/${ID}/entry.json`), JSON.stringify(value));
 
@@ -56,8 +58,23 @@ it('registers, prepares, inspects, independently reviews and packages without co
   await saveEntry(entry); command('transition', `private-data/${ID}/entry.json`, 'ready-to-publish');
   command('publish', `private-data/${ID}`);
   const manifest = JSON.parse(await readFile(path.join(root, 'public/content/manifest.json'), 'utf8'));
+  const published = JSON.parse(await readFile(path.join(root, 'src/content/catalog.json'), 'utf8'));
   expect(manifest.expressions[0].status).toBe('published');
+  // The release date moves forward with each publish, in the catalog and its generated manifest alike.
+  expect(published.updatedAt).toBe(releaseDate(new Date(), entry.updatedAt, unpublished.updatedAt));
+  expect(manifest.updatedAt).toBe(published.updatedAt);
+  expect(published.updatedAt >= entry.updatedAt && published.updatedAt >= unpublished.updatedAt).toBe(true);
   expect(manifest.expressions[0].assets.video).toBeUndefined();
   expect(await readFile(path.join(root, 'public', entry.assets.motion!.uri), 'utf8')).toBe(JSON.stringify(fixture.clip));
   expect(() => command('publish', `private-data/${ID}`)).toThrow();
-}, 15000);
+
+  // CI's compatibility check compares published entries with the base commit; a newer top-level date passes.
+  const older = (value: { updatedAt: string }) => JSON.stringify({ ...value, updatedAt: '2026-01-01' }, null, 2) + '\n';
+  const current = { catalog: await readFile(path.join(root, 'src/content/catalog.json'), 'utf8'), manifest: await readFile(path.join(root, 'public/content/manifest.json'), 'utf8') };
+  await writeFile(path.join(root, 'src/content/catalog.json'), older(JSON.parse(current.catalog)));
+  await writeFile(path.join(root, 'public/content/manifest.json'), older(JSON.parse(current.manifest)));
+  git('init', '-q'); git('add', '-A'); git('commit', '-q', '-m', 'base release');
+  await writeFile(path.join(root, 'src/content/catalog.json'), current.catalog);
+  await writeFile(path.join(root, 'public/content/manifest.json'), current.manifest);
+  expect(execFileSync(process.execPath, [bundle, 'validate'], { cwd: root, encoding: 'utf8', env: { ...process.env, CONTENT_BASE_REF: 'HEAD' } })).toContain('콘텐츠 검증 완료');
+}, 30000);

@@ -30,6 +30,14 @@ export async function validatePackage(catalog: Catalog, root: string, includeDra
     }
   }
 }
+/**
+ * Top-level release date for a publish: the operator's local calendar day, never earlier than the
+ * published entry or the previous catalog (a KST morning is still the previous day in UTC).
+ */
+export function releaseDate(now: Date, ...dates: string[]) {
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  return [local, ...dates].sort().at(-1)!;
+}
 export function publicManifest(catalog: Catalog): Catalog {
   return { ...catalog, expressions: catalog.expressions.filter(e => e.status === 'published') };
 }
