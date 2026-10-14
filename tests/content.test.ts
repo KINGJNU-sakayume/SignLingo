@@ -23,11 +23,14 @@ async function packageFixture() {
   return { root, file, ...fixture };
 }
 describe('content release contract', () => {
-  it('keeps ten sourced candidates internal and ships no pretend KSL lesson', () => {
+  it('publishes only the reviewed course-1 expressions and keeps the other candidates internal', () => {
     const parsed = parseCatalog(catalog);
     expect(parsed.expressions).toHaveLength(10);
-    expect(parsed.expressions.every(entry => entry.status === 'rights-review-required' && !entry.assets.motion && entry.gloss === null)).toBe(true);
-    expect(manifest).toEqual(publicManifest(parsed)); expect(manifest.expressions).toEqual([]);
+    const published = parsed.expressions.filter(entry => entry.status === 'published');
+    expect(published.map(entry => entry.id)).toEqual(['ksl-thanks', 'ksl-sorry', 'ksl-meet']);
+    expect(published.every(entry => entry.lessonId === 'courtesy' && entry.assets.motion && !entry.assets.video && entry.provenance === 'authorized-video')).toBe(true);
+    expect(parsed.expressions.filter(entry => entry.status !== 'published').every(entry => entry.status === 'rights-review-required' && !entry.assets.motion && entry.gloss === null)).toBe(true);
+    expect(manifest).toEqual(publicManifest(parsed)); expect(manifest.expressions.map(entry => entry.id)).toEqual(['ksl-thanks', 'ksl-sorry', 'ksl-meet']);
   });
   it('rejects duplicate IDs, missing lessons, unsupported schema and incomplete attribution/license metadata', () => {
     expect(() => parseCatalog({ ...catalog, expressions: [catalog.expressions[0], catalog.expressions[0]] })).toThrow('중복');
@@ -38,8 +41,9 @@ describe('content release contract', () => {
     }
   });
   it('rejects setting published or ready flags without evidence and forbids skipped transitions', () => {
-    for (const status of ['source-approved', 'ready-to-publish', 'published']) expect(() => parseCatalog({ ...catalog, expressions: [{ ...catalog.expressions[0], status }] })).toThrow();
-    expect(() => transition(expressionSchema.parse(catalog.expressions[0]), 'published')).toThrow('순서');
+    const candidate = catalog.expressions.find(entry => entry.status === 'rights-review-required')!;
+    for (const status of ['source-approved', 'ready-to-publish', 'published']) expect(() => parseCatalog({ ...catalog, expressions: [{ ...candidate, status }] })).toThrow();
+    expect(() => transition(expressionSchema.parse(candidate), 'published')).toThrow('순서');
   });
   it('requires separate reconstruction and linguistic review and rights for each distribution scope', async () => {
     const { entry, manifest } = await approvedFixture();
