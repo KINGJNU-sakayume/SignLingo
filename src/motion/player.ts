@@ -1,10 +1,13 @@
-import type { DisplayPose, MotionClip, Pose, TemporalMotion } from './types';
+import type { DisplayPose, MotionClip, Pose, Side, TemporalMotion } from './types';
 import { sequenceBoundary } from './tracking';
 import { boundWrist, eulerQuat, q, qa, rad } from './math';
 export function frameIndex(clip: MotionClip, seconds: number) {
-  let lo=0, hi=clip.frames.length-1;
+  return timestampIndex(clip.frames, seconds);
+}
+export function timestampIndex(frames: readonly { timestamp: number }[], seconds: number) {
+  let lo=0, hi=frames.length-1;
   const ms=seconds*1000;
-  while (lo<hi) { const mid=Math.ceil((lo+hi)/2); if (clip.frames[mid].timestamp<=ms) lo=mid; else hi=mid-1; }
+  while (lo<hi) { const mid=Math.ceil((lo+hi)/2); if (frames[mid].timestamp<=ms) lo=mid; else hi=mid-1; }
   return lo;
 }
 export function editedPose(clip: MotionClip, index: number, temporal?: TemporalMotion): DisplayPose {
@@ -20,6 +23,25 @@ export function editedPose(clip: MotionClip, index: number, temporal?: TemporalM
   }
   return pose;
 }
+/** Which parts of a hand may be blended between two samples. */
+export type BlendRules<P> = { hand: (pose: P, side: Side) => boolean; fingers: (pose: P, side: Side) => boolean };
+/** Shared interpolation core: unavailable hands and fingers keep the earlier sample instead of inventing motion. */
+export function blendPose<P extends DisplayPose>(a: P, b: P, t: number, rules: BlendRules<P>, rulesB: BlendRules<P> = rules): P {
+  const rotations={...a.rotations};
+  for (const key of Object.keys(rotations)) {
+    const side=key.startsWith('left.')?'left':key.startsWith('right.')?'right':null;
+    if (side) {
+      if (!rules.hand(a,side) || !rulesB.hand(b,side)) continue;
+      if (key.split('.').length===3 && (!rules.fingers(a,side)||!rulesB.fingers(b,side))) continue;
+    }
+    rotations[key]=qa(q(a.rotations[key]).slerp(q(b.rotations[key]),t));
+  }
+  return { ...a, rotations, root:a.root.map((x,k)=>x+(b.root[k]-x)*t) as Pose['root'] };
+}
+const evidenceRules: BlendRules<DisplayPose> = {
+  hand: (pose, side) => pose.evidence ? ['observed','interpolated'].includes(pose.evidence[side].state) : pose.quality[`${side}State`]==='tracked',
+  fingers: (pose, side) => pose.evidence?.[side].fingers!=='unavailable',
+};
 export function samplePose(clip: MotionClip, seconds: number, temporal?: TemporalMotion): DisplayPose {
   const i=frameIndex(clip,seconds), j=Math.min(i+1,clip.frames.length-1);
   const a=editedPose(clip,i,temporal), b=editedPose(clip,j,temporal);
@@ -27,17 +49,7 @@ export function samplePose(clip: MotionClip, seconds: number, temporal?: Tempora
   const t=gap>0 ? Math.max(0,Math.min(1,(seconds*1000-clip.frames[i].timestamp)/gap)) : 0;
   // Never interpolate across unreliable endpoints or long detection gaps.
   if (gap>200 || !a.quality.body || !b.quality.body || (j!==i&&sequenceBoundary(clip.frames[i],clip.frames[j]))) return a;
-  const rotations={...a.rotations};
-  for (const key of Object.keys(rotations)) {
-    const side=key.startsWith('left.')?'left':key.startsWith('right.')?'right':null;
-    if (side) {
-      const available=(pose:DisplayPose)=>pose.evidence ? ['observed','interpolated'].includes(pose.evidence[side].state) : pose.quality[`${side}State`]==='tracked';
-      if (!available(a) || !available(b)) continue;
-      if (key.split('.').length===3 && (a.evidence?.[side].fingers==='unavailable'||b.evidence?.[side].fingers==='unavailable')) continue;
-    }
-    rotations[key]=qa(q(a.rotations[key]).slerp(q(b.rotations[key]),t));
-  }
-  return { ...a, rotations, root:a.root.map((x,k)=>x+(b.root[k]-x)*t) as Pose['root'] };
+  return blendPose(a,b,t,evidenceRules);
 }
 // The HTMLVideoElement is the only clock when footage is attached.
 export function playbackTime(video: Pick<HTMLVideoElement,'currentTime'> | null, standaloneSeconds: number) { return video ? video.currentTime : standaloneSeconds; }
