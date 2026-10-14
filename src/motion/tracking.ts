@@ -73,7 +73,8 @@ export class TemporalHandTracker {
       let temporal = 0;
       if (continuing) {
         const movement = p.distanceTo(previous.point);
-        if (movement > .04 + 3.5 * Math.abs(dt)) return Infinity;
+        const directAnchor = confidence(wrist) >= .8 && hand.score >= .8 && distance < .06;
+        if (movement > .04 + 3.5 * Math.abs(dt) && !directAnchor) return Infinity;
         const predicted = previous.point.clone().addScaledVector(previous.velocity, dt);
         const residual = p.distanceTo(predicted);
         // Acceleration allowance grows quadratically with elapsed time. A valid

@@ -62,6 +62,11 @@ describe('sequence hand identity', () => {
     const missing = detection(250); missing.body = [];
     expect(tracker.assign(missing).assignment).toEqual({});
   });
+  it('preserves a sharp measured translation when strong anatomy overrides prediction', () => {
+    const tracker = new TemporalHandTracker(); tracker.assign(detection());
+    const next = detection(33); next.body[15] = next.hands[0].image[0] = lm(.95, .6);
+    expect(tracker.assign(next).assignment).toEqual({ left: 0, right: 1 });
+  });
   it('requires forward/backward agreement and expires ambiguous acceleration', () => {
     const a = { assignment: { left: 0, right: 1 }, identity: { left: 'reliable', right: 'reliable' } } as const;
     const b = { ...a, assignment: { left: 1, right: 0 } };
@@ -90,6 +95,10 @@ describe('evidence-aware temporal reconstruction', () => {
     expect(hand.shoulder.distanceTo(hand.elbow)).toBeCloseTo(.28, 8);
     expect(hand.elbow.distanceTo(hand.wrist)).toBeCloseTo(.26, 8);
     expect(validInferredFingers(result.frames[2].pose, 'left')).toBe(true);
+  });
+  it('rejects invalid configuration rather than disabling gap limits', () => {
+    expect(() => reconstructTemporal(sequence(), { maxGapMs: NaN })).toThrow('finite');
+    expect(() => reconstructTemporal(sequence(), { maxGapMs: Infinity })).toThrow('finite');
   });
   it('handles quaternion antipodes without a full spin', () => {
     const clip = hide(sequence(), [2]);

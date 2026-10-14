@@ -74,6 +74,7 @@ function compatible(a: MotionFrame, b: MotionFrame, side: Side, maxGap: number, 
 /** Shared generator keeps offline evaluation and interruptible browser work identical. */
 function* temporalSteps(clip: MotionClip, options: TemporalOptions): Generator<TemporalProgress, TemporalMotion> {
   const started = performance.now(), input = clip.frames, count = input.length;
+  if (options.maxGapMs !== undefined && !Number.isFinite(options.maxGapMs)) throw new RangeError('Temporal gap must be finite.');
   const maxGapMs = Math.min(150, Math.max(0, options.maxGapMs ?? 150));
   const progress = (phase: string, done: number): TemporalProgress => ({ phase, done, total: count });
   const boundaries = input.map((f, i) => i === 0 || sequenceBoundary(input[i - 1], f));

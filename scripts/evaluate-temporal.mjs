@@ -51,6 +51,16 @@ try {
     hand: controlledOcclusion(clip, 'hand', maxGapMs),
     handAndWrist: controlledOcclusion(clip, 'hand-and-wrist', maxGapMs),
   };
+  if (args.includes('--synthetic')) {
+    for (const row of controlled[150].hand) {
+      if (row.gapFrames === 5) {
+        if (row.complete !== 0) throw new Error('Long synthetic gap was incorrectly reconstructed.');
+      } else if (row.complete !== row.attempted || !row.after || !row.before ||
+        row.after.palmDegrees >= row.before.palmDegrees || row.after.fingerDirectionDegrees >= row.before.fingerDirectionDegrees || row.identity.disagreement) {
+        throw new Error(`Synthetic temporal regression at ${row.gapFrames} hidden frames.`);
+      }
+    }
+  }
   if (snapshot !== JSON.stringify(clip)) throw new Error('Evaluation mutated the input evidence.');
   const report = {
     format: 'signlingo.temporal-evaluation', version: 1,

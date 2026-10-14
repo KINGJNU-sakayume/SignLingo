@@ -7,6 +7,7 @@ import { SIDES, type MotionClip, type Pose, type Side, type TemporalMotion } fro
 
 const degrees = 180 / Math.PI;
 const mean = (values: number[]) => values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+const max = (values: number[]) => values.length ? Math.max(...values) : null;
 export type MaskMode = 'hand' | 'hand-and-wrist';
 
 /** Drop evidence BEFORE rerunning pass 1. No withheld pose, assignment, or hold
@@ -44,11 +45,11 @@ function continuity(poses: Pose[], timestamps: number[], side: Side) {
   const angularVelocity = hands.slice(1).map((h, i) => h.palm.angleTo(hands[i].palm) * degrees / ((timestamps[i + 1] - timestamps[i]) / 1000));
   const acceleration = velocity.slice(1).map((v, i) => v.clone().sub(velocity[i]).divideScalar((timestamps[i + 2] - timestamps[i]) / 2000));
   return {
-    maxWristStepMm: Math.max(0, ...hands.slice(1).map((h, i) => h.wrist.distanceTo(hands[i].wrist) * 1000)),
-    maxPalmStepDegrees: Math.max(0, ...hands.slice(1).map((h, i) => h.palm.angleTo(hands[i].palm) * degrees)),
-    maxVelocityJumpMps: Math.max(0, ...velocity.slice(1).map((v, i) => v.distanceTo(velocity[i]))),
-    maxAccelerationJumpMps2: Math.max(0, ...acceleration.slice(1).map((a, i) => a.distanceTo(acceleration[i]))),
-    maxAngularVelocityJumpDps: Math.max(0, ...angularVelocity.slice(1).map((v, i) => Math.abs(v - angularVelocity[i]))),
+    maxWristStepMm: max(hands.slice(1).map((h, i) => h.wrist.distanceTo(hands[i].wrist) * 1000)),
+    maxPalmStepDegrees: max(hands.slice(1).map((h, i) => h.palm.angleTo(hands[i].palm) * degrees)),
+    maxVelocityJumpMps: max(velocity.slice(1).map((v, i) => v.distanceTo(velocity[i]))),
+    maxAccelerationJumpMps2: max(acceleration.slice(1).map((a, i) => a.distanceTo(acceleration[i]))),
+    maxAngularVelocityJumpDps: max(angularVelocity.slice(1).map((v, i) => Math.abs(v - angularVelocity[i]))),
   };
 }
 
@@ -97,9 +98,15 @@ export function controlledOcclusion(clip: MotionClip, mode: MaskMode, maxGapMs =
       // Report continuity only for completely reconstructed windows. Missing
       // neutral placeholders must not be counted as accurate predictions.
       if (wholeGap) {
-        const times = window.map(f => f.timestamp);
-        continuityAfter.push(continuity(enhanced.frames.slice(start - 1, end + 1).map(f => f.pose), times, side));
-        if (masked.frames.slice(start, end).every(f => f.pose.quality[`${side}State`] !== 'missing')) continuityBefore.push(continuity(masked.frames.slice(start - 1, end + 1).map(f => f.pose), times, side));
+        // Include observed steps OUTSIDE both joins, so a constant-speed bridge
+        // cannot hide its acceleration discontinuity at entry and exit.
+        const lo = Math.max(0, start - 3), hi = Math.min(clip.frames.length, end + 3);
+        const context = enhanced.frames.slice(lo, hi), times = context.map(f => f.timestamp);
+        const continuous = clip.frames.slice(lo, hi).every((f, i) => i === 0 || !sequenceBoundary(clip.frames[lo + i - 1], f));
+        if (continuous && context.every(f => ['observed', 'interpolated'].includes(f.pose.evidence![side].fingers))) {
+          continuityAfter.push(continuity(context.map(f => f.pose), times, side));
+          if (masked.frames.slice(lo, hi).every(f => f.pose.quality[`${side}State`] !== 'missing')) continuityBefore.push(continuity(masked.frames.slice(lo, hi).map(f => f.pose), times, side));
+        }
       }
       // Remaining measured hands: compare identities to the supplied baseline
       // after mapping detection indices through removal, never to array order.
@@ -112,7 +119,7 @@ export function controlledOcclusion(clip: MotionClip, mode: MaskMode, maxGapMs =
         if (actual !== undefined) { assigned++; if (actual === expected) identityAgreements++; }
       }
     }
-    const aggregate = <T extends Record<string, number>>(items: T[]) => items.length ? Object.fromEntries(Object.keys(items[0]).map(key => [key, mean(items.map(item => item[key]))])) : null;
+    const aggregate = <T extends Record<string, number | null>>(items: T[]) => items.length ? Object.fromEntries(Object.keys(items[0]).map(key => [key, mean(items.flatMap(item => item[key] === null ? [] : [item[key] as number]))])) : null;
     return { gapFrames, trials, attempted, complete, palmSamples, wristSamples, evidence,
       beforeSamples: before.length, afterSamples: after.length, before: aggregate(before), after: aggregate(after),
       wristMeanMm: mean(wristErrors), palmBeforeMeanDegrees: mean(palmBefore), palmAfterMeanDegrees: mean(palmAfter),
