@@ -14,8 +14,8 @@ export type TorsoReport = {
   rootMode: 'fixed' | 'smoothed' | 'unavailable'; rootSpreadMeters: number;
   maxDeviationDegrees: number; maxWristResidual: number; maxElbowShift: number;
 };
-// Course 1 measurements (docs/DISPLAY_PIPELINE.md): p90 torso deviation 5.7°/3.9° for thanks/meet,
-// 14.4° for sorry. Below the threshold the variation is treated as estimation noise and removed.
+// Course 1 measurements (docs/DISPLAY_PIPELINE.md): p90 torso deviation 6.5°/4.2° for thanks/meet,
+// 18.4° for sorry. Below the threshold the variation is treated as estimation noise and removed.
 export const DEFAULTS = { fixedMaxDegrees: 8, fixedMaxRootMeters: .01, cutoffHz: 1 };
 const shoulderOffset = (side: Side) => new Vector3(side === 'left' ? .19 : -.19, 0, 0);
 
