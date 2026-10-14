@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { samplePose } from '../motion/player';
-import type { MotionClip } from '../motion/types';
+import { displayDuration as duration, sampleDisplay, type DisplayClip } from '../motion/display';
 
-const duration = (clip: MotionClip) => (clip.frames.at(-1)?.timestamp ?? 0) / 1000;
 const REST_MS = 600;
 
 /**
- * Plays one or more clips in order on a single avatar (e.g. "시범 1" then "시범 2").
+ * Plays one or more display clips in order on a single avatar (e.g. "시범 1" then "시범 2").
  * Looping pauses briefly between repetitions so the start and end of a sign stay visible.
  */
-export function useSequencePlayback(clips: readonly MotionClip[], { speed, loop }: { speed: number; loop: boolean }) {
+export function useSequencePlayback(clips: readonly DisplayClip[], { speed, loop }: { speed: number; loop: boolean }) {
   const [state, setState] = useState({ index: 0, time: 0, playing: false, rest: 0 });
   const play = useCallback((index = 0) => setState({ index, time: 0, playing: true, rest: 0 }), []);
   const pause = useCallback(() => setState(s => ({ ...s, playing: false })), []);
@@ -35,6 +33,6 @@ export function useSequencePlayback(clips: readonly MotionClip[], { speed, loop 
     return () => window.clearInterval(handle);
   }, [state.playing, clips, speed, loop]);
   const clip = clips[Math.min(state.index, clips.length - 1)];
-  const pose = useMemo(() => clip ? samplePose(clip, state.time) : null, [clip, state.time]);
+  const pose = useMemo(() => clip ? sampleDisplay(clip, state.time) : null, [clip, state.time]);
   return { index: state.index, time: state.time, playing: state.playing, pose, play, pause, toggle };
 }

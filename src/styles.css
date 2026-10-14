@@ -5,3 +5,5 @@
 .diagnostics-lab .section-title h2{color:#dce5eb}.diagnostics-lab .text-button{color:#8edbcc}
 .settings-card,.diagnostics-card,.quality-cell{min-width:0}@media(max-width:600px){.quality-cell strong{flex-wrap:wrap;gap:3px}.quality-cell small{width:100%}.diagnostic-summary{flex-wrap:wrap}}
 @media(max-width:760px){.workflow-bar{flex-wrap:wrap;row-gap:10px}}
+/* Motion Lab A–B section repeat */
+.loop-controls{margin-left:0}.loop-controls button{min-width:24px;display:flex;align-items:center;justify-content:center}.timeline-loop{position:absolute;top:3px;height:12px;border-radius:3px;background:#f3ddb7;border:1px solid #d9a665;pointer-events:none}

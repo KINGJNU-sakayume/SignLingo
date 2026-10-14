@@ -7,7 +7,8 @@ export const LEARN_KEY = 'signlingo.learn.v2';
 export type Box = 1 | 2 | 3 | 4 | 5;
 export type NodeRecord = { completedAt: string; runs: number };
 export type ReviewRecord = { box: Box; due: string; seen: number; correct: number; wrong: number };
-export type LearnStore = { version: 2; nodes: Record<string, NodeRecord>; expressions: Record<string, ReviewRecord>; settings: { sound: boolean } };
+/** `mirror` is a per-device display preference for the 3D demonstration; it never affects grading or the Practice comparison. */
+export type LearnStore = { version: 2; nodes: Record<string, NodeRecord>; expressions: Record<string, ReviewRecord>; settings: { sound: boolean; mirror: boolean } };
 
 const LIMITS = { nodes: 1000, expressions: 2000, key: 4096, count: 1_000_000 };
 // Node IDs come from path.ts nodeId(); expression keys from progressKey().
@@ -15,7 +16,7 @@ const NODE_KEY = /^(lesson|review):[a-z][a-z0-9-]*:[a-z0-9@:+-]+$/;
 const EXPRESSION_KEY = /^[a-z][a-z0-9-]*@[1-9][0-9]*:([a-f0-9]{64}|unpublished)$/;
 
 export function emptyStore(): LearnStore {
-  return { version: 2, nodes: Object.create(null), expressions: Object.create(null), settings: { sound: true } };
+  return { version: 2, nodes: Object.create(null), expressions: Object.create(null), settings: { sound: true, mirror: false } };
 }
 const isDate = (value: unknown): value is string => typeof value === 'string' && value.length <= 40 && Number.isFinite(Date.parse(value));
 const isCount = (value: unknown, min = 0): value is number => typeof value === 'number' && Number.isInteger(value) && value >= min && value <= LIMITS.count;
@@ -39,6 +40,7 @@ export function parseLearnStore(value: unknown): LearnStore {
     }
   }
   if (isRecord(value.settings) && typeof value.settings.sound === 'boolean') store.settings.sound = value.settings.sound;
+  if (isRecord(value.settings) && typeof value.settings.mirror === 'boolean') store.settings.mirror = value.settings.mirror;
   return store;
 }
 export function readLearnStore(key = LEARN_KEY): LearnStore {

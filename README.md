@@ -10,7 +10,7 @@ A client-side video → MediaPipe landmarks → articulated mannequin proof of c
 4. Upload an MP4 (H.264 recommended) or WebM (VP8/VP9), up to 120 seconds and 250 MB. Use one signer with shoulders, wrists, and hands visible. No video is included in this repository.
 5. Enable **Mirrored source** only if the *saved pixels* are horizontally reflected. Both models receive unmirrored pixels; the source overlay maps back to the displayed pixels. A selfie preview alone does not establish whether the saved file is mirrored.
 6. Choose 15 or 30 samples/second and **Extract & reconstruct**. First use downloads model assets; CPU inference can take longer than video duration. Progress and cancellation are available.
-7. Compare source and 3D playback. Scrub, choose 0.25×/0.5×/1×, orbit, zoom, switch front/side/rear, show the skeleton/joints, and jump to flagged frames. Turquoise is anatomical left; amber is right.
+7. Compare source and 3D playback. Scrub, choose 0.25×/0.5×/1×, repeat an A–B section, orbit, zoom, switch front/side/first-person/hand close-up views, show the skeleton/joints, and jump to flagged frames. Turquoise is anatomical left; amber is right. **몸통 고정** (off by default here) previews the learner screens' steadied torso; Motion Lab otherwise shows stored poses unchanged.
 8. Export motion JSON. Reimport it later without rerunning inference. To compare again, attach the matching original filename/size and duration. JSON does **not** contain the video. Filename/size/duration matching is a convenience, not cryptographic source verification.
 
 No video, extracted landmarks or motion JSON are uploaded by the application. Model/CDN hosts receive ordinary asset requests. JSON exports contain source filenames and motion data; share deliberately. Live HTTPS and WebGL2 are required; recent desktop Chrome/Edge is the tested browser target. On iOS/iPadOS, Tasks Vision runs on the main thread to avoid a WebKit worker canvas incompatibility; processing can be slower and briefly use more battery. Other browsers retain worker inference, with a main-thread retry only for worker DOM/canvas errors. This compatibility route is not yet validated on physical iOS hardware.
@@ -18,10 +18,10 @@ No video, extracted landmarks or motion JSON are uploaded by the application. Mo
 ## What the viewer means
 
 - **Rest pose** is a static rig preview, never a reconstructed sign.
-- Missing arms/hands are withheld. A lost handshape can be held for at most 200 ms, colored amber and explicitly assigned confidence zero; after that the hand mesh is hidden. Observed arm motion can remain visible.
+- Missing arms/hands are withheld. A lost handshape can be held for at most 200 ms, colored amber and explicitly assigned confidence zero; after that the hand mesh is hidden in Motion Lab. Observed arm motion can remain visible. Learner screens additionally fill such hands **for display only** (translucent orange, legend “추정으로 채운 손 모양”); stored clips and diagnostics keep the original states. See [the display pipeline](docs/DISPLAY_PIPELINE.md).
 - Confidence numbers are pose visibility/presence and a conservative proxy combining arm visibility with hand *handedness classification* score and, in 0.2, palm conditioning. MediaPipe does not return a calibrated accuracy score for each finger. A high value does not establish correct depth or handshape.
 - Flagged frames include uncertain hand identity, wrist jumps, behind-torso depth, degenerate geometry, and anatomical limit corrections. No flag does not imply accuracy.
-- Legs are static presentation geometry. Facial expression and linguistic nonmanual grammar are not reconstructed. Head direction is only a coarse nose/ear estimate.
+- Only the upper body is drawn (no legs, pelvis or floor), as in broadcast signing. Facial expression and linguistic nonmanual grammar are not reconstructed. Head direction is only a coarse nose/ear estimate. The first-person view looks at the hands from just below the signer's eyes and keeps anatomical left/right; the learner mirror view reflects the rendering only.
 - Manual wrist edits apply to the current sampled frame, are limited to ±45° per axis (legacy 0.1 clips also retain their original wrist bounds), interpolate to adjacent frames, and persist in JSON. They are not a full pose editor; reprocessing discards edits.
 
 ## Development / validation
@@ -64,8 +64,9 @@ MediaPipe code is Apache 2.0; consult upstream model cards/terms for selected mo
 | `tracking.ts` | Unique anatomical wrist association, confidence gating, ambiguous-crossing rejection |
 | `reconstruct.ts` | Torso/head estimation, fixed-length rig retargeting, finger constraints, adaptive filtering and diagnostics |
 | `player.ts` | Timestamp lookup, quaternion interpolation, bounded manual edits; video as master clock |
+| `display/` | Pure display-only post-processing (torso steadying with arm IK compensation, handshape filling), per-screen presets; never stored or compared ([details](docs/DISPLAY_PIPELINE.md)) |
 | `serialization.ts`, `types.ts` | Versioned KSL motion contract, strict import validation, raw observations and correction metadata |
-| `components/Avatar.tsx` | Procedural hierarchical mesh rig with 30 finger segment joints; orbitable Three.js viewer |
+| `components/Avatar.tsx` | Procedural upper-body mesh rig with 30 finger segment joints; front/side/first-person/hand close-up views, render-only mirror view |
 | `components/Overlay.tsx`, `App.tsx` | Synchronized comparison, source overlays, diagnostics and correction controls |
 | `.github/workflows/pages.yml` | Validation and static Pages deployment |
 

@@ -1,24 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Camera, Check, ExternalLink, Pause, Play, Repeat, RotateCcw, Turtle } from 'lucide-react';
-import { Avatar } from '../components/Avatar';
-import { samplePose } from '../motion/player';
+import { ArrowLeft, Camera, Check, ExternalLink, Pause, Play, Repeat, RotateCcw } from 'lucide-react';
+import { Avatar, type CameraView } from '../components/Avatar';
+import { displayDuration, displayFor, handFocus, hasFilled, sampleDisplay } from '../motion/display';
 import type { MotionClip } from '../motion/types';
 import type { Expression } from '../content/schema';
 import { ChunkyButton } from '../design/ChunkyButton';
 import { Mascot } from '../design/Mascot';
 import type { ContentSource } from '../learn/source';
 import { progressKey, type ProgressRecord } from './catalog';
+import { loopTime, NO_LOOP, type LoopRange } from '../learn/loop';
+import { ExpressionCaption, FilledLegend, LoopControls, MirrorBadge, MirrorToggle, Scrubber, SpeedToggle, ViewPicker } from '../learn/stage';
 
-const VIEWS = [['front', '정면'], ['side', '측면'], ['rear', '뒤에서']] as const;
+const VIEWS: CameraView[] = ['front', 'side', 'first', 'hands'];
 
 /** Expression card: reviewed 3D demonstration, original video, movement notes, sources and practice history. */
-export function LessonDetail({ entry, source, progress, backLabel, onBack, onViewed, onPractice }: {
-  entry: Expression; source: ContentSource; progress: ProgressRecord; backLabel: string;
+export function LessonDetail({ entry, source, progress, backLabel, mirror, onToggleMirror, onBack, onViewed, onPractice }: {
+  entry: Expression; source: ContentSource; progress: ProgressRecord; backLabel: string; mirror: boolean; onToggleMirror: () => void;
   onBack: () => void; onViewed: () => void; onPractice: (clip: MotionClip) => void;
 }) {
   const [clip, setClip] = useState<MotionClip | null>(null), [error, setError] = useState(''), [retry, setRetry] = useState(0);
   const [videoUrl, setVideoUrl] = useState(''), [videoError, setVideoError] = useState('');
-  const [time, setTime] = useState(0), [playing, setPlaying] = useState(false), [speed, setSpeed] = useState(1), [repeat, setRepeat] = useState(true), [preset, setPreset] = useState('front');
+  const [time, setTime] = useState(0), [playing, setPlaying] = useState(false), [speed, setSpeed] = useState(1), [repeat, setRepeat] = useState(true), [view, setView] = useState<CameraView>('front');
+  const [range, setRange] = useState<LoopRange>(NO_LOOP);
   const video = useRef<HTMLVideoElement>(null), clock = useRef(0);
   const current = progress[progressKey(entry)] ?? { viewed: false, attempts: 0 };
   useEffect(() => {
@@ -35,8 +38,12 @@ export function LessonDetail({ entry, source, progress, backLabel, onBack, onVie
     }).catch(() => { if (!controller.signal.aborted) setVideoError('원본 영상을 불러오지 못했어요. 3D 시범은 계속 볼 수 있어요.'); });
     return () => { controller.abort(); if (url) URL.revokeObjectURL(url); };
   }, [entry, source, retry, clip]);
-  const duration = (clip?.frames.at(-1)?.timestamp ?? 0) / 1000;
-  const pose = useMemo(() => clip ? samplePose(clip, time) : null, [clip, time]);
+  // Learner display: torso held still, missing handshapes filled and marked. The verified clip is unchanged.
+  const display = useMemo(() => clip ? displayFor(clip, 'learner') : null, [clip]);
+  const focus = useMemo(() => display ? handFocus([display]) : null, [display]);
+  const duration = display ? displayDuration(display) : 0;
+  const pose = useMemo(() => display ? sampleDisplay(display, time) : null, [display, time]);
+  useEffect(() => setRange(NO_LOOP), [clip]);
   function seek(value: number) {
     clock.current = Math.max(0, Math.min(duration, value)); setTime(clock.current);
     if (video.current?.readyState) video.current.currentTime = clock.current + (clip?.source.timeOffset ?? 0);
@@ -49,16 +56,20 @@ export function LessonDetail({ entry, source, progress, backLabel, onBack, onVie
       const now = performance.now();
       const next = video.current?.readyState ? Math.max(0, video.current.currentTime - (clip.source.timeOffset ?? 0)) : clock.current + (now - previous) / 1000 * speed;
       previous = now;
+      const looped = loopTime(next, range);
+      if (looped.wrapped) { seek(looped.time); return; }
       if (next >= duration) {
         if (repeat) { seek(0); if (video.current) void video.current.play().catch(() => { setVideoError('영상 재생이 중단되었어요.'); setVideoUrl(''); }); }
         else { seek(duration); setPlaying(false); video.current?.pause(); }
       } else { clock.current = next; setTime(next); }
     }, 33);
     return () => clearInterval(handle);
-  }, [playing, clip, duration, speed, repeat]);
+  }, [playing, clip, duration, speed, repeat, range]);
   async function toggle() {
     if (playing) { setPlaying(false); video.current?.pause(); return; }
-    if (time >= duration) seek(0);
+    const start = loopTime(time, range);
+    if (start.wrapped) seek(start.time);
+    else if (time >= duration) seek(0);
     try { if (video.current) await video.current.play(); setPlaying(true); }
     catch { setVideoError('원본 영상 재생이 중단되었어요. 3D 시범은 계속 볼 수 있어요.'); setVideoUrl(''); setPlaying(true); }
   }
@@ -74,23 +85,24 @@ export function LessonDetail({ entry, source, progress, backLabel, onBack, onVie
       <ChunkyButton variant="secondary" size="sm" onClick={() => setRetry(value => value + 1)}><RotateCcw size={18} strokeWidth={2.5} aria-hidden="true" />다시 시도</ChunkyButton></div></div>
       : !clip ? <div role="status" className="sl-loading"><Mascot mood="thinking" size={72} /><p>시범 자료를 확인하는 중이에요…</p></div> : <>
       <section className="ec-stage-card" aria-label="3D 동작 시범">
-        <div className="ec-stage"><Avatar pose={pose} skeleton={false} markers={false} preset={preset} theme="light" /></div>
+        <div className="ec-stage"><Avatar pose={pose} skeleton={false} markers={false} view={view} focus={focus} mirror={mirror} theme="light" /><MirrorBadge mirror={mirror} view={view} /></div>
         <div className="ec-controls">
           <ChunkyButton variant="sky" size="sm" onClick={() => void toggle()}>{playing ? <Pause size={20} strokeWidth={2.75} aria-hidden="true" /> : <Play size={20} strokeWidth={2.75} aria-hidden="true" />}{playing ? '일시정지' : '시범 재생'}</ChunkyButton>
-          <button type="button" className="sl-toggle" aria-pressed={speed === .5} onClick={() => setSpeed(value => value === .5 ? 1 : .5)}><Turtle size={22} strokeWidth={2.5} aria-hidden="true" /><span>0.5배속</span></button>
+          <SpeedToggle speed={speed} onChange={setSpeed} />
           <button type="button" className="sl-toggle" aria-pressed={repeat} onClick={() => setRepeat(value => !value)}><Repeat size={20} strokeWidth={2.5} aria-hidden="true" /><span>반복</span></button>
+          <MirrorToggle mirror={mirror} onToggle={onToggleMirror} />
         </div>
-        <input className="ec-scrub" aria-label="시범 재생 위치" type="range" min={0} max={duration || 1} step="0.01" value={time} onChange={event => seek(Number(event.target.value))} />
-        <div className="sl-segmented" role="group" aria-label="시범 카메라 시점">
-          {VIEWS.map(([value, label]) => <button type="button" key={value} aria-pressed={preset === value} onClick={() => setPreset(value)}>{label}</button>)}
-        </div>
-        <p className="ec-hint">아바타를 드래그하면 시점을 돌릴 수 있어요. <strong>뒤에서</strong>는 내 손과 같은 방향으로 보여요.</p>
+        <Scrubber label="시범 재생 위치" value={time} duration={duration} range={range} onSeek={seek} />
+        <LoopControls range={range} time={time} onChange={setRange} />
+        <ViewPicker views={VIEWS} value={view} onChange={setView} label="시범 카메라 시점" />
+        {display && hasFilled(display) && <FilledLegend />}
+        <div className="ec-explain"><h2>움직임 살펴보기</h2><ExpressionCaption items={[{ entry }]} /></div>
+        <p className="ec-hint">아바타를 드래그하면 시점을 돌릴 수 있어요. <strong>1인칭</strong>은 수어하는 사람이 자기 손을 내려다보는 시야예요. 이마·얼굴 가까이에서 하는 동작은 1인칭에서 잘 보이지 않아요. <strong>거울 모드</strong>는 좌우를 뒤집어 거울을 보듯 따라 할 수 있게 해요.</p>
       </section>
       <section className="ec-section" aria-labelledby="ec-video"><h2 id="ec-video">원본 수어 영상</h2>
         {videoUrl ? <video ref={video} src={videoUrl} muted playsInline preload="metadata" aria-label="원본 수어 영상" onLoadedMetadata={() => { if (video.current) { video.current.currentTime = clock.current + (clip.source.timeOffset ?? 0); video.current.playbackRate = speed; if (playing) void video.current.play().catch(() => setVideoUrl('')); } }} onError={() => { setVideoError('원본 영상을 재생하지 못했어요. 3D 시범은 계속 볼 수 있어요.'); setVideoUrl(''); }} />
           : <p className="ec-muted">{videoError || '이 사이트에서 재생할 수 있는 원본 영상이 없어요. 아래 출처 페이지에서 볼 수 있어요.'}</p>}
       </section>
-      {!!entry.movementNotes.length && <section className="ec-section" aria-labelledby="ec-notes"><h2 id="ec-notes">움직임 살펴보기</h2><ul className="ec-notes">{entry.movementNotes.map(note => <li key={note}>{note}</li>)}</ul></section>}
       <ul className="ec-checklist" aria-label="이 표현의 학습 기록">
         <li className={current.viewed ? 'is-done' : ''}><Check size={18} strokeWidth={3} aria-hidden="true" />{current.viewed ? '시범 관찰 완료' : '시범 관찰 전'}</li>
         <li className={current.attempts ? 'is-done' : ''}><Check size={18} strokeWidth={3} aria-hidden="true" />따라 하기 {current.attempts}회</li>

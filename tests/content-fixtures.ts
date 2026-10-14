@@ -5,11 +5,13 @@ import { reviewSubject, sha256 } from '../src/content/validation';
 import { practiceClip } from './practice-fixtures';
 import type { MotionClip } from '../src/motion/types';
 
-export async function approvedFixture(id = catalog.expressions[0].id) {
+export async function approvedFixture(id = catalog.expressions[0].id, { missingLeadHand = false } = {}) {
   const entry = expressionSchema.parse(structuredClone(catalog.expressions.find(item => item.id === id)!));
   // Simulate metadata of an authorized camera import to exercise the release contract.
   // This metadata is deliberately fictional; geometry remains synthetic test data.
   const clip = practiceClip(); clip.source.name = 'contract-camera.mp4'; clip.pipeline.detector = 'contract-camera-import';
+  // Optionally lose the left hand (not its arm) at the start, as real recordings often do.
+  if (missingLeadHand) for (const frame of clip.frames.slice(0, 6)) { frame.pose.quality.leftState = 'missing'; frame.pose.quality.left = 0; }
   const bytes = new TextEncoder().encode(JSON.stringify(clip));
   const document = new TextEncoder().encode('TEST ONLY: simulated evidence; not a KSL approval.');
   const documentHash = await sha256(document);

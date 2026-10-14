@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Camera, Check, Equal, EqualNot, Info, Play, RotateCcw, Turtle, Volume2, VolumeX, X } from 'lucide-react';
-import { Avatar } from '../components/Avatar';
+import { Camera, Check, Equal, EqualNot, Info, Play, RotateCcw, Volume2, VolumeX, X } from 'lucide-react';
+import { Avatar, type CameraView } from '../components/Avatar';
 import type { Catalog, Expression } from '../content/schema';
 import type { MotionClip } from '../motion/types';
+import { displayFor, handFocus, hasFilled } from '../motion/display';
 import { BottomSheet } from '../design/BottomSheet';
 import { ChoiceCard } from '../design/ChoiceCard';
 import { ChunkyButton } from '../design/ChunkyButton';
@@ -12,16 +13,18 @@ import { ProgressBar } from '../design/ProgressBar';
 import { completeStep, currentStep, gradeAnswer, isFinished, isGraded, recordAnswer, sessionProgress, skipCamera, type CameraResult, type SessionState, type Step } from './session';
 import { playCue } from './sound';
 import { useSequencePlayback } from './usePlayback';
+import { ExpressionCaption, FilledLegend, MirrorBadge, MirrorToggle, SpeedToggle, ViewPicker } from './stage';
 
 type Props = {
-  session: SessionState; catalog: Catalog; clips: Record<string, MotionClip>; sound: boolean;
+  session: SessionState; catalog: Catalog; clips: Record<string, MotionClip>; sound: boolean; mirror: boolean;
   cameraReturn: CameraResult | null;
-  onSession: (next: SessionState) => void; onToggleSound: () => void; onViewed: (expressionId: string) => void;
+  onSession: (next: SessionState) => void; onToggleSound: () => void; onToggleMirror: () => void; onViewed: (expressionId: string) => void;
   onCamera: (expressionId: string) => void; onCameraAcknowledged: () => void; onExit: () => void; onFinish: (final: SessionState) => void;
 };
 type Checked = { stepId: string; answer: string | null; correct: boolean };
 const PRAISE = ['좋아요!', '정확해요!', '잘 보고 있어요!', '멋져요!'];
 const LETTERS = ['A', 'B', 'C', 'D'];
+const VIEWS: CameraView[] = ['front', 'first', 'hands'];
 
 function prompt(step: Step, entry: Expression) {
   switch (step.kind) {
@@ -38,11 +41,11 @@ function answerOptions(step: Step, session: SessionState): string[] {
   return [];
 }
 
-export function LessonPlayer({ session, catalog, clips, sound, cameraReturn, onSession, onToggleSound, onViewed, onCamera, onCameraAcknowledged, onExit, onFinish }: Props) {
+export function LessonPlayer({ session, catalog, clips, sound, mirror, cameraReturn, onSession, onToggleSound, onToggleMirror, onViewed, onCamera, onCameraAcknowledged, onExit, onFinish }: Props) {
   const step = currentStep(session);
   const entries = useMemo(() => new Map(catalog.expressions.map(e => [e.id, e])), [catalog]);
   const [selected, setSelected] = useState<string | null>(null), [checked, setChecked] = useState<Checked | null>(null);
-  const [demo, setDemo] = useState<string | null>(null), [speed, setSpeed] = useState(1), [preset, setPreset] = useState<'front' | 'rear'>('front');
+  const [demo, setDemo] = useState<string | null>(null), [speed, setSpeed] = useState(1), [view, setView] = useState<CameraView>('front');
   const [leaving, setLeaving] = useState(false), [praise, setPraise] = useState(PRAISE[0]);
   const heading = useRef<HTMLHeadingElement>(null), sheetAction = useRef<HTMLButtonElement>(null), finished = useRef(false);
   const progress = sessionProgress(session);
@@ -61,7 +64,9 @@ export function LessonPlayer({ session, catalog, clips, sound, cameraReturn, onS
     if (step.kind === 'pick-sign') return selected ? [selected] : [];
     return [step.target];
   }, [step, demo, selected]);
-  const stageClips = useMemo(() => stageIds.map(id => clips[id]).filter(Boolean), [stageIds, clips]);
+  // Learner display: torso held still, missing handshapes filled and marked. Stored clips are unchanged.
+  const stageClips = useMemo(() => stageIds.map(id => clips[id]).filter(Boolean).map(clip => displayFor(clip, 'learner')), [stageIds, clips]);
+  const focus = useMemo(() => handFocus(stageClips), [stageClips]);
   const loop = step?.kind === 'intro' || step?.kind === 'pick-meaning' || step?.kind === 'camera';
   const player = useSequencePlayback(stageClips, { speed, loop: loop && !demo });
 
@@ -132,6 +137,10 @@ export function LessonPlayer({ session, catalog, clips, sound, cameraReturn, onS
   const answerText = step.kind === 'same-different' ? (step.same ? '같은 수어예요' : '다른 수어예요') : target.displayName;
   const tone = (option: string) => !checked ? undefined : (step.kind === 'same-different' ? (option === 'same') === step.same : option === step.target) ? 'correct' : option === checked.answer ? 'wrong' : undefined;
   const label = session.plan.kind === 'review' ? '복습 진행도' : '레슨 진행도';
+  // Descriptions would give graded answers away, so they appear only once the answer is checked.
+  const explained = step.kind === 'same-different'
+    ? (step.same ? [{ entry: target, label: '시범 1·2' }] : [{ entry: target, label: '시범 1' }, { entry: entries.get(step.other), label: '시범 2' }].filter((item): item is { entry: Expression; label: string } => !!item.entry))
+    : [{ entry: target }];
 
   return <div className={`sl-root lp lp-${step.kind}${sheetOpen ? ' has-sheet' : ''}`} lang="ko" data-step-kind={step.kind}>
     <header className="lp-top">
@@ -148,24 +157,24 @@ export function LessonPlayer({ session, catalog, clips, sound, cameraReturn, onS
       </div>
       <section className="lp-stage-card" aria-label="시범">
         <div className="lp-stage">
-          <Avatar pose={player.pose} skeleton={false} markers={false} preset={preset} theme="light" />
+          <Avatar pose={player.pose} skeleton={false} markers={false} view={view} focus={focus} mirror={mirror} theme="light" />
+          <MirrorBadge mirror={mirror} view={view} />
           {step.kind === 'pick-sign' && !stageClips.length && <p className="lp-stage-hint">보기를 누르면 여기에서 시범이 재생돼요</p>}
           {step.kind === 'same-different' && !demo && <span className="lp-stage-tag" aria-live="polite">시범 {player.index + 1}</span>}
         </div>
         <div className="lp-controls">
           <button type="button" className="sl-toggle" onClick={() => { setDemo(null); player.play(0); }} disabled={!stageClips.length}>
             {player.playing ? <RotateCcw size={20} strokeWidth={2.5} aria-hidden="true" /> : <Play size={20} strokeWidth={2.5} aria-hidden="true" />}<span>다시 보기</span></button>
-          <button type="button" className="sl-toggle" aria-pressed={speed === .5} onClick={() => setSpeed(value => value === .5 ? 1 : .5)}><Turtle size={22} strokeWidth={2.5} aria-hidden="true" /><span>천천히</span></button>
-          <div className="sl-segmented" role="group" aria-label="시범 시점">
-            <button type="button" aria-pressed={preset === 'front'} onClick={() => setPreset('front')}>정면</button>
-            <button type="button" aria-pressed={preset === 'rear'} onClick={() => setPreset('rear')}>뒤에서</button>
-          </div>
+          <SpeedToggle speed={speed} onChange={setSpeed} />
+          <MirrorToggle mirror={mirror} onToggle={onToggleMirror} />
+          <ViewPicker views={VIEWS} value={view} onChange={setView} />
         </div>
+        {stageClips.some(hasFilled) && <FilledLegend />}
+        {(step.kind === 'intro' || step.kind === 'camera') && <ExpressionCaption items={[{ entry: target }]} />}
         {step.kind === 'same-different' && <div className="lp-pair" role="group" aria-label="시범 따로 보기">
           {['시범 1', '시범 2'].map((name, i) => <button type="button" key={name} className="sl-toggle" onClick={() => { setDemo([step.target, step.other][i]); player.play(0); }}><Play size={18} strokeWidth={2.5} aria-hidden="true" /><span>{name}</span></button>)}
         </div>}
       </section>
-      {step.kind === 'intro' && !!target.movementNotes.length && <ul className="lp-notes">{target.movementNotes.slice(0, 2).map(note => <li key={note}>{note}</li>)}</ul>}
       {isGraded(step) && <div className={`lp-choices${step.kind === 'pick-meaning' && options.length > 2 ? ' is-grid' : ''}${step.kind === 'pick-sign' ? ' is-letters' : ''}`} role="group" aria-label="보기">
         {options.map((option, i) => {
           const body = step.kind === 'same-different'
@@ -200,8 +209,9 @@ export function LessonPlayer({ session, catalog, clips, sound, cameraReturn, onS
         <p className="sl-sheet-note">동작 비교는 정답 판정이 아니에요.</p>
       </> : checked && !checked.correct ? <>
         <p>정답: {answerText}</p>
+        <ExpressionCaption items={explained} />
         <button type="button" className="sl-sheet-link" onClick={replayAnswer}><RotateCcw size={16} strokeWidth={2.75} aria-hidden="true" />시범 다시 보기</button>
-      </> : null}
+      </> : checked ? <ExpressionCaption items={explained} /> : null}
     </BottomSheet>
     <ConfirmDialog open={leaving} title="레슨을 나갈까요?" body="지금 나가면 이번 레슨 진행이 저장되지 않아요."
       stayLabel="계속 학습하기" leaveLabel="나가기" onStay={() => setLeaving(false)} onLeave={onExit} />
