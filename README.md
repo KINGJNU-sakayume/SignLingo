@@ -50,7 +50,7 @@ Vite uses relative asset URLs (`base: './'`) so workers and JS resolve under `/S
 | Hand float16, revision 1 | https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task |
 | Tasks Vision 1.1.0 WASM loader/binaries | https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.0/wasm |
 
-The two models total approximately 16.5 MB, plus WASM. Their URLs and runtime version are included in motion exports. Hosts must support HTTPS/CORS and remain reachable. A blocked CDN, failed download, unsupported WASM/SIMD, missing WebGL2/OffscreenCanvas, or unsupported video codec causes an explicit error. There is no gesture fallback. Versioned URLs do not guarantee perpetual availability. The app does not install a service worker or promise offline model caching.
+The two models total approximately 16.5 MB, plus WASM. The local batch tool caches them in `work/models/` and records their SHA-256 on first download, then refuses changed bytes ([details](docs/MOTION_BATCH.md)). Their URLs and runtime version are included in motion exports. Hosts must support HTTPS/CORS and remain reachable. A blocked CDN, failed download, unsupported WASM/SIMD, missing WebGL2/OffscreenCanvas, or unsupported video codec causes an explicit error. There is no gesture fallback. Versioned URLs do not guarantee perpetual availability. The app does not install a service worker or promise offline model caching.
 
 MediaPipe code is Apache 2.0; consult upstream model cards/terms for selected model assets. This repository does not relicense external models, datasets, or footage. No private videos/checkpoints/datasets are committed.
 
@@ -60,6 +60,8 @@ MediaPipe code is Apache 2.0; consult upstream model cards/terms for selected mo
 |---|---|
 | `src/motion/video.ts` | Bounded local video decoding, frame seeks, sampling, pixel unmirroring, progress/cancel |
 | `detector.ts`, `detector.worker.ts` | Replaceable detector contract; real Pose + Hand Tasks inference in a worker or iOS document-backed CPU adapter |
+| `handRegions.ts`, `visionResult.ts` | 0.3.0 hand-region re-detection: pose-predicted crops, crop→frame inverse, confidence fusion |
+| `extract.ts`, `pipeline.ts` | Shared Motion Lab / batch extraction entry; pipeline version metadata |
 | `math.ts` | Explicit coordinate conversion, hand registration, two-bone IK, quaternion frames and wrist limits |
 | `tracking.ts` | Unique anatomical wrist association, confidence gating, ambiguous-crossing rejection |
 | `reconstruct.ts` | Torso/head estimation, fixed-length rig retargeting, finger constraints, adaptive filtering and diagnostics |
@@ -68,6 +70,7 @@ MediaPipe code is Apache 2.0; consult upstream model cards/terms for selected mo
 | `serialization.ts`, `types.ts` | Versioned KSL motion contract, strict import validation, raw observations and correction metadata |
 | `components/Avatar.tsx` | Procedural upper-body mesh rig with 30 finger segment joints; front/side/first-person/hand close-up views, render-only mirror view |
 | `components/Overlay.tsx`, `App.tsx` | Synchronized comparison, source overlays, diagnostics and correction controls |
+| `src/batch/` | Local `motion:batch` / `motion:compare` / `motion:report` tools: headless Chromium runs the same extraction path; per-clip reports ([details](docs/MOTION_BATCH.md)) |
 | `.github/workflows/pages.yml` | Validation and static Pages deployment |
 
 Read [RECONSTRUCTION_REPORT.md](RECONSTRUCTION_REPORT.md) for coordinate conventions, constraints, model research, evidence, and known accuracy limits. KSL is an independent language; no spoken-Korean word-to-gesture assumption is encoded here.
@@ -106,3 +109,11 @@ Learning Mode now starts from `public/content/manifest.json`. Approved expressio
 **학습하기** is a Duolingo-style learning path: units of 3–5 minute lessons, one question per screen, a feedback sheet, a completion screen and Leitner review. Recognition questions are graded; camera imitation only shows observed differences and is never graded. Streaks, XP, hearts and leagues are intentionally absent. Run `npm run dev` and open `/?demo=1` to try the flow with development-only synthetic demo motions (never bundled into production builds). See [the learning design](docs/LEARNING_DESIGN.md) for tokens, screens, grading principles, the demo mode and what was left out.
 
 See [source and rights research](docs/KSL_CONTENT_RESEARCH.md) and [content preparation, review and publishing](docs/CONTENT_PUBLISHING.md). `npm run content:validate` checks rights, separate reviews, evidence documents, asset integrity and published-version compatibility; production builds run it automatically. Motion Lab and its local inspection flow remain available.
+
+## Pipeline 0.3.0 and batch processing
+
+Motion Lab now extracts with pipeline **0.3.0**: after the unchanged full-frame pass, each pose wrist predicts a square around its hand (sized from the image-space forearm). The square is cut from the decoded frame, upscaled to 320 px, and given to an IMAGE-mode HandLandmarker. The result is mapped back to frame coordinates and fused with the full-frame hands by handedness score. Duplicate estimates of the same hand are dropped by landmark correspondence, so touching hands are kept. Left/right assignment still uses the existing wrist rules. The 0.2.0 solver is unchanged.
+
+Clips record `pipeline.handRegions` (all parameters), a learner-display temporal policy, and each hand's `origin`, all within schema 1. The `learner` display preset runs temporal reconstruction first for clips that record the policy. Published v1 (0.2.0) clips, Practice analysis (still 0.2.0) and stored data are unchanged.
+
+`npm run motion:batch`, `motion:compare` and `motion:report` process local videos in headless Chromium through the same `extractMotion()` path, with all off-machine requests blocked. They write per-clip reports to `work/`. See [batch processing and 0.3.0](docs/MOTION_BATCH.md) and the [recording guide](docs/RECORDING_GUIDE.md) for contributors. Real-video comparisons run locally only; private videos and derived JSON are never committed.
