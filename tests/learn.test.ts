@@ -11,6 +11,7 @@ import {
 } from '../src/learn/session';
 import { koreanStems, similarExpressions } from '../src/learn/similarity';
 import { emptyStore, LEARN_KEY, parseLearnStore, readLearnStore, saveLearnStore } from '../src/learn/storage';
+import { activeRange, loopTime, NO_LOOP } from '../src/learn/loop';
 import { learnCatalog, learnEntry } from './learn-fixtures';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -251,6 +252,12 @@ describe('v2 learning storage', () => {
     expect(restored.settings.sound).toBe(true);
     expect(({} as Record<string, unknown>).completedAt).toBeUndefined();
   });
+  it('stores the mirror view per device and accepts only booleans', () => {
+    expect(emptyStore().settings).toEqual({ sound: true, mirror: false });
+    expect(parseLearnStore({ version: 2, settings: { sound: false, mirror: true } }).settings).toEqual({ sound: false, mirror: true });
+    expect(parseLearnStore({ version: 2, settings: { sound: false } }).settings.mirror).toBe(false);
+    expect(parseLearnStore({ version: 2, settings: { mirror: 'yes' } }).settings.mirror).toBe(false);
+  });
   it('bounds the number of stored records', () => {
     const nodes = Object.fromEntries(Array.from({ length: 1500 }, (_, i) => [`lesson:courtesy:n${i}`, { completedAt: NOW.toISOString(), runs: 1 }]));
     expect(Object.keys(parseLearnStore({ version: 2, nodes }).nodes)).toHaveLength(1000);
@@ -258,5 +265,21 @@ describe('v2 learning storage', () => {
   it('keeps working when storage is blocked', () => {
     vi.stubGlobal('window', { localStorage: { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('full'); } } });
     expect(readLearnStore()).toEqual(emptyStore()); expect(() => saveLearnStore(emptyStore())).not.toThrow();
+  });
+});
+
+describe('A–B section repeat', () => {
+  it('needs both points at least 0.1 s apart and orders them', () => {
+    expect(activeRange(NO_LOOP)).toBeNull();
+    expect(activeRange({ a: 1, b: null })).toBeNull();
+    expect(activeRange({ a: 1, b: 1.05 })).toBeNull();
+    expect(activeRange({ a: 2, b: 1 })).toEqual({ start: 1, end: 2 });
+  });
+  it('wraps from B back to A and pulls playback outside the section into it', () => {
+    const range = { a: 1, b: 2 };
+    expect(loopTime(1.5, range)).toEqual({ time: 1.5, wrapped: false });
+    expect(loopTime(2, range)).toEqual({ time: 1, wrapped: true });
+    expect(loopTime(.2, range)).toEqual({ time: 1, wrapped: true });
+    expect(loopTime(3, NO_LOOP)).toEqual({ time: 3, wrapped: false });
   });
 });

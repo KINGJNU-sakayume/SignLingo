@@ -14,6 +14,16 @@ test('a lesson runs from the path through feedback, a retried miss and completio
   await expect(page.locator('.lp-stage canvas')).toHaveCount(1);
   await expect(page.getByRole('heading', { name: target })).toBeVisible();
   expect(await overflow(page)).toBeLessThanOrEqual(0);
+  await expect(page.getByRole('group', { name: '시범 시점' }).getByRole('button')).toHaveText(['정면', '1인칭', '손 확대']);
+  await expect(page.getByRole('button', { name: '0.5배속' })).toBeVisible();
+  // The description and movement notes sit under the 3D stage, never on top of it or under the footer.
+  const caption = page.locator('.lp-stage-card .sl-caption');
+  await expect(caption).toContainText(entries[0].description);
+  for (const note of entries[0].movementNotes) await expect(caption).toContainText(note);
+  const canvas = (await page.locator('.lp-stage canvas').boundingBox())!;
+  expect((await caption.boundingBox())!.y).toBeGreaterThanOrEqual(canvas.y + canvas.height);
+  await caption.scrollIntoViewIfNeeded();
+  expect(await caption.evaluate(element => { const box = element.getBoundingClientRect(); return element.contains(document.elementFromPoint(box.left + box.width / 2, box.bottom - 4)); })).toBe(true);
   const learner = new Learner(page, target, true);
   await learner.until(null);
   expect(learner.missed).toBeGreaterThan(0); expect(learner.retried).toBe(learner.missed);
@@ -45,10 +55,13 @@ test('keyboard control, exit confirmation and the camera step round trip through
   await page.keyboard.press('Escape'); await expect(dialog).toHaveCount(0);
   await page.keyboard.press('Enter');
   await expect(page.locator('.lp')).toHaveAttribute('data-step-kind', 'pick-meaning');
+  // Graded questions keep the description hidden until the answer is checked.
+  await expect(page.locator('.sl-caption')).toHaveCount(0);
   const texts = await page.locator('.lp-choices [data-choice]').allInnerTexts();
   await page.keyboard.press(String(texts.findIndex(text => text.includes(target)) + 1));
   await page.keyboard.press('Enter');
   await expect(page.locator('.sl-sheet-correct')).toBeVisible();
+  await expect(page.locator('.sl-sheet')).toContainText(entries[0].description);
   await page.keyboard.press('Enter');
   await expect(page.locator('.sl-sheet')).toHaveCount(0);
   const learner = new Learner(page, target);
@@ -76,7 +89,11 @@ test('keyboard control, exit confirmation and the camera step round trip through
 
 test('leaving a lesson keeps the path unchanged', async ({ page }) => {
   await routes(page); await page.goto('/'); await startFirstLesson(page);
+  await page.getByRole('button', { name: '거울 모드', exact: true }).click();
+  await expect(page.locator('.lp-stage .sl-mirror-badge')).toHaveText('거울 모드');
   await page.getByRole('button', { name: '계속', exact: true }).click();
+  // The mirror view stays on across steps; graded steps still show the badge.
+  await expect(page.locator('.lp-stage .sl-mirror-badge')).toHaveText('거울 모드');
   await page.getByRole('button', { name: '레슨 나가기' }).click();
   await page.getByRole('button', { name: '나가기', exact: true }).click();
   await expect(page.getByRole('button', { name: '단원 1 레슨 1 · 지금 할 차례' })).toBeVisible();

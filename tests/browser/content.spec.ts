@@ -6,8 +6,8 @@ import { reviewSubject } from '../../src/content/validation';
 import deployed from '../../public/content/manifest.json' with { type: 'json' };
 
 // Only intercepted responses contain fixtures; synthetic lessons never enter production public/.
-async function fixtureRoutes(page: Page) {
-  const fixture = await approvedFixture();
+async function fixtureRoutes(page: Page, options: Parameters<typeof approvedFixture>[1] = {}) {
+  const fixture = await approvedFixture(undefined, options);
   await page.route('**/content/manifest.json', route => route.fulfill({ json: fixture.manifest }));
   await page.route('**/' + fixture.entry.assets.motion!.uri, route => route.fulfill({ body: Buffer.from(fixture.bytes), contentType: 'application/json' }));
   return fixture;
@@ -41,6 +41,8 @@ test('prepackaged reference loads into Practice and keeps per-version history af
   await page.goto('/');
   await openCard(page, entry.displayName);
   await expect(page.locator('.ec-stage canvas')).toBeVisible();
+  await expect(page.getByRole('group', { name: '시범 카메라 시점' }).getByRole('button')).toHaveText(['정면', '측면', '1인칭', '손 확대']);
+  await expect(page.getByRole('button', { name: '뒤에서' })).toHaveCount(0);
   await page.getByRole('button', { name: '0.5배속' }).click();
   await expect(page.getByRole('button', { name: '0.5배속' })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: '측면', exact: true }).click();
@@ -63,6 +65,42 @@ test('prepackaged reference loads into Practice and keeps per-version history af
   await page.getByText('출처와 이용 조건', { exact: true }).click();
   await expect(page.getByText(entry.source.attribution, { exact: true })).toBeVisible();
   await expect(page.getByText(entry.license.type, { exact: false })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+test('expression card: description, filled-hand legend, persistent mirror mode and A–B repeat', async ({ page }) => {
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  const { entry } = await fixtureRoutes(page, { missingLeadHand: true });
+  await page.goto('/'); await openCard(page, entry.displayName);
+  await expect(page.locator('.ec-stage canvas')).toBeVisible();
+  const explain = page.locator('.ec-explain');
+  await expect(explain).toContainText(entry.description);
+  for (const note of entry.movementNotes) await expect(explain).toContainText(note);
+  await expect(page.getByText('추정으로 채운 손 모양', { exact: true })).toBeVisible();
+
+  const mirror = page.getByRole('button', { name: '거울 모드', exact: true }), badge = page.locator('.ec-stage .sl-mirror-badge');
+  const views = page.getByRole('group', { name: '시범 카메라 시점' });
+  await expect(mirror).toHaveAttribute('aria-pressed', 'false'); await expect(badge).toHaveCount(0);
+  await mirror.click();
+  await expect(badge).toHaveText('거울 모드');
+  await views.getByRole('button', { name: '1인칭', exact: true }).click();
+  await expect(badge).toHaveText('1인칭 · 거울 모드 꺼짐');
+  await views.getByRole('button', { name: '손 확대', exact: true }).click();
+  await expect(badge).toHaveText('거울 모드');
+  await page.reload(); await openCard(page, entry.displayName);
+  await expect(mirror).toHaveAttribute('aria-pressed', 'true'); await expect(badge).toBeVisible();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('signlingo.learn.v2')!).settings.mirror)).toBe(true);
+
+  const position = page.getByLabel('시범 재생 위치');
+  await position.fill('0.4'); await page.getByRole('button', { name: '구간 시작(A) 지정' }).click();
+  await position.fill('1'); await page.getByRole('button', { name: '구간 끝(B) 지정' }).click();
+  await expect(page.getByRole('group', { name: '구간 반복' })).toContainText('구간 반복 0.4초–1.0초');
+  await page.getByRole('button', { name: '시범 재생', exact: true }).click();
+  const seen: number[] = [];
+  for (let i = 0; i < 25; i++) { seen.push(Number(await position.inputValue())); await page.waitForTimeout(80); }
+  expect(Math.min(...seen)).toBeGreaterThanOrEqual(.39); expect(Math.max(...seen)).toBeLessThanOrEqual(1.01);
+  expect(seen.some((value, i) => i > 0 && value < seen[i - 1]), 'playback wraps from B back to A').toBe(true);
+  await page.getByRole('button', { name: '구간 반복 해제' }).click();
+  await expect(page.getByRole('group', { name: '구간 반복' })).not.toContainText('구간 반복 0.4초');
   expect(errors).toEqual([]);
 });
 test('missing or corrupted media blocks practice and supports retry', async ({ page }) => {

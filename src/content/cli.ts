@@ -3,7 +3,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { expressionSchema, STATES, type Expression, type ContentState } from './schema';
 import { parseCatalog, reviewSubject, sha256, stateErrors, transition, verifyReviews } from './validation';
-import { publicManifest, validatePackage, validatePublic, verifyCompatibility } from './package';
+import { publicManifest, releaseDate, validatePackage, validatePublic, verifyCompatibility } from './package';
 import { importMotion } from '../motion/serialization';
 
 const json = async (file: string) => JSON.parse(await readFile(file, 'utf8'));
@@ -66,7 +66,9 @@ try {
     const old = catalog.expressions.find(e => e.id === entry.id);
     if (!old) throw new Error('Register the candidate in the catalog first');
     if (old.status === 'published' && entry.revision <= old.revision) throw new Error('Published revisions are immutable; increment revision');
-    const next = parseCatalog({ ...catalog, expressions: catalog.expressions.map(e => e.id === entry.id ? published : e) });
+    // The catalog and its generated manifest record when this release was made; published entries stay immutable.
+    const next = parseCatalog({ ...catalog, updatedAt: releaseDate(new Date(), published.updatedAt, catalog.updatedAt),
+      expressions: catalog.expressions.map(e => e.id === entry.id ? published : e) });
     await validatePackage({ ...next, expressions: [published] }, directory);
     // Every validation, including external media availability, completes before any public copy.
     for (const asset of Object.values(published.assets)) {

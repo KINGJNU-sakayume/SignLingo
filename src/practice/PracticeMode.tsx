@@ -10,7 +10,8 @@ import { processPracticeVideo } from './fallback';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Avatar } from '../components/Avatar';
 import { importMotion } from '../motion/serialization';
-import { editedPose, frameIndex } from '../motion/player';
+import { frameIndex } from '../motion/player';
+import { displayFor, displayPose, hasFilled } from '../motion/display';
 import type { MotionClip, Side } from '../motion/types';
 import { activeInterval, features } from './features';
 import { compareMotion } from './compare';
@@ -47,7 +48,9 @@ function WristPaths({reference,learner,result,side,index,locale}:{reference:Moti
     })}
   </svg>;
 }
-export function PracticeMode({initialReference=null,onResultReviewed,onReturnToLesson}:{initialReference?:MotionClip|null;onResultReviewed?:(evidence:'sufficient'|'limited',feedback?:string[])=>void;onReturnToLesson?:()=>void}={}) {
+// `avatarMirror` is the learner's mirror view: avatars and their videos flip together so left and right stay
+// consistent on screen; the comparison always uses the unmodified clips.
+export function PracticeMode({initialReference=null,avatarMirror=false,onResultReviewed,onReturnToLesson}:{initialReference?:MotionClip|null;avatarMirror?:boolean;onResultReviewed?:(evidence:'sufficient'|'limited',feedback?:string[])=>void;onReturnToLesson?:()=>void}={}) {
   const [locale,setLocale]=useState<Locale>('ko'),t=copy[locale];
   const [reference,setReference]=useState<MotionClip|null>(initialReference),[learner,setLearner]=useState<MotionClip|null>(null);
   const [ri,setRi]=useState<Interval|null>(()=>initialReference?activeInterval(initialReference):null),[li,setLi]=useState<Interval|null>(null);
@@ -74,8 +77,11 @@ export function PracticeMode({initialReference=null,onResultReviewed,onReturnToL
   const rt=pair?.referenceTime??time,lt=pair?.learnerTime??0;
   const referenceMediaTime=rt+(reference?.source.timeOffset??0),learnerMediaTime=lt+(learner?.source.timeOffset??0);
   const rIndex=pair?.reference??(reference?frameIndex(reference,rt):0),lIndex=pair?.learner??(learner?frameIndex(learner,lt):0);
-  const rPose=useMemo(()=>reference?editedPose(reference,rIndex):null,[reference,rIndex]);
-  const lPose=useMemo(()=>learner?editedPose(learner,lIndex):null,[learner,lIndex]);
+  // Display only: the reference gets the learner view; the attempt keeps its tracking gaps visible.
+  const referenceDisplay=useMemo(()=>reference?displayFor(reference,'learner'):null,[reference]);
+  const learnerDisplay=useMemo(()=>learner?displayFor(learner,'attempt'):null,[learner]);
+  const rPose=useMemo(()=>referenceDisplay?displayPose(referenceDisplay,rIndex):null,[referenceDisplay,rIndex]);
+  const lPose=useMemo(()=>learnerDisplay?displayPose(learnerDisplay,lIndex):null,[learnerDisplay,lIndex]);
   useEffect(()=>()=>{epoch.current++;clearTimeout(timer.current);capture.current?.cancel();framing.current?.close();offline.current?.abort();},[]);
   useEffect(()=>()=>{if(referenceUrl)URL.revokeObjectURL(referenceUrl);},[referenceUrl]);
   useEffect(()=>()=>{if(learnerUrl)URL.revokeObjectURL(learnerUrl);},[learnerUrl]);
@@ -177,7 +183,7 @@ export function PracticeMode({initialReference=null,onResultReviewed,onReturnToL
       {reference&&!busy&&<details><summary>{t.loadAttempt}</summary><input aria-label={t.loadAttempt} type="file" accept="application/json,.json" onChange={e=>void load(e,'learner')}/></details>}
     </section>
     {reference&&<>
-      <div className="practice-viewers">{([{name:t.reference,pose:rPose,url:referenceUrl,ref:referenceVideo},{name:t.learner,pose:lPose,url:learnerUrl,ref:learnerVideo}]).map((panel,k)=><section className="practice-card" key={k}><h2>{panel.name} · {seconds(k?lt:rt)}</h2><div className="practice-avatar"><Avatar pose={panel.pose} skeleton={false} markers={!!highlight} preset="front" highlightSide={highlight}/></div>{panel.url?<video ref={panel.ref} src={panel.url} muted playsInline preload="auto" aria-label={`${panel.name} video`} onLoadedMetadata={()=>{if(panel.ref.current)panel.ref.current.currentTime=k?learnerMediaTime:referenceMediaTime;}} onError={()=>setError(locale==='ko'?'연결한 영상을 재생할 수 없습니다. 3D 동작은 계속 확인할 수 있습니다.':'The attached video could not be decoded. The 3D motion remains available.')}/>:<p>{k?(learner?`${learner.frames.length} ${t.frames}`:t.idle):t.noVideo}</p>}</section>)}</div>
+      <div className="practice-viewers">{([{name:t.reference,pose:rPose,url:referenceUrl,ref:referenceVideo},{name:t.learner,pose:lPose,url:learnerUrl,ref:learnerVideo}]).map((panel,k)=><section className="practice-card" key={k}><h2>{panel.name} · {seconds(k?lt:rt)}</h2><div className="practice-avatar"><Avatar pose={panel.pose} skeleton={false} markers={!!highlight} view="front" mirror={avatarMirror} highlightSide={highlight}/>{avatarMirror&&<span className="sl-mirror-badge">{t.mirrorBadge}</span>}</div>{k===0&&hasFilled(referenceDisplay)&&<p className="sl-filled-legend"><i aria-hidden="true"/>{t.filled}</p>}{panel.url?<video ref={panel.ref} src={panel.url} className={avatarMirror?'is-mirrored':undefined} muted playsInline preload="auto" aria-label={`${panel.name} video`} onLoadedMetadata={()=>{if(panel.ref.current)panel.ref.current.currentTime=k?learnerMediaTime:referenceMediaTime;}} onError={()=>setError(locale==='ko'?'연결한 영상을 재생할 수 없습니다. 3D 동작은 계속 확인할 수 있습니다.':'The attached video could not be decoded. The 3D motion remains available.')}/>:<p>{k?(learner?`${learner.frames.length} ${t.frames}`:t.idle):t.noVideo}</p>}</section>)}</div>
       <p>{t.raw}</p>
       <section className="practice-card"><div className="practice-controls"><button className="button secondary" onClick={()=>{if(!playing){if(result&&index>=result.pairs.length-1)setIndex(0);if(!result&&time>=reference.frames.at(-1)!.timestamp/1000)setTime(0);}setPlaying(!playing);}}>{playing?t.pause:t.play}</button><label className="practice-seek">{t.seek}<input aria-label={t.seek} type="range" min={0} max={result?result.pairs.length-1:reference.frames.at(-1)!.timestamp/1000} step={result?1:.01} value={result?index:time} onChange={e=>{setPlaying(false);if(result)setIndex(Number(e.target.value));else setTime(Number(e.target.value));}}/></label></div></section>
       <section className="practice-card"><h2>{t.intervals}</h2><p>{t.intervalNote}</p>{ri&&<Trim clip={reference} value={ri} onChange={setRi} label={t.reference} locale={locale}/ >}{learner&&li&&<Trim clip={learner} value={li} onChange={setLi} label={t.learner} locale={locale}/ >}{comparison.error&&<p role="alert">{comparison.error}</p>}</section>

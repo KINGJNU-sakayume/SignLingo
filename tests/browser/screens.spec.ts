@@ -23,6 +23,9 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     await page.getByRole('button', { name: '단원 1 가이드북' }).click(); await shot('guidebook');
     await page.getByRole('button', { name: new RegExp(fixture.entries[0].displayName) }).click();
     await expect(page.locator('.ec-stage canvas')).toBeVisible(); await shot('card');
+    for (const [view, label] of [['front', '정면'], ['side', '측면'], ['first', '1인칭'], ['hands', '손 확대']]) {
+      await page.getByRole('group', { name: '시범 카메라 시점' }).getByRole('button', { name: label, exact: true }).click(); await shot(`card-${view}`);
+    }
     await page.getByRole('button', { name: '가이드북', exact: true }).click();
     await page.getByRole('button', { name: '학습 경로', exact: true }).click();
     await page.getByRole('button', { name: '단원 1 레슨 1 · 지금 할 차례' }).click();

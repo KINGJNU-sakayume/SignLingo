@@ -12,7 +12,7 @@ No audio, automatic uploads, persistence, paid API or inference server is introd
 
 The existing `signlingo.motion` version 1 schema remains readable. Optional `source.timeOffset` records the first decoded presentation timestamp when extracted evidence begins after the video's origin. Frames still start at timestamp zero; both players map back to media time. Files without an offset behave as before. A separate in-memory `signlingo.practice` session contains clips, intervals, alignment and comparison evidence with `linguisticValidation: not-performed`.
 
-Avatars show stored frame reconstruction, including manual wrist edits. Metrics use original raw observations and ignore those edits; held avatar handshapes are never evidence. Fixed rig lengths can conceal position differences, so measured wrist paths and residuals are displayed too.
+Avatars show stored frame reconstruction, including manual wrist edits, through the display-only pipeline in [DISPLAY_PIPELINE.md](docs/DISPLAY_PIPELINE.md): both avatars steady the torso (wrists, palms and fingers keep their reconstructed positions), the reference also fills missing handshapes in translucent orange, and the learner's own attempt keeps its tracking gaps visible. The optional mirror view only reflects the rendering. Metrics use original raw observations and ignore edits and all display processing; held or filled avatar handshapes are never evidence and anatomical left/right is never swapped. Fixed rig lengths can conceal position differences, so measured wrist paths and residuals are displayed too.
 
 ## Coordinates and component evidence
 

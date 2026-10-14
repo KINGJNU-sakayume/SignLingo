@@ -48,3 +48,22 @@ test('technical laboratory compares stored detections, seeks exact frames and ex
   const motionDownload=page.waitForEvent('download');await page.getByRole('button',{name:'JSON 내보내기',exact:true}).click();const motionStream=await(await motionDownload).createReadStream();const motionChunks:Buffer[]=[];for await(const chunk of motionStream!)motionChunks.push(chunk);const adopted=JSON.parse(Buffer.concat(motionChunks).toString());expect(adopted.pipeline.version).toBe('0.2.0');expect(adopted.frames[0].hands).toEqual(clip.frames[0].hands);
   expect(errors).toEqual([]);
 });
+test('Motion Lab shows stored poses by default and offers upper-body views, torso steadying and A–B repeat',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/');await page.getByRole('button',{name:'동작 복원',exact:true}).click();
+  const views=page.getByLabel('카메라 시점',{exact:true});
+  await expect(views.getByRole('button',{name:'후면',exact:true})).toHaveCount(0);
+  for(const name of ['정면','측면','1인칭','손 확대'])await expect(views.getByRole('button',{name,exact:true})).toBeVisible();
+  await page.locator('input[accept="application/json,.json"]').setInputFiles({name:'synthetic.motion.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(fixtureClip()))});
+  const steady=page.getByLabel('몸통 고정',{exact:true});await expect(steady).not.toBeChecked();
+  await steady.check();await views.getByRole('button',{name:'1인칭',exact:true}).click();await expect(views.getByRole('button',{name:'1인칭',exact:true})).toHaveAttribute('aria-pressed','true');
+  await page.getByLabel('기술 진단 모드').check();await expect(steady).toBeDisabled();await expect(steady).not.toBeChecked();
+  await page.getByLabel('기술 진단 모드').uncheck();await expect(steady).toBeChecked();
+  await page.getByLabel('재생 위치').fill('0.05');await page.getByRole('button',{name:'구간 시작(A) 지정'}).click();
+  await page.getByLabel('재생 위치').fill('0.5');await page.getByRole('button',{name:'구간 끝(B) 지정'}).click();
+  await expect(page.getByRole('button',{name:'구간 끝(B) 지정'})).toHaveAttribute('aria-pressed','true');
+  await page.getByRole('button',{name:'재생',exact:true}).click();await page.waitForTimeout(1200);
+  const value=Number(await page.getByLabel('재생 위치').inputValue());expect(value).toBeGreaterThanOrEqual(.05);expect(value).toBeLessThanOrEqual(.51);
+  await page.getByRole('button',{name:'일시정지',exact:true}).click();await page.getByRole('button',{name:'구간 반복 해제'}).click();
+  await expect(page.getByRole('button',{name:'구간 시작(A) 지정'})).toHaveAttribute('aria-pressed','false');
+  expect(errors).toEqual([]);
+});

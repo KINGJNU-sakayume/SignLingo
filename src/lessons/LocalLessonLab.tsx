@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Avatar } from '../components/Avatar';
-import { samplePose } from '../motion/player';
+import { displayDuration, displayFor, sampleDisplay } from '../motion/display';
 import { importMotion } from '../motion/serialization';
 import type { MotionClip } from '../motion/types';
 import { LESSONS, type LessonProgress } from './catalog';
@@ -20,8 +20,10 @@ export function LocalLessonLab({reference,progress,onReference,onViewed,onPracti
   const url=useMemo(()=>videoFile?URL.createObjectURL(videoFile):'', [videoFile]);
   useEffect(()=>()=>{if(url)URL.revokeObjectURL(url);},[url]);
   useEffect(()=>{setPlaying(false);setTime(0);setVideoFile(null);},[reference]);
-  const duration=(reference?.frames.at(-1)?.timestamp??0)/1000;
-  const pose=useMemo(()=>reference?samplePose(reference,time):null,[reference,time]);
+  // Same learner display as the published lesson screens.
+  const display=useMemo(()=>reference?displayFor(reference,'learner'):null,[reference]);
+  const duration=display?displayDuration(display):0;
+  const pose=useMemo(()=>display?sampleDisplay(display,time):null,[display,time]);
   const completed=(progress.viewed?1:0)+(progress.attempts>0?1:0);
   const seek=(value:number)=>{
     const target=Math.max(0,Math.min(duration,value));
@@ -93,7 +95,7 @@ export function LocalLessonLab({reference,progress,onReference,onViewed,onPracti
             <input type="file" accept="video/*" aria-label="레슨 원본 영상" onChange={loadVideo}/>
           </label>
           <div className="lesson-reference">
-            <section><h3>3D 동작 시범</h3><div className="practice-avatar"><Avatar pose={pose} skeleton={false} markers={false} preset="front"/></div></section>
+            <section><h3>3D 동작 시범</h3><div className="practice-avatar"><Avatar pose={pose} skeleton={false} markers={false} view="front"/></div></section>
             <section><h3>원본 수어 영상</h3>{url?<video ref={video} src={url} muted playsInline preload="metadata" onEnded={()=>setPlaying(false)} onError={()=>setError('원본 영상을 읽을 수 없습니다. 다른 형식의 영상을 선택해 주세요.')}/>:<div className="lesson-empty">원본 영상을 연결하면 3D 시범과 나란히 비교할 수 있습니다. 연결하지 않아도 3D 동작은 확인할 수 있습니다.</div>}</section>
           </div>
           <div className="lesson-slider"><button className="button secondary" type="button" onClick={()=>void toggle()}>{playing?'일시정지':'시범 재생'}</button><input type="range" min={0} max={duration||1} step=".01" value={time} aria-label="시범 재생 위치" onChange={e=>seek(Number(e.target.value))}/><span>{time.toFixed(1)} / {duration.toFixed(1)}초</span></div>

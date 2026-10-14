@@ -7,7 +7,7 @@ import manifest from '../public/content/manifest.json';
 import { expressionSchema, assetSchema } from '../src/content/schema';
 import { parseCatalog, reviewSubject, sha256, transition, verifyReviews } from '../src/content/validation';
 import { assetUrl, loadLessonMotion, parseLessonMotion, verifyAsset } from '../src/content/assets';
-import { publicManifest, readContained, validatePackage, validatePublic, verifyCompatibility } from '../src/content/package';
+import { publicManifest, readContained, releaseDate, validatePackage, validatePublic, verifyCompatibility } from '../src/content/package';
 import { approvedFixture } from './content-fixtures';
 import { practiceClip } from './practice-fixtures';
 
@@ -100,6 +100,16 @@ describe('content release contract', () => {
     const empty = { ...manifest, expressions: [] };
     await validatePublic(empty, root, [entry], root);
     await rm(file); await expect(validatePublic(empty, root, [entry], root)).rejects.toThrow();
+  });
+  it('treats the top-level release date as release metadata, not as a published revision', async () => {
+    const { entry, manifest } = await approvedFixture();
+    const next = { ...manifest, updatedAt: '2026-10-14' };
+    // validate compares only entries with the base; the manifest must still equal the catalog it came from.
+    expect(() => verifyCompatibility(manifest.expressions, next.expressions)).not.toThrow();
+    expect(publicManifest(next).updatedAt).toBe('2026-10-14');
+    expect(() => verifyCompatibility([entry], [{ ...entry, updatedAt: '2026-12-31' }])).toThrow('modified');
+    expect(releaseDate(new Date(2026, 9, 14, 8), '2026-10-13')).toBe('2026-10-14');
+    expect(releaseDate(new Date(2026, 9, 14, 8), '2026-10-15', '2026-10-13')).toBe('2026-10-15');
   });
   it('loads approved lessons using the existing parser, checks digests, and handles network failure', async () => {
     const { entry, bytes } = await approvedFixture();

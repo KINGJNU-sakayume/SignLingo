@@ -91,6 +91,9 @@ function AppShell({ source }: { source: ContentSource }) {
   const due = useMemo(() => catalog ? dueExpressions(store, catalog.expressions, now) : [], [catalog, store, now]);
   const sound = store.settings.sound;
   const toggleSound = () => setStore(old => ({ ...old, settings: { ...old.settings, sound: !old.settings.sound } }));
+  // Per-device display preference, saved with the learning store; never part of grading or comparison.
+  const mirror = store.settings.mirror;
+  const toggleMirror = () => setStore(old => ({ ...old, settings: { ...old.settings, mirror: !old.settings.mirror } }));
 
   const record = (key: string, update: (p: LessonProgress) => LessonProgress) => setProgress(old => ({ ...old, [key]: update(old[key] ?? EMPTY) }));
   const markViewed = (entry: Expression) => record(progressKey(entry), p => ({ ...p, viewed: true }));
@@ -168,7 +171,7 @@ function AppShell({ source }: { source: ContentSource }) {
     setGuided(null);
   }
   const practice = (kind: Guided['kind'], clip: MotionClip, entry?: Expression) => setGuided({ kind, clip, entry, key: Date.now() });
-  const practiceView = <PracticeMode key={guided ? `guided-${guided.key}` : 'free'} initialReference={guided?.clip ?? null}
+  const practiceView = <PracticeMode key={guided ? `guided-${guided.key}` : 'free'} initialReference={guided?.clip ?? null} avatarMirror={mirror}
     onResultReviewed={guided ? practiceResult : undefined} onReturnToLesson={guided ? returnFromPractice : undefined} />;
 
   // Views -------------------------------------------------------------------------------------
@@ -179,7 +182,7 @@ function AppShell({ source }: { source: ContentSource }) {
     ? <div className="sl-root sl-state" role="alert"><Mascot mood="oops" size={96} /><p>학습 목록을 불러오지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.</p>
       <ChunkyButton variant="secondary" onClick={() => setCatalogRetry(v => v + 1)}><RotateCcw size={20} strokeWidth={2.5} aria-hidden="true" />다시 시도</ChunkyButton></div>
     : !catalog || !path ? <div className="sl-root sl-state" role="status"><Mascot mood="thinking" size={96} /><p>학습 경로를 불러오는 중이에요…</p></div>
-      : view.name === 'card' && cardEntry ? <LessonDetail key={cardEntry.id} entry={cardEntry} source={source} progress={progress} backLabel={view.back.label}
+      : view.name === 'card' && cardEntry ? <LessonDetail key={cardEntry.id} entry={cardEntry} source={source} progress={progress} backLabel={view.back.label} mirror={mirror} onToggleMirror={toggleMirror}
         onBack={() => view.back.to === 'review' ? (setView({ name: 'path' }), setMode('review')) : setView({ name: 'guidebook', unitId: view.back.unitId })}
         onViewed={() => markViewed(cardEntry)} onPractice={clip => { practice('card', clip, cardEntry); setMode('practice'); }} />
         : view.name === 'guidebook' && unit ? <Guidebook unit={unit} onBack={() => setView({ name: 'path' })}
@@ -196,7 +199,7 @@ function AppShell({ source }: { source: ContentSource }) {
           <p>시범 자료를 불러오거나 검증하지 못했어요. 연결을 확인하고 다시 시도해 주세요.</p>
           <ChunkyButton onClick={() => setLesson(old => old && { ...old, status: 'loading', attempt: old.attempt + 1 })}><RotateCcw size={20} strokeWidth={2.5} aria-hidden="true" />다시 시도</ChunkyButton>
           <ChunkyButton variant="ghost" onClick={closeLesson}>경로로 돌아가기</ChunkyButton></div>
-          : status === 'playing' && catalog && lesson.clips ? <LessonPlayer session={session} catalog={catalog} clips={lesson.clips} sound={sound} cameraReturn={cameraReturn}
+          : status === 'playing' && catalog && lesson.clips ? <LessonPlayer session={session} catalog={catalog} clips={lesson.clips} sound={sound} mirror={mirror} onToggleMirror={toggleMirror} cameraReturn={cameraReturn}
             onSession={next => setLesson(old => old && { ...old, session: next })} onToggleSound={toggleSound}
             onViewed={id => { const entry = entries.get(id); if (entry) markViewed(entry); }}
             onCamera={id => { const entry = entries.get(id), clip = lesson.clips?.[id]; if (entry && clip) practice('lesson', clip, entry); }}
