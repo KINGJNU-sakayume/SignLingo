@@ -1,8 +1,8 @@
-// Fails when development-only demo content leaks into the production build.
+// Fails when development-only demo or review-preview content leaks into the production build.
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-const MARKERS = ['SIGNLINGO_DEMO_CONTENT', '데모 동작', 'signlingo.demo.', 'demoSource'];
+const MARKERS = ['SIGNLINGO_DEMO_CONTENT', '데모 동작', 'signlingo.demo.', 'demoSource', 'SIGNLINGO_REVIEW_PREVIEW', 'signlingo.review.', 'reviewSource', 'private-data/'];
 const root = process.argv[2] ?? 'dist';
 async function* files(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {

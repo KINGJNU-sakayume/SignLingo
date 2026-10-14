@@ -37,14 +37,18 @@ type Guided = { kind: 'card' | 'lesson' | 'local'; entry?: Expression; clip: Mot
 function demoRequested() {
   return import.meta.env.DEV && new URLSearchParams(window.location.search).get('demo') === '1';
 }
+function reviewRequested() {
+  return import.meta.env.DEV && new URLSearchParams(window.location.search).get('review') === '1';
+}
 const stepExpressions = (plan: Plan) => [...new Set(plan.steps.flatMap(step => 'options' in step ? step.options : step.kind === 'same-different' ? [step.target, step.other] : [step.target]))];
 
-/** Resolves the content source. The demo source exists only in development builds. */
+/** Resolves the content source. The demo and review-preview sources exist only in development builds. */
 export default function Shell() {
-  const [source, setSource] = useState<ContentSource | null>(() => demoRequested() ? null : publishedSource);
+  const [source, setSource] = useState<ContentSource | null>(() => demoRequested() || reviewRequested() ? null : publishedSource);
   useEffect(() => {
     if (import.meta.env.DEV) {
       if (demoRequested()) void import('./dev/demoSource').then(module => setSource(module.demoSource));
+      else if (reviewRequested()) void import('./dev/reviewSource').then(module => setSource(module.reviewSource));
     }
   }, []);
   if (!source) return <p className="sl-root sl-boot" role="status">준비하는 중이에요…</p>;
