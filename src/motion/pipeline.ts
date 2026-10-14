@@ -3,6 +3,8 @@ import { MODELS } from './types';
 
 export type PipelineVersion = '0.2.0' | '0.3.0';
 export const PIPELINE_VERSIONS: readonly PipelineVersion[] = ['0.2.0', '0.3.0'];
+/** Opt-in only: Motion Lab's "실험: 손 영역 재검출" and `--pipeline 0.3.0`. */
+export const EXPERIMENTAL_PIPELINE: PipelineVersion = '0.3.0';
 export const TEMPORAL_POLICY: TemporalPolicy = { algorithm: 'conservative-bidirectional-v1', maxGapMs: 150, applies: 'learner-display' };
 
 /**

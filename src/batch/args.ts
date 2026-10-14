@@ -8,7 +8,7 @@ export type BatchArgs = {
   hz: 15 | 30; pipeline: PipelineVersion; mirrored: boolean; channel?: string;
 };
 export const USAGE = `사용법
-  npm run motion:batch -- <영상 또는 폴더...> --out <출력 폴더> [--hz 30|15] [--pipeline 0.3.0|0.2.0] [--mirrored] [--report work/batch-report.json]
+  npm run motion:batch -- <영상 또는 폴더...> --out <출력 폴더> [--hz 30|15] [--pipeline 0.2.0|0.3.0] [--mirrored] [--report work/batch-report.json]
   npm run motion:compare -- <영상 폴더 또는 영상...> [--hz 30|15] [--mirrored] [--out work/compare] [--report work/compare-report.json]
   npm run motion:report -- <motion.json 또는 폴더...> [--report work/motion-report.json]
 공통: [--channel chrome|msedge] (H.264 MP4는 설치된 Chrome/Edge로 디코딩), CHROMIUM_PATH=<실행 파일>`;
@@ -34,7 +34,7 @@ export function parseArgs(argv: readonly string[]): BatchArgs {
   if (!inputs.length) throw new Error(`입력이 없습니다.\n${USAGE}`);
   const hz = Number(options.hz ?? 30);
   if (hz !== 15 && hz !== 30) throw new Error('--hz는 Motion Lab과 같은 15 또는 30만 허용합니다.');
-  const pipeline = (options.pipeline ?? '0.3.0') as PipelineVersion;
+  const pipeline = (options.pipeline ?? '0.2.0') as PipelineVersion; // 0.3.0 is the opt-in experiment
   if (!PIPELINE_VERSIONS.includes(pipeline)) throw new Error(`--pipeline은 ${PIPELINE_VERSIONS.join(' 또는 ')}입니다.`);
   if (command === 'compare' && options.pipeline) throw new Error('compare는 0.2.0과 0.3.0을 모두 실행합니다. --pipeline을 빼세요.');
   if (command === 'batch' && typeof options.out !== 'string') throw new Error(`batch에는 --out <출력 폴더>가 필요합니다.\n${USAGE}`);

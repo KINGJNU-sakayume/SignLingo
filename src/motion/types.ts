@@ -68,8 +68,11 @@ export type TemporalFrame = { timestamp: number; pose: DisplayPose; assignment: 
 export type TemporalMotion = { algorithm: 'conservative-bidirectional-v1'; frames: TemporalFrame[]; maxGapMs: number; elapsedMs: number };
 export const SIDES: Side[] = ['left', 'right'];
 export const FINGERS = ['thumb', 'index', 'middle', 'ring', 'pinky'] as const;
-/** Latest pipeline: 0.2.0 solver + hand-region re-detection + learner temporal policy. */
-export const PIPELINE_VERSION = '0.3.0';
+/**
+ * Default extraction pipeline. 0.3.0 (hand-region re-detection + learner temporal policy) is an opt-in
+ * experiment: on the private real-video evaluation it did not reduce missing hands and cost >2× throughput.
+ */
+export const PIPELINE_VERSION = '0.2.0';
 export const MODELS = {
   pose: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task',
   hand: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',

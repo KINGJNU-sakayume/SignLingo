@@ -15,9 +15,9 @@ import { Reconstructor } from '../src/motion/reconstruct';
 import { MODELS, SIDES, type MotionClip } from '../src/motion/types';
 
 describe('arguments', () => {
-  it('defaults to 0.3.0 at 30 Hz and the documented report path', () => {
-    expect(parseArgs(['batch', 'a.webm', 'videos', '--out', 'private-data/exports'])).toEqual({ command: 'batch', inputs: ['a.webm', 'videos'], out: 'private-data/exports', report: 'work/batch-report.json', hz: 30, pipeline: '0.3.0', mirrored: false });
-    expect(parseArgs(['batch', 'a.mp4', '--out', 'o', '--hz', '15', '--pipeline', '0.2.0', '--mirrored', '--channel', 'chrome'])).toMatchObject({ hz: 15, pipeline: '0.2.0', mirrored: true, channel: 'chrome' });
+  it('defaults to 0.2.0 at 30 Hz and the documented report path; 0.3.0 only when asked', () => {
+    expect(parseArgs(['batch', 'a.webm', 'videos', '--out', 'private-data/exports'])).toEqual({ command: 'batch', inputs: ['a.webm', 'videos'], out: 'private-data/exports', report: 'work/batch-report.json', hz: 30, pipeline: '0.2.0', mirrored: false });
+    expect(parseArgs(['batch', 'a.mp4', '--out', 'o', '--hz', '15', '--pipeline', '0.3.0', '--mirrored', '--channel', 'chrome'])).toMatchObject({ hz: 15, pipeline: '0.3.0', mirrored: true, channel: 'chrome' });
     expect(parseArgs(['compare', 'private-data/videos'])).toMatchObject({ out: 'work/compare', report: 'work/compare-report.json' });
   });
   it.each([
