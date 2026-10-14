@@ -1,6 +1,7 @@
 import type { DisplayPose, MotionClip, Pose, Side, TemporalMotion } from './types';
 import { sequenceBoundary } from './tracking';
 import { boundWrist, eulerQuat, q, qa, rad } from './math';
+import { preservesSourcePalm } from './pipeline';
 export function frameIndex(clip: MotionClip, seconds: number) {
   return timestampIndex(clip.frames, seconds);
 }
@@ -19,7 +20,7 @@ export function editedPose(clip: MotionClip, index: number, temporal?: TemporalM
     const adjusted=q(pose.rotations[key]).multiply(delta).normalize();
     // Keep schema-1/0.1 playback semantics, but do not re-clamp preserved 0.2 palms
     // merely because the user saves an edit (including an explicit zero edit).
-    pose.rotations[key]=qa(clip.pipeline.version==='0.2.0'?adjusted:boundWrist(adjusted).rotation);
+    pose.rotations[key]=qa(preservesSourcePalm(clip.pipeline.version)?adjusted:boundWrist(adjusted).rotation);
   }
   return pose;
 }

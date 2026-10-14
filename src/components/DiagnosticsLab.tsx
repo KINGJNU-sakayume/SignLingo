@@ -25,7 +25,7 @@ export function DiagnosticsLab({clips,view,onView,index,onSeek,onAdopt}:{clips:R
   }
   return <section className="diagnostics-lab" aria-label="복원 기술 진단">
     <div className="section-title"><h2>복원 기술 진단</h2><span className="small-tag">기하학적 참고 지표</span></div>
-    <p>모든 복원 방식은 동일하게 저장된 추적 데이터를 사용합니다. 기존 방식은 0.1.0, 개선 방식은 0.2.0입니다. AI 추론을 다시 실행하지 않습니다. 저장된 프레임을 그대로 검사하며 직접 보정한 값은 측정에서 제외합니다.</p>
+    <p>모든 복원 방식은 동일하게 저장된 추적 데이터를 사용합니다. 기존 방식은 0.1.0, 개선 방식은 0.2.0입니다(0.3.0 클립은 같은 개선 풀이를 쓰고, 손 영역 재검출 결과가 저장된 추적 데이터에 들어 있습니다). AI 추론을 다시 실행하지 않습니다. 저장된 프레임을 그대로 검사하며 직접 보정한 값은 측정에서 제외합니다.</p>
     <div className="lab-controls"><label>복원 방식 선택 <select aria-label="복원 방식 선택" value={view} onChange={e=>onView(e.target.value as PipelineView)}><option value="stored">저장된 복원 결과</option><option value="original">기존 방식 0.1.0</option><option value="improved">개선 방식 0.2.0</option></select></label><button className="button secondary" onClick={exportReport}>비교 요약 내보내기</button><button className="button secondary" disabled={view==='stored'} onClick={onAdopt}>선택한 복원 결과 적용</button><span>다른 복원 방식을 적용하면 저장된 손목 보정이 지워집니다. 원본 추적 데이터는 유지됩니다.</span></div>
     <p className="confidence-note">노란색 선은 추적된 관절 추정값, 흰색 선은 실제 3D 아바타 관절입니다. 깊이·손 정렬·뼈 길이에는 불확실성이 있습니다. 관절 위치가 일치한다고 수어가 정확하다는 의미는 아닙니다.</p>
     <div className="lab-scroll"><table><caption>전체 영상 비교 · 양쪽 방향 비교 표본: {paired.segments} · {fixed(paired.beforeDegrees)}° → {fixed(paired.afterDegrees)}°</caption><thead><tr><th>측정 항목</th><th>기존</th><th>개선</th></tr></thead><tbody>

@@ -1,20 +1,26 @@
 import type { HandLandmarker, PoseLandmarker } from '@mediapipe/tasks-vision';
 import { MODELS } from './types';
-import type { Landmark } from './types';
-import type { Detection } from './types';
+import type { Detection, HandRegionSettings } from './types';
+import { cleanLandmarks, detectWithRegions, handsFrom, regionLandmarkerOptions } from './visionResult';
 export type VisionFrame = ImageBitmap | HTMLCanvasElement;
 export function releaseFrame(frame: VisionFrame) { if ('close' in frame) frame.close(); }
 // Future GPU/server adapters return the SAME explicit raw coordinate contract.
 // A mesh-only model must convert its joint convention before implementing this interface.
 export interface LandmarkDetector {
   readonly id: string;
+  /** Present when hands are also re-detected in pose-predicted crops (pipeline 0.3.0). */
+  readonly handRegions?: HandRegionSettings;
   initialize(): Promise<void>;
-  detect(frame: VisionFrame, timestampMs: number): Promise<Detection>;
+  /** `detail` is the same decoded frame at higher resolution, used only for hand-region crops. Both frames are released. */
+  detect(frame: VisionFrame, timestampMs: number, detail?: VisionFrame): Promise<Detection>;
   close(): void;
 }
+export type DetectorOptions = { handRegions?: HandRegionSettings };
 type Pending = { resolve: (value: Detection) => void; reject: (reason: Error) => void; timer: ReturnType<typeof setTimeout> };
 class WorkerMediaPipeDetector implements LandmarkDetector {
   readonly id='mediapipe-tasks-vision@1.1.0';
+  readonly handRegions?: HandRegionSettings;
+  constructor(options: DetectorOptions = {}) { this.handRegions=options.handRegions; }
   private worker?: Worker;
   private pending?: Pending;
   private initialization?: {reject:(reason:Error)=>void;timer:ReturnType<typeof setTimeout>};
@@ -28,7 +34,7 @@ class WorkerMediaPipeDetector implements LandmarkDetector {
         if (e.data.type==='ready') { clearTimeout(timer);this.initialization=undefined;resolve(); }
         if (e.data.type==='error') { clearTimeout(timer);this.initialization=undefined;reject(new Error(e.data.message)); }
       };
-      this.worker!.postMessage({type:'init'});
+      this.worker!.postMessage({type:'init',handRegions:this.handRegions});
     });
     this.worker.onmessage=e=>{
       if (!this.pending) return;
@@ -38,13 +44,13 @@ class WorkerMediaPipeDetector implements LandmarkDetector {
     };
     this.worker.onerror=e=>{ if (this.pending) { clearTimeout(this.pending.timer);this.pending.reject(new Error(e.message));this.pending=undefined; } };
   }
-  detect(frame: ImageBitmap,timestampMs: number) {
-    if (!this.worker || this.pending) { frame.close();return Promise.reject(new Error('Detector is not ready for another frame.')); }
+  detect(frame: ImageBitmap,timestampMs: number,detail?: ImageBitmap) {
+    if (!this.worker || this.pending) { frame.close();detail?.close();return Promise.reject(new Error('Detector is not ready for another frame.')); }
     return new Promise<Detection>((resolve,reject)=>{
       const timer=setTimeout(()=>{ this.pending=undefined;reject(new Error('Frame inference timed out. Try a smaller video or another browser.'));},45000);
       this.pending={resolve,reject,timer};
-      try { this.worker!.postMessage({type:'detect',frame,timestampMs},[frame]); }
-      catch(error) { clearTimeout(timer);this.pending=undefined;frame.close();reject(error); }
+      try { this.worker!.postMessage({type:'detect',frame,detail,timestampMs},detail?[frame,detail]:[frame]); }
+      catch(error) { clearTimeout(timer);this.pending=undefined;frame.close();detail?.close();reject(error); }
     });
   }
   close() { if(this.initialization){clearTimeout(this.initialization.timer);this.initialization.reject(new DOMException('Processing canceled','AbortError'));this.initialization=undefined;} if (this.pending) { clearTimeout(this.pending.timer);this.pending.reject(new DOMException('Processing canceled','AbortError'));this.pending=undefined; } this.worker?.terminate();this.worker=undefined; }
@@ -61,17 +67,16 @@ export function prefersMainThreadVision(userAgent:string,platform:string,maxTouc
   return /iPad|iPhone|iPod/i.test(userAgent) || (platform==='MacIntel' && maxTouchPoints>1);
 }
 const needsDocument=(error:unknown)=>/\b(document|OffscreenCanvas)\b/i.test(error instanceof Error?error.message:String(error));
-const cleanLandmarks=(points:Landmark[],hasConfidence=true)=>points.map(p=>({
-  x:p.x,y:p.y,z:p.z,
-  ...(hasConfidence&&Number.isFinite(p.visibility)?{visibility:p.visibility}:{}),
-  ...(hasConfidence&&Number.isFinite(p.presence)?{presence:p.presence}:{})
-}));
 
 export class MainThreadMediaPipeDetector implements LandmarkDetector {
   readonly id='mediapipe-tasks-vision@1.1.0-main-thread';
+  readonly handRegions?: HandRegionSettings;
   private pose?:PoseLandmarker;
   private hands?:HandLandmarker;
+  private regionHands?:HandLandmarker;
+  private surface?:HTMLCanvasElement;
   private closed=false;
+  constructor(options:DetectorOptions={}) {this.handRegions=options.handRegions;}
 
   async initialize():Promise<void> {
     try {
@@ -93,13 +98,19 @@ export class MainThreadMediaPipeDetector implements LandmarkDetector {
       const hands=await HandLandmarker.createFromOptions(files,{baseOptions:{modelAssetPath:MODELS.hand,delegate:'CPU'},runningMode:'VIDEO',numHands:2,minHandDetectionConfidence:0.5,minHandPresenceConfidence:0.5,minTrackingConfidence:0.5});
       if(this.closed){hands.close();throw new DOMException('Processing canceled','AbortError');}
       this.hands=hands;
+      if(this.handRegions){
+        runtime.ModuleFactory=loader.default;
+        const regionHands=await HandLandmarker.createFromOptions(files,regionLandmarkerOptions(this.handRegions));
+        if(this.closed){regionHands.close();throw new DOMException('Processing canceled','AbortError');}
+        this.regionHands=regionHands;
+      }
     } catch(error) {
       this.close();
       throw error;
     }
   }
 
-  async detect(frame:VisionFrame,timestampMs:number):Promise<Detection> {
+  async detect(frame:VisionFrame,timestampMs:number,detail?:VisionFrame):Promise<Detection> {
     // Yield a macrotask before synchronous inference so Safari can paint
     // progress and process a Cancel click between sampled frames.
     await new Promise<void>(resolve=>setTimeout(resolve,0));
@@ -107,19 +118,16 @@ export class MainThreadMediaPipeDetector implements LandmarkDetector {
       if(this.closed || !this.pose || !this.hands)throw new DOMException('Processing canceled','AbortError');
       const p=this.pose.detectForVideo(frame,timestampMs);
       const h=this.hands.detectForVideo(frame,timestampMs);
-      return {
-        timestamp:timestampMs,
-        body:cleanLandmarks(p.landmarks[0]??[]),
-        bodyWorld:cleanLandmarks(p.worldLandmarks[0]??[]),
-        hands:h.landmarks.map((landmarks,i)=>({
-          image:cleanLandmarks(landmarks,false),
-          world:cleanLandmarks(h.worldLandmarks[i]??[],false),
-          label:h.handedness[i]?.[0]?.categoryName??'Unknown',
-          score:h.handedness[i]?.[0]?.score??0
-        }))
-      };
+      const body=cleanLandmarks(p.landmarks[0]??[]);
+      let hands=handsFrom(h);
+      if(this.regionHands&&this.handRegions){
+        this.surface??=document.createElement('canvas');
+        hands=await detectWithRegions({body,frameHands:hands,source:detail??frame,surface:this.surface,landmarker:this.regionHands,settings:this.handRegions});
+      }
+      return {timestamp:timestampMs,body,bodyWorld:cleanLandmarks(p.worldLandmarks[0]??[]),hands};
     } finally {
       releaseFrame(frame);
+      if(detail)releaseFrame(detail);
     }
   }
 
@@ -127,6 +135,7 @@ export class MainThreadMediaPipeDetector implements LandmarkDetector {
     this.closed=true;
     this.pose?.close();this.pose=undefined;
     this.hands?.close();this.hands=undefined;
+    this.regionHands?.close();this.regionHands=undefined;
   }
 }
 
@@ -137,11 +146,15 @@ export class MediaPipeDetector implements LandmarkDetector {
   private abort=new AbortController();
   private ready=false;
   private busy=false;
-  constructor(private factories={worker:()=>new WorkerMediaPipeDetector() as LandmarkDetector,main:()=>new MainThreadMediaPipeDetector() as LandmarkDetector}) {}
+  constructor(
+    private factories:{worker:(options:DetectorOptions)=>LandmarkDetector;main:(options:DetectorOptions)=>LandmarkDetector}={worker:options=>new WorkerMediaPipeDetector(options),main:options=>new MainThreadMediaPipeDetector(options)},
+    private options:DetectorOptions={},
+  ) {}
   get id():string {return this.backend?.id??'mediapipe-tasks-vision@1.1.0';}
+  get handRegions():HandRegionSettings|undefined {return this.options.handRegions;}
   private async initializeBackend(main:boolean) {
     if(this.closed)throw new DOMException('Processing canceled','AbortError');
-    const backend=main?this.factories.main():this.factories.worker();this.backend=backend;
+    const backend=main?this.factories.main(this.options):this.factories.worker(this.options);this.backend=backend;
     let timer:ReturnType<typeof setTimeout>|undefined;
     let abort:()=>void=()=>{};
     try {
@@ -160,19 +173,21 @@ export class MediaPipeDetector implements LandmarkDetector {
     catch(error){if(main||this.closed||!needsDocument(error))throw error;await this.initializeBackend(true);}
     this.ready=true;
   }
-  async detect(frame:VisionFrame,timestampMs:number):Promise<Detection> {
-    if(this.closed||!this.ready||!this.backend||this.busy){releaseFrame(frame);throw new Error('Detector is not ready for another frame.');}
+  async detect(frame:VisionFrame,timestampMs:number,detail?:VisionFrame):Promise<Detection> {
+    if(this.closed||!this.ready||!this.backend||this.busy){releaseFrame(frame);if(detail)releaseFrame(detail);throw new Error('Detector is not ready for another frame.');}
     this.busy=true;
     try {
       const worker=this.backend.id.indexOf('main-thread')<0;
-      // Keep the canvas snapshot for a DOM-error retry; only transfer its bitmap.
+      // Keep the canvas snapshots for a DOM-error retry; only transfer their bitmaps.
       const input=worker && !('close' in frame)?await createImageBitmap(frame):frame;
-      if(this.closed){releaseFrame(input);throw new DOMException('Processing canceled','AbortError');}
-      try{return await this.backend.detect(input,timestampMs);}
+      const detailInput=detail&&worker&&!('close' in detail)?await createImageBitmap(detail):detail;
+      if(this.closed){releaseFrame(input);if(detailInput)releaseFrame(detailInput);throw new DOMException('Processing canceled','AbortError');}
+      const run=(backend:LandmarkDetector,a:VisionFrame,b?:VisionFrame)=>b?backend.detect(a,timestampMs,b):backend.detect(a,timestampMs);
+      try{return await run(this.backend,input,detailInput);}
       catch(error){
-        if(!worker||this.closed||!needsDocument(error)||'close' in frame)throw error;
+        if(!worker||this.closed||!needsDocument(error)||'close' in frame||(detail&&'close' in detail))throw error;
         this.backend.close();await this.initializeBackend(true);
-        return await this.backend!.detect(frame,timestampMs);
+        return await run(this.backend!,frame,detail);
       }
     } finally{this.busy=false;}
   }

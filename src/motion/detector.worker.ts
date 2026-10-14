@@ -1,13 +1,13 @@
 /// <reference lib="webworker" />
 import { FilesetResolver, HandLandmarker, PoseLandmarker } from '@mediapipe/tasks-vision';
 import { MODELS } from './types';
-import type { Landmark } from './types';
+import type { HandRegionSettings } from './types';
+import { cleanLandmarks as clean, detectWithRegions, handsFrom, regionLandmarkerOptions } from './visionResult';
 let pose: PoseLandmarker, hands: HandLandmarker;
-// Hand Tasks do not estimate per-point visibility/presence. The JS wrapper
-// materializes unset proto fields as zero; do not misreport them as observations.
-const clean=(points: Landmark[],hasConfidence=true)=>points.map(p=>({x:p.x,y:p.y,z:p.z,...(hasConfidence&&Number.isFinite(p.visibility)?{visibility:p.visibility}:{}),...(hasConfidence&&Number.isFinite(p.presence)?{presence:p.presence}:{})}));
+// Optional pipeline 0.3.0 crop re-detection: a separate IMAGE-mode task, so full-frame VIDEO tracking is untouched.
+let regionHands: HandLandmarker | undefined, regions: HandRegionSettings | undefined, surface: OffscreenCanvas | undefined;
 self.onmessage=async (event: MessageEvent)=>{
-  const {type,frame,timestampMs}=event.data;
+  const {type,frame,detail,timestampMs,handRegions}=event.data;
   try {
     if (type==='init') {
       const files=await FilesetResolver.forVisionTasks(MODELS.wasm,true);
@@ -20,12 +20,19 @@ self.onmessage=async (event: MessageEvent)=>{
       pose=await PoseLandmarker.createFromOptions(files,{baseOptions:{modelAssetPath:MODELS.pose,delegate:'CPU'},runningMode:'VIDEO',numPoses:1,minPoseDetectionConfidence:0.5,minPosePresenceConfidence:0.5,minTrackingConfidence:0.5});
       runtime.ModuleFactory=loader.default;
       hands=await HandLandmarker.createFromOptions(files,{baseOptions:{modelAssetPath:MODELS.hand,delegate:'CPU'},runningMode:'VIDEO',numHands:2,minHandDetectionConfidence:0.5,minHandPresenceConfidence:0.5,minTrackingConfidence:0.5});
+      if (handRegions) {
+        runtime.ModuleFactory=loader.default;
+        regionHands=await HandLandmarker.createFromOptions(files,regionLandmarkerOptions(handRegions));
+        regions=handRegions;surface=new OffscreenCanvas(handRegions.cropSize,handRegions.cropSize);
+      }
       self.postMessage({type:'ready'});
     } else if (type==='detect') {
       try {
         const p=pose.detectForVideo(frame,timestampMs), h=hands.detectForVideo(frame,timestampMs);
-        self.postMessage({type:'result',result:{timestamp:timestampMs,body:clean(p.landmarks[0]??[]),bodyWorld:clean(p.worldLandmarks[0]??[]),hands:h.landmarks.map((landmarks,i)=>({image:clean(landmarks,false),world:clean(h.worldLandmarks[i],false),label:h.handedness[i]?.[0]?.categoryName??'Unknown',score:h.handedness[i]?.[0]?.score??0}))}});
-      } finally { frame.close(); }
+        const body=clean(p.landmarks[0]??[]);
+        const detected=regionHands&&regions&&surface?await detectWithRegions({body,frameHands:handsFrom(h),source:detail??frame,surface,landmarker:regionHands,settings:regions}):handsFrom(h);
+        self.postMessage({type:'result',result:{timestamp:timestampMs,body,bodyWorld:clean(p.worldLandmarks[0]??[]),hands:detected}});
+      } finally { frame.close();detail?.close(); }
     }
   } catch(error) { self.postMessage({type:'error',message:error instanceof Error ? error.message : String(error)}); }
 };

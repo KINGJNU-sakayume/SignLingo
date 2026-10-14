@@ -5,7 +5,8 @@ import { appearanceCut } from './sceneCut';
 import { reconstructTemporalAsync } from './temporalReconstruction';
 import type { TemporalMotion } from './types';
 import { Reconstructor } from './reconstruct';
-import { MODELS, PIPELINE_VERSION, SPACES } from './types';
+import { SPACES } from './types';
+import { pipelineInfo } from './pipeline';
 import type { MotionClip } from './types';
 export type Progress={phase:string;done:number;total:number};
 export function waitEvent(target: HTMLVideoElement,event: string,signal: AbortSignal,timeout=15000) {
@@ -46,6 +47,12 @@ export async function processVideo(file: File,detector: LandmarkDetector,options
     const scale=Math.min(1,(options.maxDimension??960)/Math.max(video.videoWidth,video.videoHeight));
     canvas.width=Math.round(video.videoWidth*scale);canvas.height=Math.round(video.videoHeight*scale);
     const ctx=canvas.getContext('2d');if (!ctx) throw new Error('Canvas 2D is unavailable.');
+    // 0.3.0 hand-region crops are cut from a sharper copy of the same decoded frame when the source is larger
+    // than the analysis canvas. The full-frame pose/hand pass keeps the analysis canvas exactly as in 0.2.0.
+    const regions=detector.handRegions,detailScale=regions?Math.min(1,regions.cropSourceMaxDimension/Math.max(video.videoWidth,video.videoHeight)):0;
+    const detailCanvas=regions&&detailScale>scale+1e-9?document.createElement('canvas'):undefined;
+    if(detailCanvas){detailCanvas.width=Math.round(video.videoWidth*detailScale);detailCanvas.height=Math.round(video.videoHeight*detailScale);}
+    const detailContext=detailCanvas?.getContext('2d');if(detailCanvas&&!detailContext)throw new Error('Canvas 2D is unavailable.');
     const cutCanvas=document.createElement('canvas');cutCanvas.width=16;cutCanvas.height=9;
     const cutContext=cutCanvas.getContext('2d',{willReadFrequently:true});let previousThumbnail:Uint8ClampedArray|undefined;
     const reconstruction=new Reconstructor();
@@ -69,8 +76,9 @@ export async function processVideo(file: File,detector: LandmarkDetector,options
         const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data;
         if(identicalPixels(previousPixels,pixels)){report.duplicateDecodedFrames++;progress({phase:'Sampling decoded frames',done:i+1,total});continue;}previousPixels=pixels;
       }
+      if(detailCanvas&&detailContext){detailContext.setTransform(mirrored?-1:1,0,0,1,mirrored?detailCanvas.width:0,0);detailContext.drawImage(video,0,0,detailCanvas.width,detailCanvas.height);}
       origin??=time;const inferenceStarted=performance.now();
-      const detection=await detector.detect(canvas,(time-origin)*1000);
+      const detection=await (detailCanvas?detector.detect(canvas,(time-origin)*1000,detailCanvas):detector.detect(canvas,(time-origin)*1000));
       report.inferenceMs+=performance.now()-inferenceStarted;
       cutContext?.drawImage(canvas,0,0,16,9);
       const thumbnail=cutContext?.getImageData(0,0,16,9).data;
@@ -84,7 +92,7 @@ export async function processVideo(file: File,detector: LandmarkDetector,options
     report.elapsedMs=performance.now()-started;report.analysisFps=report.elapsedMs?frames.length*1000/report.elapsedMs:null;options.measurements?.({...report});
     if(!frames.length)throw new Error('No distinct decoded frames were observed. Try an H.264 MP4 or a current browser with video-frame callbacks.');
     if (!options.allowHandOnly && !frames.some(f=>f.pose.quality.body>0)) throw new Error('No reliable upper-body pose was detected. Keep one signer, both shoulders and hands visible. No animation was generated.');
-    const clip:MotionClip={schema:'signlingo.motion',version:1,language:'ksl',pipeline:{version:PIPELINE_VERSION,detector:detector.id,models:MODELS},source:{name:file.name,size:file.size,duration:Math.max(.001,duration-(origin??0)),timeOffset:origin??0,width:video.videoWidth,height:video.videoHeight,mirrored,sampleHz},spaces:SPACES,nonmanual:{head:'Approximate nose/ear orientation; not facial grammar.',face:'not-estimated',linguisticValidation:'not-performed'},frames,edits:[]};
+    const clip:MotionClip={schema:'signlingo.motion',version:1,language:'ksl',pipeline:pipelineInfo(detector.id,detector.handRegions),source:{name:file.name,size:file.size,duration:Math.max(.001,duration-(origin??0)),timeOffset:origin??0,width:video.videoWidth,height:video.videoHeight,mirrored,sampleHz},spaces:SPACES,nonmanual:{head:'Approximate nose/ear orientation; not facial grammar.',face:'not-estimated',linguisticValidation:'not-performed'},frames,edits:[]};
     if(options.onTemporal){stage='Temporal reconstruction failure';options.onTemporal(await reconstructTemporalAsync(clip,{signal,progress}));}
     signal.throwIfAborted();
     return clip;

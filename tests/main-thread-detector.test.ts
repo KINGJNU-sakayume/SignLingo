@@ -1,5 +1,6 @@
 import { beforeEach,afterEach,it,expect,vi } from 'vitest';
 import { MainThreadMediaPipeDetector } from '../src/motion/detector';
+import { HAND_REGION_DEFAULTS } from '../src/motion/handRegions';
 const mock=vi.hoisted(()=>({files:vi.fn(),pose:vi.fn(),hands:vi.fn()}));
 vi.mock('@mediapipe/tasks-vision',()=>({FilesetResolver:{forVisionTasks:mock.files},PoseLandmarker:{createFromOptions:mock.pose},HandLandmarker:{createFromOptions:mock.hands}}));
 const task=()=>({close:vi.fn(),detectForVideo:vi.fn(()=>({landmarks:[],worldLandmarks:[],handedness:[]}))});
@@ -25,4 +26,25 @@ it('releases owned bitmap on inference failure and both models on close',async()
 it('cancels queued main-thread inference before reading a frame',async()=>{
   const pose=task();mock.pose.mockResolvedValue(pose);const detector=new MainThreadMediaPipeDetector();await detector.initialize();
   const frame={close:vi.fn()} as unknown as ImageBitmap;const detecting=detector.detect(frame,42);const rejected=expect(detecting).rejects.toMatchObject({name:'AbortError'});detector.close();await rejected;expect(pose.detectForVideo).not.toHaveBeenCalled();expect(frame.close).toHaveBeenCalledOnce();
+});
+it('adds an IMAGE-mode crop landmarker for hand regions and fuses its hands into the detection',async()=>{
+  const pose=task(),hands=task(),regions={close:vi.fn(),detect:vi.fn()};
+  const body=Array.from({length:33},()=>({x:.5,y:.5,z:0,visibility:0}));
+  Object.assign(body,{11:{x:.6,y:.35,z:0,visibility:.9},12:{x:.4,y:.35,z:0,visibility:.9},13:{x:.62,y:.75,z:0,visibility:.9},15:{x:.62,y:.55,z:0,visibility:.9}});
+  pose.detectForVideo.mockReturnValue({landmarks:[body],worldLandmarks:[body],handedness:[]} as never);
+  const crop=Array.from({length:21},(_,i)=>({x:.5,y:.6-i*.01,z:0}));
+  regions.detect.mockReturnValue({landmarks:[crop],worldLandmarks:[crop],handedness:[[{categoryName:'Left',score:.91}]]});
+  mock.pose.mockResolvedValue(pose);mock.hands.mockResolvedValueOnce(hands).mockResolvedValueOnce(regions);
+  const context={clearRect:vi.fn(),drawImage:vi.fn()};
+  vi.stubGlobal('document',{createElement:()=>({width:0,height:0,getContext:()=>context})});
+  try{
+    const detector=new MainThreadMediaPipeDetector({handRegions:HAND_REGION_DEFAULTS});await detector.initialize();
+    expect(mock.hands).toHaveBeenCalledTimes(2);expect(mock.hands.mock.calls[1][1]).toMatchObject({runningMode:'IMAGE',numHands:2});
+    const frame={close:vi.fn(),width:700,height:466} as unknown as ImageBitmap,detail={close:vi.fn(),width:1400,height:932} as unknown as ImageBitmap;
+    const result=await detector.detect(frame,7,detail);
+    expect(context.drawImage.mock.calls[0][0]).toBe(detail);
+    expect(result.hands).toHaveLength(1);expect(result.hands[0]).toMatchObject({origin:'region',label:'Left',score:.91});
+    expect(frame.close).toHaveBeenCalledOnce();expect(detail.close).toHaveBeenCalledOnce();
+    detector.close();expect(regions.close).toHaveBeenCalledOnce();
+  }finally{vi.unstubAllGlobals();}
 });

@@ -7,11 +7,11 @@ import { Avatar, type CameraView } from './components/Avatar';
 import { handFocus, runDisplayPipeline, sampleDisplay, stabilizeTorso } from './motion/display';
 import { activeRange, loopTime, NO_LOOP, type LoopRange } from './learn/loop';
 import { Overlay } from './components/Overlay';
-import { MediaPipeDetector } from './motion/detector';
-import { processVideo,type Progress } from './motion/video';
+import { extractMotion } from './motion/extract';
+import type { Progress } from './motion/video';
 import { downloadMotion,importMotion } from './motion/serialization';
 import { frameIndex,playbackTime } from './motion/player';
-import { SIDES,type DisplayPose,type MotionClip,type TemporalMotion,type Side,type Vec3 } from './motion/types';
+import { PIPELINE_VERSION,SIDES,type DisplayPose,type MotionClip,type TemporalMotion,type Side,type Vec3 } from './motion/types';
 import { koMessage, koState } from './i18n/ko';
 const evidenceLabel={observed:'관측',interpolated:'시간 보간',held:'임시 유지',unavailable:'사용 불가'};
 const VIEWS:[CameraView,string][]=[['front','정면'],['side','측면'],['first','1인칭'],['hands','손 확대']];
@@ -78,7 +78,7 @@ export default function App({active=true}:{active?:boolean}){
   async function reconstruct(){
     if(!file)return;pause();setError('');setClip(null);seek(0);
     const controller=new AbortController();abort.current=controller;setProgress({phase:'영상을 여는 중',done:0,total:0});
-    try {const result=await processVideo(file,new MediaPipeDetector(),{mirrored,sampleHz,signal:controller.signal,progress:setProgress});setClip(result);seek(0);}
+    try {const result=await extractMotion(file,{pipeline:PIPELINE_VERSION,mirrored,sampleHz,signal:controller.signal,progress:setProgress});setClip(result);seek(0);}
     catch(e){setError(controller.signal.aborted?'분석을 취소했습니다. 불완전한 동작은 저장하지 않았습니다.':`동작 복원 실패: ${koMessage(e instanceof Error?e.message:String(e))}`);}
     finally{setProgress(null);abort.current=null;}
   }
