@@ -117,7 +117,9 @@ test('GitHub Pages subpath resolves the content manifest relative to the applica
   });
   const request = page.waitForRequest('**/SignLingo/content/manifest.json');
   await page.goto('/SignLingo/'); expect((await request).url()).toContain('/SignLingo/content/manifest.json');
-  await expect(page.getByRole('heading', { name: '첫 레슨을 준비하고 있어요' })).toBeVisible();
+  // The deployed manifest publishes course 1; it must parse with its real evidence and open its first lesson.
+  await expect(page.getByRole('heading', { name: '첫 만남과 예의' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '단원 1 레슨 1 · 지금 할 차례' })).toBeVisible();
 });
 test('unavailable original video leaves verified 3D practice available', async ({ page }) => {
   const { entry, manifest, bytes } = await approvedFixture();
