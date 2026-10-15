@@ -20,6 +20,7 @@ describe('MediaPipe inference backend selection',()=>{
 import { afterEach,beforeEach,vi } from 'vitest';
 import { MediaPipeDetector } from '../src/motion/detector';
 import { detection } from './fixtures';
+import { HAND_REGION_DEFAULTS } from '../src/motion/handRegions';
 beforeEach(()=>{
   vi.stubGlobal('navigator',{userAgent:'Chrome',platform:'Linux',maxTouchPoints:0});
   vi.stubGlobal('Worker',class {});
@@ -58,4 +59,18 @@ it('cancels initialization promptly and never starts a fallback after cancellati
 });
 it('bounds initialization time and closes the backend',async()=>{
   vi.useFakeTimers();const s=adapters();s.worker.initialize.mockImplementation(()=>new Promise(()=>{}));const rejected=expect(s.detector.initialize()).rejects.toThrow('timed out');await vi.advanceTimersByTimeAsync(120000);await rejected;expect(s.worker.close).toHaveBeenCalled();
+});
+it('passes hand-region settings to the selected backend and transfers the detail frame as a second bitmap',async()=>{
+  const seen:unknown[]=[];const s=adapters();
+  const detector=new MediaPipeDetector({worker:options=>{seen.push(options);return s.worker;},main:options=>{seen.push(options);return s.main;}},{handRegions:HAND_REGION_DEFAULTS});
+  expect(detector.handRegions).toBe(HAND_REGION_DEFAULTS);
+  await detector.initialize();expect(seen).toEqual([{handRegions:HAND_REGION_DEFAULTS}]);
+  await detector.detect({} as HTMLCanvasElement,5,{} as HTMLCanvasElement);
+  expect(createImageBitmap).toHaveBeenCalledTimes(2);
+  expect(s.worker.detect).toHaveBeenCalledWith(expect.objectContaining({close:expect.any(Function)}),5,expect.objectContaining({close:expect.any(Function)}));
+  detector.close();
+});
+it('releases both frames when it is not ready',async()=>{
+  const s=adapters(),frame={close:vi.fn()} as unknown as ImageBitmap,detail={close:vi.fn()} as unknown as ImageBitmap;
+  await expect(s.detector.detect(frame,1,detail)).rejects.toThrow('not ready');expect(frame.close).toHaveBeenCalledOnce();expect(detail.close).toHaveBeenCalledOnce();
 });

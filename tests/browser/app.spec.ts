@@ -4,6 +4,8 @@ test('upload-first UI, real rig and mobile layout',async({page})=>{
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/');await page.getByRole('button',{name:'동작 복원',exact:true}).click();
   await expect(page.getByRole('heading',{name:'수어 동작을 3D로 재현합니다.'})).toBeVisible();
   await expect(page.getByRole('button',{name:'동작 추출 및 복원'})).toBeDisabled();
+  // 0.2.0 is the default; hand-region re-detection (0.3.0) is an explicit experiment.
+  await expect(page.getByLabel('실험: 손 영역 재검출',{exact:true})).not.toBeChecked();
   await expect(page.getByText('기본 자세 · 동작을 불러오지 않았습니다')).toBeVisible();
   await expect(page.locator('.avatar-stage canvas')).toBeVisible();
   await page.getByRole('button',{name:'측면',exact:true}).click();await page.getByLabel('뼈대 표시', {exact:true}).check();

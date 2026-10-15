@@ -5,7 +5,8 @@ import type { DisplayPose, MotionClip, Side, TemporalMotion } from '../types';
  * never evidence and never a Practice comparison input.
  */
 export type DisplayHandState = 'observed' | 'interpolated' | 'held' | 'filled' | 'missing';
-export type HandAnnotation = { state: DisplayHandState; fill?: 'lead' | 'trail' | 'gap'; anchors?: [number, number] };
+/** `hidden`: the fill safeguard kept this hand hidden (`missing`) instead of filling or holding it. */
+export type HandAnnotation = { state: DisplayHandState; fill?: 'lead' | 'trail' | 'gap'; anchors?: [number, number]; hidden?: 'insufficient-evidence' | 'offscreen' };
 export type TorsoAnnotation = {
   mode: 'fixed' | 'smoothed';
   /** Angle between the reconstructed and the displayed torso. */

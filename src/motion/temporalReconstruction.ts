@@ -3,17 +3,13 @@ import { confidence, q, qa, rad, solveArm } from './math';
 import { forwardArm } from './rig';
 import { Reconstructor } from './reconstruct';
 import { distributeForearmRoll } from './hand';
-import { reconcileAssociations, sequenceBoundary, TemporalHandTracker, type HandAssociation } from './tracking';
+import { reconcileAssociations, sequenceBoundary, TemporalHandTracker, wristInImage as inImage, type HandAssociation } from './tracking';
 import { FINGERS, SIDES, type DisplayPose, type HandEvidence, type MotionClip, type MotionFrame, type Pose, type Side, type TemporalFrame, type TemporalMotion } from './types';
 
 export type TemporalProgress = { phase: string; done: number; total: number };
 export type TemporalOptions = { maxGapMs?: number; signal?: AbortSignal; progress?: (progress: TemporalProgress) => void };
 const emptyEvidence = (): HandEvidence => ({ state: 'unavailable', position: 'unavailable', orientation: 'unavailable', fingers: 'unavailable', identity: 'unavailable' });
 const fingerKeys = (side: Side) => FINGERS.flatMap(f => [0, 1, 2].map(j => `${side}.${f}.${j}`));
-const inImage = (f: MotionFrame, side: Side) => {
-  const p = f.body[side === 'left' ? 15 : 16];
-  return confidence(p) >= .45 && p.x > .02 && p.x < .98 && p.y > .02 && p.y < .98;
-};
 
 // Only inferred articulation is constrained. Unusual observed signs are preserved.
 export function validInferredFingers(pose: Pose, side: Side): boolean {

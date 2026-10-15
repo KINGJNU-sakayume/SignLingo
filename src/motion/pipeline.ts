@@ -1,0 +1,24 @@
+import type { HandRegionSettings, PipelineInfo, TemporalPolicy } from './types';
+import { MODELS } from './types';
+
+/** Versions this build can extract. 0.3.0 (all-hands fusion) clips still load and play, but are no longer produced. */
+export type PipelineVersion = '0.2.0' | '0.3.1';
+export const PIPELINE_VERSIONS: readonly PipelineVersion[] = ['0.2.0', '0.3.1'];
+/** Opt-in only: Motion Lab's "실험: 손 영역 재검출" and `--pipeline 0.3.1`. */
+export const EXPERIMENTAL_PIPELINE: PipelineVersion = '0.3.1';
+export const TEMPORAL_POLICY: TemporalPolicy = { algorithm: 'conservative-bidirectional-v1', maxGapMs: 150, applies: 'learner-display' };
+
+/**
+ * What a clip records about how it was made. The version follows the detector actually used: a detector
+ * without hand-region re-detection yields exactly the 0.2.0 metadata (Practice keeps this path); with it,
+ * 0.3.1 records the crop/gap-fill parameters and the learner-display temporal policy. The solver is unchanged.
+ */
+export function pipelineInfo(detector: string, handRegions?: HandRegionSettings): PipelineInfo {
+  if (!handRegions) return { version: '0.2.0', detector, models: MODELS };
+  return { version: '0.3.1', detector, models: MODELS, handRegions: { enabled: true, ...handRegions }, temporal: TEMPORAL_POLICY };
+}
+
+/** 0.2.0 and later preserve the detected palm under a wrist edit; 0.1.0 (and unknown versions) keep the bounded wrist. */
+export const preservesSourcePalm = (version: string) => version === '0.2.0' || version === '0.3.0' || version === '0.3.1';
+/** Region re-detection pipelines (0.3.0 record or 0.3.1). */
+export const isRegionPipeline = (version: string) => version === '0.3.0' || version === '0.3.1';

@@ -18,7 +18,7 @@ MotionClip (+ 시간 복원 결과) ──► baseFrames ──► [단계 1] �
 
 | 타입 | 내용 |
 | --- | --- |
-| `DisplayInput` | `{ clip, temporal? }`. 시간 복원 결과는 Motion Lab에서만 넘깁니다. |
+| `DisplayInput` | `{ clip, temporal? }`. 시간 복원 결과는 Motion Lab에서만 넘깁니다. `learner` preset은 단계 0이 직접 계산합니다. |
 | `DisplayFrame` | `{ timestamp, segment, pose, annotation }`. `segment`는 `sequenceBoundary()`(장면 전환·150 ms 넘는 검출 공백)에서 바뀌며, 어떤 단계도 segment를 넘어 값을 잇지 않습니다. |
 | `DisplayAnnotation` | `hands[side] = { state, fill?, anchors? }`. state는 `observed / interpolated / held / filled / missing`입니다. `torso?`(모드·편차·손목 잔차·팔꿈치 이동)와 이 프레임을 바꾼 단계 id 목록 `stages`가 붙습니다. |
 | `DisplayClip` | `{ frames, stages, reports }`. `reports[stageId]`에 단계별 클립 단위 요약이 들어갑니다. |
@@ -44,6 +44,15 @@ runDisplayPipeline({ clip }, [stabilizeTorso(), constraints, fillHands()]);
 
 `withPose()`가 주석에 단계 id를 남깁니다. 바꾸지 않은 프레임은 같은 객체를 그대로 돌려주면 됩니다. 새 단계에서도 위의 불변식(입력 불변, 표시 전용, 추정 표시)을 지킵니다. `tests/display-pipeline.test.ts`에 끼워 넣기 테스트가 있습니다.
 
+## 단계 0 · 시간 복원 `temporal-reconstruct` (`learner`만, 파이프라인 0.3.x 클립)
+
+`learner` preset의 첫 단계입니다(`temporal.ts`). 기존 시간 복원(`reconstructTemporal`, `conservative-bidirectional-v1`)을 그대로 실행해 기준 프레임을 다시 만들고, 앞뒤 관측 사이의 짧은 공백(≤150 ms)을 `interpolated` 손으로 메웁니다. 남은 `held`·`missing` 손만 다음 단계의 손 채우기가 추정으로 채웁니다.
+
+- **적용 조건**: 클립의 `pipeline.temporal`이 있음(0.3.x 추출이 기록), `sampleHz ≥ 15`, 프레임 3–1800개. 하나라도 아니면 프레임을 그대로 넘기고 보고서에 `applied: false`와 이유(`not-recorded` / `sample-rate` / `frame-count`)를 남깁니다.
+- 공개 코스 1(v1, 0.2.0)에는 `pipeline.temporal`이 없으므로 **검수받은 화면이 그대로** 보입니다. 테스트가 이전 preset과 프레임 단위로 같은지 확인합니다.
+- 반드시 첫 단계여야 합니다(다른 단계 뒤에 두면 오류). `attempt` preset, Motion Lab(자체 시간 복원 UI 유지), 저장되는 MotionClip, Practice 비교에는 쓰지 않습니다.
+- 보고서 `reports['temporal-reconstruct']`: 적용 여부와 쪽별 상태 개수(관측·보간·유지·없음).
+
 ## 단계 1 · 몸통 고정 `torso-stabilize` (멀미 방지)
 
 1. 몸통이 있는 프레임(`quality.body > 0`)에서 torso 회전의 **기하 중앙값**(Weiszfeld)을 구합니다. 각 프레임의 편차를 구하고, 그 90번째 백분위를 변동량으로 씁니다.
@@ -64,7 +73,7 @@ runDisplayPipeline({ clip }, [stabilizeTorso(), constraints, fillHands()]);
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | ksl-thanks | 6.5° | fixed | 9.2° | 1.5 mm | 3.5 cm | 2.87 → 0 | 38·0·31 / 35·8·29 |
 | ksl-sorry | 18.4° | smoothed | 5.7° | 1.5 mm | 3.8 cm | 6.44 → 0.36 | 42·12·26 / 29·14·4 |
-| ksl-meet | 4.2° | fixed | 7.2° | 0 | 2.4 cm | 1.51 → 0 | 5·5·5 / 2·4·5 |
+| ksl-meet | 4.2° | fixed | 7.2° | 0 | 2.4 cm | 1.51 → 0 | 4·5·4 / 0·4·5 (안전장치 전 5·5·5 / 2·4·5) |
 
 - 공식만 썼다면 손이 쪽마다 최대 2.8 / 6.5 / 2.3 cm 움직였을 것입니다.
 - IK 보정을 쓰면 양손이 모두 관측된 프레임에서 두 검지 끝 사이 거리 변화가 2 mm보다 작습니다. ksl-meet에서는 수치 오차 수준(10⁻¹⁵ m)입니다.
@@ -84,12 +93,31 @@ runDisplayPipeline({ clip }, [stabilizeTorso(), constraints, fillHands()]);
 - 기준(anchor)은 관측된 손입니다(시간 보간 손은 손가락까지 있을 때만 씁니다). segment를 넘지 않고, 팔이 숨겨진 프레임은 채우지 않습니다.
 - `reconstruct.ts`의 200 ms 유지 규칙과 저장된 `held` 상태는 그대로이며, Motion Lab 진단 패널은 원래 상태(예: "임시 유지")를 그대로 보여 줍니다.
 
+### 손 채우기 안전장치
+
+관측 근거가 부족한 손은 채우지 않고 숨깁니다(`fillHands()`의 기본값 `FILL_DEFAULTS`). 비공개 평가에서 거의 화면 밖에 있던 손을 몇 프레임만 관측하고, 나머지 107프레임을 추정으로 채운 사례가 있었기 때문입니다.
+
+1. **손 단위**: 동작 구간(`activeInterval`, Practice의 동작 구간 추정) 안에서 팔이 보이는 프레임 중 기준(관측, 또는 손가락까지 있는 보간) 프레임의 비율을 셉니다. 이 비율이 **0.15**(`minObservedFraction`) 미만이면 그 손은 클립 전체에서 채우지 않습니다.
+2. **프레임 단위**: pose 손목이 화면 밖(가장자리 2%)이거나 신뢰도 0.45 미만인 프레임(`wristInImage`)은 채우지 않습니다(`hideOffscreen`).
+3. 두 규칙으로 건너뛴 프레임 중 `held`이거나 원래 채워졌을 `missing` 프레임은 `missing`(손 숨김)으로 표시합니다. 주석 `hidden: 'insufficient-evidence' | 'offscreen'`을 남깁니다. 관측·보간 프레임은 바꾸지 않습니다.
+4. 보고서 `reports['hand-fill-guard']`: 손마다 구간, 팔이 보이는 프레임 수, 기준 프레임 수, 비율, 충분 여부, 규칙별 숨김 수. `reports['hand-fill']`(앞·중간·뒤)는 그대로입니다.
+
+`fillHands({ minObservedFraction: 0, hideOffscreen: false })`는 안전장치 전과 같은 결과를 냅니다(테스트로 확인). 공개 코스 1에서 바뀐 것은 ksl-meet뿐입니다. 손목이 화면 밖인 2프레임씩이 채움에서 숨김으로 바뀌었습니다.
+
+| 클립 | 손 | 채움 앞·중간·뒤 (전 → 후) | 숨김(화면 밖) | 동작 구간 관측 비율 |
+| --- | --- | --- | ---: | ---: |
+| ksl-thanks | 왼 / 오 | 38·0·31 → 같음 / 35·8·29 → 같음 | 0 / 0 | 0.425 / 0.400 |
+| ksl-sorry | 왼 / 오 | 42·12·26 → 같음 / 29·14·4 → 같음 | 0 / 0 | 0.200 / 0.520 |
+| ksl-meet | 왼 / 오 | 5·5·5 → 4·5·4 / 2·4·5 → 0·4·5 | 2 / 2 | 0.819 / 0.843 |
+
+가장 낮은 비율은 ksl-sorry 왼손의 0.200으로, 기준 0.15보다 높아 그대로 채웁니다. `tests/diagnostics.test.ts`가 이 표를 고정합니다.
+
 ## 화면별 적용 (`presets.ts`)
 
 | 화면 | preset | 단계 |
 | --- | --- | --- |
-| 레슨(`LessonPlayer`), 표현 카드(`LessonDetail`), 로컬 학습 흐름 점검 | `learner` | 몸통 고정 → 손 채우기 |
-| Practice 기준 아바타 | `learner` | 몸통 고정 → 손 채우기 |
+| 레슨(`LessonPlayer`), 표현 카드(`LessonDetail`), 로컬 학습 흐름 점검 | `learner` | 시간 복원(0.3.x 클립) → 몸통 고정 → 손 채우기(안전장치) |
+| Practice 기준 아바타 | `learner` | 시간 복원(0.3.x 클립) → 몸통 고정 → 손 채우기(안전장치) |
 | Practice 내 시도 아바타 | `attempt` | 몸통 고정만. 추적 공백이 그대로 보여야 피드백과 맞습니다. |
 | Motion Lab | `lab-original` (기본) / `lab-stabilized` | 기본은 원본 그대로입니다. "몸통 고정" 체크박스로 켤 수 있고, 기술 진단 모드에서는 꺼집니다. 손 채우기는 쓰지 않습니다. |
 
@@ -112,6 +140,7 @@ runDisplayPipeline({ clip }, [stabilizeTorso(), constraints, fillHands()]);
   - 첫 등장 전·중간 공백·마지막 이후가 채워지는지
   - 입력이 바뀌지 않는지, 단계를 끼워 넣을 수 있는지, `samplePose`와 같은 결과인지
   - 공개 코스 1 측정값
+- `tests/pipeline-0.3.test.ts`: 시간 복원 단계의 적용 조건, 보간과 채움의 분리, 0.2.0·공개 클립에서 이전 preset과 같은 결과, `attempt` 제외
 - 브라우저 테스트(`tests/browser/content.spec.ts`, `learn.spec.ts`, `app.spec.ts`): 시점 버튼, 거울 모드 배지와 유지, 설명 위치(390 px), 채점 문항의 설명 공개 시점, A–B 반복, Motion Lab 기본값
 - 디자인 캡처: `SCREENSHOTS=1 npx playwright test screens`. 표현 카드의 정면·측면·1인칭·손 확대가 포함됩니다.
 - 검수 미리보기(`npm run dev` → `/?review=1`)는 무시 대상인 `private-data/`의 패키지를 같은 화면과 같은 `learner` preset으로 보여 줍니다.

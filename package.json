@@ -14,7 +14,10 @@
     "content": "node scripts/content.mjs",
     "content:validate": "node scripts/content.mjs validate",
     "check:dist": "node scripts/check-dist.mjs",
-    "evaluate:temporal": "node scripts/evaluate-temporal.mjs"
+    "evaluate:temporal": "node scripts/evaluate-temporal.mjs",
+    "motion:batch": "node scripts/motion-batch.mjs batch",
+    "motion:compare": "node scripts/motion-batch.mjs compare",
+    "motion:report": "node scripts/motion-batch.mjs report"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "1.1.0",
