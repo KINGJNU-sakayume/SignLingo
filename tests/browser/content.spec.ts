@@ -161,7 +161,7 @@ test('GitHub Pages subpath resolves the content manifest relative to the applica
 });
 test('unavailable original video leaves verified 3D practice available', async ({ page }) => {
   const { entry, manifest, bytes } = await approvedFixture();
-  entry.assets.video = { uri: 'https://media.example.org/v1/original.mp4', sha256: entry.source.videoSha256!, bytes: 100, version: 1, mediaType: 'video/mp4' };
+  entry.assets.video = { uri: `https://media.example.org/v${entry.revision}/original.mp4`, sha256: entry.source.videoSha256!, bytes: 100, version: entry.revision, mediaType: 'video/mp4' };
   for (const review of Object.values(entry.reviews)) review.subjectSha256 = await reviewSubject(entry);
   await page.route('**/content/manifest.json', route => route.fulfill({ json: manifest }));
   await page.route('**/' + entry.assets.motion!.uri, route => route.fulfill({ body: Buffer.from(bytes), contentType: 'application/json' }));

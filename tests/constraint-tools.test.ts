@@ -4,6 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import catalog from '../src/content/catalog.json';
+import releases from '../public/content/releases.json';
 import { constraintsName, parseArgs } from '../src/batch/args';
 import { batchMarkdown, type BatchReport } from '../src/batch/report';
 import { batchConstraintEntry, constraintMarkdown, constraintReport } from '../src/batch/constraintReport';
@@ -42,7 +43,8 @@ describe('docs/CONSTRAINTS.md', () => {
 describe('published course 1: the documented meet example (read only)', () => {
   it('brings the index fingers together at one height without touching the asset', async () => {
     const file = 'public/content/assets/ksl-meet/v1/reference.motion.json';
-    const asset = catalog.expressions.find(e => e.id === 'ksl-meet')!.assets.motion!;
+    // Revision 1 is archived in the release record; the current revision is this example applied to it.
+    const asset = releases.find(e => e.id === 'ksl-meet' && e.revision === 1)!.assets.motion!;
     expect(sha(file)).toBe(asset.sha256);
     const clip = importMotion(readFileSync(file, 'utf8')), set = parseConstraints(readFileSync('docs/constraints/ksl-meet.constraints.json', 'utf8'));
     const { clip: corrected, source, solution } = await applyConstraints(clip, set);
@@ -61,6 +63,7 @@ describe('published course 1: the documented meet example (read only)', () => {
     const markdown = constraintMarkdown(report);
     expect(markdown).toContain('# 제약 조건 보정 보고서'); expect(markdown).toContain('meet-touch'); expect(markdown).toContain('표정·비수지 신호');
     expect(sha(file)).toBe(asset.sha256);
+    expect(catalog.expressions.find(e => e.id === 'ksl-meet')!.constraints).toEqual({ sha256: await constraintHash(set), count: set.constraints.length });
     // The other two description examples apply cleanly too.
     for (const id of ['ksl-thanks', 'ksl-sorry']) {
       const other = importMotion(readFileSync(`public/content/assets/${id}/v1/reference.motion.json`, 'utf8'));
