@@ -21,7 +21,7 @@ export function temporalSkipReason(clip: MotionClip): TemporalReport['reason'] {
   if (clip.frames.length < 3 || clip.frames.length > TEMPORAL_MAX_FRAMES) return 'frame-count';
 }
 const count = (display: DisplayClip, side: Side) => {
-  const states: Record<DisplayHandState, number> = { observed: 0, interpolated: 0, held: 0, filled: 0, missing: 0 };
+  const states: Record<DisplayHandState, number> = { observed: 0, interpolated: 0, held: 0, filled: 0, constrained: 0, missing: 0 };
   for (const frame of display.frames) states[frame.annotation.hands[side].state]++;
   return states;
 };

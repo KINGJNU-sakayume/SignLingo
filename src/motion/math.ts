@@ -40,14 +40,17 @@ export function boneQuaternion(direction: Vector3, normal: Vector3) {
   return basisQuaternion(y, y.clone().cross(z))!;
 }
 export const LENGTHS = { upper: 0.28, lower: 0.26 };
+// Fixed lengths require a reach constraint. Allow full extension and deep flexion (elbow 0.1°–165°).
+export const REACH = (() => {
+  const { upper: a, lower: b } = LENGTHS;
+  return { min: Math.sqrt(a*a+b*b+2*a*b*Math.cos(rad(165))), max: Math.sqrt(a*a+b*b+2*a*b*Math.cos(rad(0.1))) };
+})();
 export function solveArm(shoulder: Vector3, target: Vector3, measuredElbow: Vector3, previousPole?: Vector3, reliability = 1) {
   const { upper: a, lower: b } = LENGTHS;
   let direction = target.clone().sub(shoulder);
   const requested = direction.length();
   if (requested < 1e-6) direction = new Vector3(0, -1, 0); else direction.normalize();
-  // Fixed lengths require a reach constraint. Allow full extension and deep flexion.
-  const min = Math.sqrt(a*a+b*b+2*a*b*Math.cos(rad(165)));
-  const max = Math.sqrt(a*a+b*b+2*a*b*Math.cos(rad(0.1)));
+  const { min, max } = REACH;
   const distance = clamp(requested, min, max);
   const wrist = shoulder.clone().addScaledVector(direction, distance);
   let pole = measuredElbow.clone().sub(shoulder);

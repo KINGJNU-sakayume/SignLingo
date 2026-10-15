@@ -1,3 +1,4 @@
+import type { ConstraintSet } from './constraints/schema';
 export type Side = 'left' | 'right';
 export type Vec3 = [number, number, number];
 export type Quat = [number, number, number, number];
@@ -10,7 +11,23 @@ export type TrackingState = 'tracked' | 'held' | 'missing';
 export type Quality = { body: number; left: number; right: number; leftArm: number; rightArm: number; leftState: TrackingState; rightState: TrackingState };
 export type Correction = { joint: string; kind: string; amount: number };
 export type Pose = { root: Vec3; rotations: Record<string, Quat>; quality: Quality };
-export type MotionFrame = Detection & { pose: Pose; warnings: string[]; corrections: Correction[]; assignment: Partial<Record<Side, number>> };
+/**
+ * Per hand, what a constraint change means: `observed` — the hand was observed in this frame and the constraint
+ * adjusted those values; `constrained` — the hand had no observation here (held or missing) and the constraint
+ * produced its values. Never an observation.
+ */
+export type ConstraintEvidence = 'observed' | 'constrained';
+/** Stored only in version-2 clips, on frames a constraint (or a baked wrist edit) changed. */
+export type FrameConstraint = {
+  /** Constraint ids active at this frame with their weight (blend × strength). Empty: only a source wrist edit was baked. */
+  applied: { id: string; weight: number }[];
+  /** Rig joints whose rotation differs from the reconstruction's stored value. */
+  joints: string[];
+  /** The stored (pre-constraint) rotations of those joints: the observation-based pose stays recoverable. */
+  original: Record<string, Quat>;
+  evidence: Partial<Record<Side, ConstraintEvidence>>;
+};
+export type MotionFrame = Detection & { pose: Pose; warnings: string[]; corrections: Correction[]; assignment: Partial<Record<Side, number>>; constraint?: FrameConstraint };
 export type WristEdit = { frame: number; side: Side; degrees: Vec3 };
 /** Pose-guided hand crop re-detection parameters (0.3.1 gap-fill), recorded verbatim in the clip. */
 export type HandRegionSettings = {
@@ -55,13 +72,26 @@ export type PipelineInfo = {
   handRegions?: (HandRegionSettings | LegacyHandRegionSettings) & { enabled: boolean };
   temporal?: TemporalPolicy;
 };
+export type ConstraintRecordSummary = { id: string; kind: string; unit: 'm' | 'deg'; activeFrames: number; coreFrames: number; beforeMax: number | null; afterMax: number | null };
+/** The constraint document applied to a version-2 clip, its canonical SHA-256 and what was baked with it. */
+export type AppliedConstraints = {
+  format: 'signlingo.constraints'; document: ConstraintSet; sha256: string; solver: string;
+  /** Wrist edits of the source clip, baked into the poses before the constraints (the clip's own `edits` start empty). */
+  sourceEdits: WristEdit[];
+  summary: { changedFrames: number; constraints: ConstraintRecordSummary[] };
+};
+/**
+ * Version 1: poses as reconstructed. Version 2: poses after constraint correction (`constraints` and per-frame
+ * `constraint` records). Landmarks, quality, warnings and the pipeline record are the reconstruction's in both.
+ */
 export type MotionClip = {
-  schema: 'signlingo.motion'; version: 1; language: 'ksl';
+  schema: 'signlingo.motion'; version: 1 | 2; language: 'ksl';
   pipeline: PipelineInfo;
   source: { name: string; size: number; duration: number; timeOffset?:number; width: number; height: number; mirrored: boolean; sampleHz: number };
   spaces: { image: string; body: string; hand: string; avatar: string; alignment: string };
   nonmanual: { head: string; face: 'not-estimated'; linguisticValidation: 'not-performed' };
   frames: MotionFrame[]; edits: WristEdit[];
+  constraints?: AppliedConstraints;
 };
 // A separate, disposable visualization product. Never a MotionClip or scoring input.
 export type EvidenceState = 'observed' | 'interpolated' | 'held' | 'unavailable';
