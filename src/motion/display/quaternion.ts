@@ -15,7 +15,7 @@ export function expQuaternion(v: Vector3): Quaternion {
   if (angle < 1e-12) return new Quaternion();
   return new Quaternion().setFromAxisAngle(v.clone().divideScalar(angle), angle);
 }
-function chordalMean(qs: Quaternion[]): Quaternion {
+export function chordalMean(qs: Quaternion[]): Quaternion {
   const sum = new Quaternion(0, 0, 0, 0), first = qs[0];
   for (const q of qs) {
     const sign = q.dot(first) < 0 ? -1 : 1;

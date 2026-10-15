@@ -1,4 +1,6 @@
 import { catalogSchema, expressionSchema, STATES, type Catalog, type ContentState, type Expression } from './schema';
+import { canonicalSha256, sha256 } from '../motion/canonical';
+export { sha256 };
 
 /** Status is a claim; evidence is checked independently at every entry point. */
 export function stateErrors(entry: Expression): string[] {
@@ -59,18 +61,13 @@ export function transition(entry: Expression, next: ContentState): Expression {
 }
 export function isPublished(entry: Expression) { return entry.status === 'published' && stateErrors(entry).length === 0; }
 
-export async function sha256(bytes: Uint8Array): Promise<string> {
-  return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new Uint8Array(bytes))), b => b.toString(16).padStart(2, '0')).join('');
-}
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
-  if (value && typeof value === 'object') return '{' + Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => JSON.stringify(k) + ':' + canonical(v)).join(',') + '}';
-  return JSON.stringify(value);
-}
-/** Includes rights, variant, text, pipeline, source and asset bytes; excludes only review/workflow bookkeeping. */
+/**
+ * Includes rights, variant, text, pipeline, source, asset bytes and applied motion constraints; excludes only
+ * review/workflow bookkeeping. Constraint correction therefore invalidates every earlier approval.
+ */
 export async function reviewSubject(entry: Expression) {
   const { reviews: _reviews, status: _status, updatedAt: _updated, ...subject } = expressionSchema.parse(entry);
-  return sha256(new TextEncoder().encode(canonical(subject)));
+  return canonicalSha256(subject);
 }
 export async function verifyReviews(entry: Expression) {
   const subject = await reviewSubject(entry);

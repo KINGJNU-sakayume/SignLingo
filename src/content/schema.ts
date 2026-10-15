@@ -42,7 +42,10 @@ export const expressionSchema = z.object({
   }).strict(),
   variant: z.object({ id: text.nullable(), description: text, status: z.enum(['unresolved', 'identified']) }).strict(),
   assets: z.object({ motion: assetSchema.optional(), video: assetSchema.optional() }).strict(),
-  reconstructionVersion: text.nullable(), provenance: z.enum(['unacquired', 'authorized-video', 'synthetic-test']),
+  reconstructionVersion: text.nullable(),
+  // Constraint correction applied to the motion asset (version-2 MotionClip): its document hash, part of the review subject.
+  constraints: z.object({ sha256: sha256Schema, count: z.number().int().min(1).max(64) }).strict().optional(),
+  provenance: z.enum(['unacquired', 'authorized-video', 'synthetic-test']),
   reviews: z.object({ reconstruction: review, linguistic: review }).strict(),
   status: z.enum(STATES), updatedAt: date,
 }).strict();

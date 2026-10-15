@@ -1,4 +1,6 @@
+import type { ConstraintSet } from '../constraints/schema';
 import type { MotionClip } from '../types';
+import { constrain } from './constraints';
 import { fillHands } from './fillHands';
 import { runDisplayPipeline } from './pipeline';
 import { stabilizeTorso } from './stabilizeTorso';
@@ -12,8 +14,14 @@ import type { DisplayClip, DisplayStage } from './types';
  * lab-*: Motion Lab shows stored poses unless its "몸통 고정" toggle is on.
  */
 export type DisplayPreset = 'learner' | 'attempt' | 'lab-original' | 'lab-stabilized';
+/**
+ * Learner stages: temporal reconstruction → torso stabilization → [constraint preview] → hand filling. A corrected
+ * (version-2) clip already stores its constraints, so the learner preset itself has no constraint stage.
+ */
+export const learnerStages = (constraints?: ConstraintSet): DisplayStage[] =>
+  [temporalReconstruct(), stabilizeTorso(), ...(constraints ? [constrain(constraints)] : []), fillHands()];
 export const PRESETS: Record<DisplayPreset, () => DisplayStage[]> = {
-  learner: () => [temporalReconstruct(), stabilizeTorso(), fillHands()],
+  learner: () => learnerStages(),
   attempt: () => [stabilizeTorso()],
   'lab-original': () => [],
   'lab-stabilized': () => [stabilizeTorso()],

@@ -1,12 +1,14 @@
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { build } from 'vite';
 import { execFileSync } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import catalog from '../src/content/catalog.json';
 import { approvedFixture } from './content-fixtures';
-import { reviewSubject, sha256 } from '../src/content/validation';
+import { reviewSubject, sha256, verifyReviews } from '../src/content/validation';
+import { importMotion } from '../src/motion/serialization';
+import { parseConstraints } from '../src/motion/constraints';
 import { expressionSchema } from '../src/content/schema';
 import { releaseDate } from '../src/content/package';
 
@@ -25,6 +27,12 @@ beforeAll(async () => {
 afterAll(async () => { if (root) await rm(root, { recursive: true, force: true }); });
 function command(...args: string[]) {
   return execFileSync(process.execPath, [bundle, ...args], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
+}
+/** Runs a command expected to fail and returns its error output. */
+function failure(...args: string[]) {
+  try { execFileSync(process.execPath, [bundle, ...args], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); }
+  catch (error) { return String((error as { stderr?: string }).stderr); }
+  throw new Error(`Expected failure: ${args.join(' ')}`);
 }
 const git = (...args: string[]) => execFileSync('git', ['-c', 'user.name=contract-test', '-c', 'user.email=contract-test@example.invalid', ...args], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
 const readEntry = async () => expressionSchema.parse(JSON.parse(await readFile(path.join(root, `private-data/${ID}/entry.json`), 'utf8')));
@@ -77,4 +85,50 @@ it('registers, prepares, inspects, independently reviews and packages without co
   await writeFile(path.join(root, 'src/content/catalog.json'), current.catalog);
   await writeFile(path.join(root, 'public/content/manifest.json'), current.manifest);
   expect(execFileSync(process.execPath, [bundle, 'validate'], { cwd: root, encoding: 'utf8', env: { ...process.env, CONTENT_BASE_REF: 'HEAD' } })).toContain('콘텐츠 검증 완료');
+}, 30000);
+
+it('constrains a published package into a new private revision, resets reviews and never touches public/', async () => {
+  const before = await readEntry();
+  const fixture = await approvedFixture(ID);
+  const files = async () => Object.fromEntries(await Promise.all((await readdir(path.join(root, 'public'), { recursive: true, withFileTypes: true }))
+    .filter(f => f.isFile()).map(async f => { const file = path.join(f.parentPath, f.name); return [file, await sha256(await readFile(file))] as const; })));
+  const publicBefore = await files();
+  const constraints = { format: 'signlingo.constraints', version: 1, expression: ID, constraints: [
+    { id: 'left-flat', kind: 'handshape', span: { frames: [0, 12] }, blendMs: 0, hand: 'left', preset: 'flat', note: '왼손 편손 (계약 테스트)' },
+    { id: 'turn', kind: 'wristOffset', span: { frames: [14, 18] }, blendMs: 0, hand: 'right', degrees: [10, 0, 0], note: '오른손목 10도 (계약 테스트)' },
+  ] };
+  await writeFile(path.join(root, 'private-data/fix.constraints.json'), JSON.stringify(constraints));
+  expect(command('constrain', `private-data/${ID}`, 'private-data/fix.constraints.json')).toContain('revision 2');
+  const entry = await readEntry();
+  expect(entry.revision).toBe(2);
+  expect(entry.status).toBe('reconstruction-review-required');
+  expect(entry.reviews).toEqual({ reconstruction: { status: 'pending' }, linguistic: { status: 'pending' } });
+  expect(entry.license.approval).toEqual(before.license.approval);
+  expect([entry.description, entry.variant, entry.movementNotes]).toEqual([before.description, before.variant, before.movementNotes]);
+  expect(entry.assets.motion).toMatchObject({ uri: `content/assets/${ID}/v2/reference.motion.json`, version: 2 });
+  const motion = await readFile(path.join(root, `private-data/${ID}`, entry.assets.motion!.uri));
+  const clip = importMotion(motion.toString());
+  expect(clip.version).toBe(2);
+  expect(entry.constraints).toEqual({ sha256: clip.constraints!.sha256, count: 2 });
+  expect(parseConstraints(await readFile(path.join(root, `private-data/${ID}/constraints.json`), 'utf8'))).toEqual(clip.constraints!.document);
+  const inspection = JSON.parse(await readFile(path.join(root, `private-data/${ID}/inspection.json`), 'utf8'));
+  expect(inspection).toMatchObject({ revision: 2, constraints: { sha256: clip.constraints!.sha256, count: 2 } });
+  expect(inspection.constraints.changedFrames).toBeGreaterThan(10);
+  // The subject changed, so approvals of the published revision no longer verify.
+  await expect(verifyReviews({ ...entry, reviews: before.reviews })).rejects.toThrow('검수');
+  expect(await reviewSubject(entry)).not.toBe(before.reviews.reconstruction.subjectSha256);
+  // Re-running from the corrected package stays at revision 2 and rebuilds the same file.
+  command('constrain', `private-data/${ID}`, 'private-data/fix.constraints.json');
+  expect((await readEntry()).revision).toBe(2);
+  expect(await readFile(path.join(root, `private-data/${ID}`, entry.assets.motion!.uri))).toEqual(motion);
+  expect(await files()).toEqual(publicBefore);
+  // A constraint document for another expression is refused.
+  await writeFile(path.join(root, 'private-data/other.constraints.json'), JSON.stringify({ ...constraints, expression: 'ksl-other' }));
+  expect(failure('constrain', `private-data/${ID}`, 'private-data/other.constraints.json')).toContain('ksl-other');
+  // Publishing a corrected package at the published revision is refused.
+  const stale = { ...before, status: 'ready-to-publish' as const };
+  await saveEntry(stale);
+  expect(failure('publish', `private-data/${ID}`)).toContain('Published revisions are immutable');
+  await saveEntry(entry);
+  expect(fixture.entry.id).toBe(ID);
 }, 30000);

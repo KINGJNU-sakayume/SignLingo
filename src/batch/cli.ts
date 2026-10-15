@@ -1,8 +1,10 @@
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { importMotion } from '../motion/serialization';
+import { exportMotion, importMotion } from '../motion/serialization';
+import { applyConstraints, constraintHash, parseConstraints } from '../motion/constraints';
+import { batchConstraintEntry, constraintMarkdown, constraintReport } from './constraintReport';
 import { PIPELINE_VERSIONS, type PipelineVersion } from '../motion/pipeline';
-import { collectInputs, MOTION, motionName, parseArgs, VIDEO, type BatchArgs } from './args';
+import { collectInputs, constraintsName, MOTION, motionName, parseArgs, VIDEO, type BatchArgs } from './args';
 import { ensureModels, sha256File, wasmHashes } from './models';
 import { batchMarkdown, clipMetrics, compareMarkdown, NOTICE, unionInterval, type BatchReport, type Interval, type ClipEntry, type CompareReport, type Environment } from './report';
 import { openSession, type Session } from './runner';
@@ -44,11 +46,22 @@ async function processVideoFile(session: Session, video: string, pipeline: Pipel
     // The same check as `content prepare`: the export must name the original file and its exact size.
     if (clip.source.name !== file || clip.source.size !== info.size) throw new Error('내보낸 source.name/size가 원본 영상과 다릅니다.');
     if (clip.pipeline.version !== pipeline) throw new Error(`요청한 ${pipeline} 대신 ${clip.pipeline.version}이 기록되었습니다.`);
+    // Prior intent (--constraints): <video name>.constraints.json, applied right after recognition to the stored frames.
+    let json = result.json, saved = clip, constraints: ClipEntry['constraints'];
+    const constraintFile = args.constraints ? constraintsName(args.constraints, video) : undefined;
+    if (constraintFile && await stat(constraintFile).then(() => true, () => false)) {
+      const set = parseConstraints(await readFile(constraintFile, 'utf8'));
+      const corrected = await applyConstraints(clip, set);
+      json = exportMotion(corrected.clip); saved = importMotion(json);
+      if (saved.source.name !== file || saved.source.size !== info.size || saved.version !== 2) throw new Error('제약 조건을 적용한 동작을 다시 읽지 못했습니다.');
+      constraints = batchConstraintEntry(path.relative(process.cwd(), constraintFile).split(path.sep).join('/'), await constraintHash(set), corrected.clip, corrected.solution);
+      log(`  제약 조건 ${set.constraints.length}개 적용: 바뀐 프레임 ${constraints.changedFrames}`);
+    }
     await mkdir(outDir, { recursive: true });
     const output = path.join(outDir, motionName(video));
-    await writeFile(output, result.json);
+    await writeFile(output, json);
     const m = result.measurements;
-    return { clip, ...(result.fusion ? { fusion: result.fusion } : {}), entry: { ...entry, output, metrics: clipMetrics(clip),
+    return { clip: saved, ...(result.fusion ? { fusion: result.fusion } : {}), entry: { ...entry, output, metrics: clipMetrics(saved), ...(constraints ? { constraints } : {}),
       ...(m ? { measurements: { requests: m.requests, observations: m.observations, inferenceFps: m.inferenceFps, analysisFps: m.analysisFps, elapsedMs: m.elapsedMs, backend: m.backend } } : {}) } };
   } catch (error) {
     let message = error instanceof Error ? error.message : String(error);
@@ -60,6 +73,18 @@ async function processVideoFile(session: Session, video: string, pipeline: Pipel
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  if (args.command === 'constrain-report') {
+    const [motionFile, constraintFile] = args.inputs;
+    const bytes = await readFile(motionFile), clip = importMotion(bytes.toString());
+    const set = parseConstraints(await readFile(constraintFile, 'utf8'));
+    const { clip: corrected, source, solution } = await applyConstraints(clip, set);
+    const relative = (file: string) => path.relative(process.cwd(), file).split(path.sep).join('/');
+    const report = constraintReport({ set, source, corrected, solution, constraintFile: relative(constraintFile), constraintSha256: await constraintHash(set),
+      motion: { file: relative(motionFile), bytes: bytes.length, sha256: await sha256File(motionFile), version: clip.version, pipeline: clip.pipeline.version,
+        frames: clip.frames.length, sampleHz: clip.source.sampleHz, duration: clip.source.duration } });
+    await writeReport(args.report, report, constraintMarkdown(report));
+    return;
+  }
   if (args.command === 'report') {
     const files = await collectInputs(args.inputs, MOTION, false);
     const clips: ClipEntry[] = [];

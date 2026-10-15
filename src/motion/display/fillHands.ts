@@ -40,17 +40,20 @@ export const handShape = (pose: DisplayPose, side: Side) => {
   const { arm, frame } = bareForearm(pose, side);
   return { relative: frame.clone().invert().multiply(arm.palm).normalize(), fingers: fingerKeys(side).map(key => q(pose.rotations[key])) };
 };
-const isAnchor = (frame: DisplayFrame, side: Side) => {
+/** Observation-based anchors: the safeguard's evidence. */
+const isObserved = (frame: DisplayFrame, side: Side) => {
   const state = frame.annotation.hands[side].state;
   return state === 'observed' || (state === 'interpolated' && fingersShown(frame, side));
 };
+/** Shapes a fill may copy or blend: observations, and hands a constraint set (never filled over or hidden). */
+const isAnchor = (frame: DisplayFrame, side: Side) => isObserved(frame, side) || frame.annotation.hands[side].state === 'constrained';
 
 /** How much observed evidence each side has inside the signing interval (`activeInterval`, the Practice heuristic). */
 function evidence(display: DisplayClip, input: DisplayInput, minObservedFraction: number): Record<Side, Omit<FillGuardSide, 'hidden'>> {
   const interval = activeInterval(input.clip);
   const inside = display.frames.filter(f => f.timestamp / 1000 >= interval.start - 1e-6 && f.timestamp / 1000 <= interval.end + 1e-6);
   return Object.fromEntries(SIDES.map(side => {
-    const shown = inside.filter(f => armVisible(f.pose, side)), anchors = shown.filter(f => isAnchor(f, side)).length;
+    const shown = inside.filter(f => armVisible(f.pose, side)), anchors = shown.filter(f => isObserved(f, side)).length;
     const fraction = shown.length ? anchors / shown.length : 0;
     return [side, { interval: { start: interval.start, end: interval.end, method: interval.method }, armFrames: shown.length, anchors, fraction, sufficient: fraction >= minObservedFraction }];
   })) as Record<Side, Omit<FillGuardSide, 'hidden'>>;
@@ -64,7 +67,8 @@ function evidence(display: DisplayClip, input: DisplayInput, minObservedFraction
  *
  * Safeguard: a side with too little observed evidence in the signing interval, and any frame whose wrist is
  * off-screen, is not filled. Its held or would-be-filled frames are shown as `missing` (hidden), annotated
- * with the reason, rather than as an invented hand. Observed and interpolated frames are never changed.
+ * with the reason, rather than as an invented hand. Observed, interpolated and constrained frames are never
+ * changed; constrained shapes may anchor a fill but never count as observed evidence.
  */
 export function fillHands(options: Partial<FillOptions> = {}): DisplayStage {
   const settings: FillOptions = { ...FILL_DEFAULTS, ...options };

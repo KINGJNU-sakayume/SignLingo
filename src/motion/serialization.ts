@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { MotionClip } from './types';
 import { neutralRotations } from './reconstruct';
+import { constraintSetSchema } from './constraints/schema';
 const num=z.number().finite();
 const point=z.object({x:num,y:num,z:num,visibility:num.min(0).max(1).optional(),presence:num.min(0).max(1).optional()});
 const quat=z.tuple([num,num,num,num]).refine(a=>Math.abs(Math.hypot(...a)-1)<0.02,'Joint quaternion must be normalized');
@@ -18,19 +19,41 @@ const handRegions=z.union([
 ]);
 const temporal=z.object({algorithm:z.literal('conservative-bidirectional-v1'),maxGapMs:num.min(0).max(150),applies:z.literal('learner-display')});
 const frame=z.object({timestamp:num.min(0),discontinuity:z.literal('cut').optional(),body:points(33),bodyWorld:points(33),hands:z.array(z.object({image:z.array(point).length(21),world:z.array(point).length(21),label:z.string().max(30),score:num.min(0).max(1),origin:z.enum(['frame','region']).optional()})).max(2),pose:z.object({root:vec,rotations:z.record(z.string(),quat).refine(r=>Object.keys(neutralRotations()).every(k=>k in r)&&Object.keys(r).length===Object.keys(neutralRotations()).length,'Unexpected rig joints'),quality}),warnings:z.array(z.string().max(500)).max(200),corrections:z.array(z.object({joint:z.string().max(80),kind:z.string().max(80),amount:num.min(0)})).max(200),assignment:z.object({left:z.number().int().min(0).max(1).optional(),right:z.number().int().min(0).max(1).optional()})});
-const schema=z.object({schema:z.literal('signlingo.motion'),version:z.literal(1),language:z.literal('ksl'),pipeline:z.object({version:z.string().max(40),detector:z.string().max(100),models:z.record(z.string(),z.string().max(1000)),handRegions:handRegions.optional(),temporal:temporal.optional()}),source:z.object({name:z.string().max(500),size:num.min(0),duration:num.positive().max(120),timeOffset:num.min(0).max(120).optional(),width:num.int().positive().max(16384),height:num.int().positive().max(16384),mirrored:z.boolean(),sampleHz:num.min(1).max(60)}),spaces:z.object({image:z.string().max(2000),body:z.string().max(2000),hand:z.string().max(2000),avatar:z.string().max(2000),alignment:z.string().max(2000)}),nonmanual:z.object({head:z.string().max(1000),face:z.literal('not-estimated'),linguisticValidation:z.literal('not-performed')}),frames:z.array(frame).min(1).max(7200),edits:z.array(z.object({frame:z.number().int().min(0),side:z.enum(['left','right']),degrees:z.tuple([num.min(-45).max(45),num.min(-45).max(45),num.min(-45).max(45)])})).max(14400)});
+const common={schema:z.literal('signlingo.motion'),language:z.literal('ksl'),pipeline:z.object({version:z.string().max(40),detector:z.string().max(100),models:z.record(z.string(),z.string().max(1000)),handRegions:handRegions.optional(),temporal:temporal.optional()}),source:z.object({name:z.string().max(500),size:num.min(0),duration:num.positive().max(120),timeOffset:num.min(0).max(120).optional(),width:num.int().positive().max(16384),height:num.int().positive().max(16384),mirrored:z.boolean(),sampleHz:num.min(1).max(60)}),spaces:z.object({image:z.string().max(2000),body:z.string().max(2000),hand:z.string().max(2000),avatar:z.string().max(2000),alignment:z.string().max(2000)}),nonmanual:z.object({head:z.string().max(1000),face:z.literal('not-estimated'),linguisticValidation:z.literal('not-performed')})};
+const edits=z.array(z.object({frame:z.number().int().min(0),side:z.enum(['left','right']),degrees:z.tuple([num.min(-45).max(45),num.min(-45).max(45),num.min(-45).max(45)])})).max(14400);
+// Version 2 = constraint-corrected poses. Version 1 is read exactly as before; it may not carry constraint records.
+const joint=z.enum(Object.keys(neutralRotations()) as [string,...string[]]);
+const frameConstraint=z.object({applied:z.array(z.object({id:z.string().max(64),weight:unit}).strict()).max(64),joints:z.array(joint).min(1).max(64),original:z.record(z.string(),quat),evidence:z.object({left:z.enum(['observed','constrained']).optional(),right:z.enum(['observed','constrained']).optional()}).strict()}).strict();
+const applied=z.object({format:z.literal('signlingo.constraints'),document:constraintSetSchema,sha256:z.string().regex(/^[a-f0-9]{64}$/),solver:z.string().max(100),sourceEdits:edits,
+  summary:z.object({changedFrames:z.number().int().min(0),constraints:z.array(z.object({id:z.string().max(64),kind:z.string().max(40),unit:z.enum(['m','deg']),activeFrames:z.number().int().min(0),coreFrames:z.number().int().min(0),beforeMax:num.nullable(),afterMax:num.nullable()}).strict()).max(64)}).strict()}).strict();
+const schema=z.discriminatedUnion('version',[
+  z.object({...common,version:z.literal(1),frames:z.array(frame).min(1).max(7200),edits}),
+  z.object({...common,version:z.literal(2),frames:z.array(frame.extend({constraint:frameConstraint.optional()})).min(1).max(7200),edits,constraints:applied}),
+]);
 export function importMotion(text:string):MotionClip {
   if(text.length>100*1024*1024)throw new Error('Motion JSON exceeds the 100 MB limit.');
-  const clip=schema.parse(JSON.parse(text));
+  const raw=JSON.parse(text);
+  // An older writer never produces constraint records; a version-1 file that has them is mislabeled corrected data.
+  if(raw?.version===1&&(raw.constraints!==undefined||(Array.isArray(raw.frames)&&raw.frames.some((f:{constraint?:unknown})=>f?.constraint!==undefined))))throw new Error('Version 1 motion cannot carry constraint records; corrected motion is version 2.');
+  const clip:MotionClip=schema.parse(raw);
   if(clip.frames.some((f,i)=>f.timestamp>=clip.source.duration*1000+1||(i>0&&f.timestamp<=clip.frames[i-1].timestamp))) throw new Error('Motion timestamps must increase strictly and lie within video duration.');
   if(clip.frames[0].timestamp!==0)throw new Error('Motion must start at timestamp zero.');
   if(clip.edits.some(e=>e.frame>=clip.frames.length))throw new Error('Wrist correction references a missing frame.');
   for (const f of clip.frames) for (const index of Object.values(f.assignment)) if(index!==undefined&&index>=f.hands.length)throw new Error('Hand assignment references missing data.');
   for (const f of clip.frames) if (f.assignment.left !== undefined && f.assignment.left === f.assignment.right) throw new Error('A hand detection cannot be assigned to both sides.');
+  if (clip.constraints) {
+    const ids=new Set(clip.constraints.document.constraints.map(c=>c.id));
+    for (const f of clip.frames) if (f.constraint) {
+      const keys=Object.keys(f.constraint.original);
+      if (keys.length!==f.constraint.joints.length||!f.constraint.joints.every(j=>keys.includes(j)))throw new Error('Constraint record must keep the original rotation of every changed joint.');
+      if (f.constraint.applied.some(a=>!ids.has(a.id)))throw new Error('Constraint record references an unknown constraint.');
+    }
+  }
   return clip;
 }
 export function exportMotion(clip:MotionClip) { return JSON.stringify(clip); }
-export function downloadMotion(clip:MotionClip) {
+/** `suffix` names derived files, e.g. `.constrained` for a constraint-corrected export. */
+export function downloadMotion(clip:MotionClip,suffix='') {
   const url=URL.createObjectURL(new Blob([exportMotion(clip)],{type:'application/json'}));
-  const a=document.createElement('a');a.href=url;a.download=clip.source.name.replace(/\.[^.]+$/,'')+'.motion.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  const a=document.createElement('a');a.href=url;a.download=clip.source.name.replace(/\.[^.]+$/,'')+suffix+'.motion.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }

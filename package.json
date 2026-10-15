@@ -17,7 +17,8 @@
     "evaluate:temporal": "node scripts/evaluate-temporal.mjs",
     "motion:batch": "node scripts/motion-batch.mjs batch",
     "motion:compare": "node scripts/motion-batch.mjs compare",
-    "motion:report": "node scripts/motion-batch.mjs report"
+    "motion:report": "node scripts/motion-batch.mjs report",
+    "motion:constrain-report": "node scripts/motion-batch.mjs constrain-report"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "1.1.0",

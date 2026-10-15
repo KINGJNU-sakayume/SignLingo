@@ -6,6 +6,7 @@ import { assignHandsDetailed, wristInImage, type HandFate } from '../motion/trac
 import { SIDES, type MotionClip, type MotionFrame, type Side } from '../motion/types';
 import type { ExtractionMeasurements } from '../motion/timing';
 import { activeInterval } from '../practice/features';
+import { residualText, type BatchConstraintEntry } from './constraintReport';
 
 export type MissingReason = 'torso' | 'offscreen' | 'arm' | 'degenerate' | 'ambiguous' | 'no-detection' | 'unassociated' | 'other';
 export type StateCounts = {
@@ -151,7 +152,7 @@ export function clipMetrics(clip: MotionClip, options: { interval?: Interval } =
   const fill = display.reports[FILL_STAGE] as FillReport | undefined, temporal = display.reports[TEMPORAL_STAGE] as TemporalReport | undefined;
   const guard = display.reports[FILL_GUARD_REPORT] as FillGuardReport | undefined;
   const learner = Object.fromEntries(SIDES.map(side => {
-    const states: Record<DisplayHandState, number> = { observed: 0, interpolated: 0, held: 0, filled: 0, missing: 0 };
+    const states: Record<DisplayHandState, number> = { observed: 0, interpolated: 0, held: 0, filled: 0, constrained: 0, missing: 0 };
     for (const frame of display.frames) states[frame.annotation.hands[side].state]++;
     const g = guard?.sides[side];
     return [side, { ...states, fill: { ...(fill?.[side] ?? { lead: 0, gap: 0, trail: 0 }) },
@@ -178,6 +179,8 @@ export type ClipEntry = {
   file: string; bytes: number; sha256: string; pipeline: string; sampleHz: number; mirrored: boolean;
   output?: string; error?: string; measurements?: Pick<ExtractionMeasurements, 'requests' | 'observations' | 'inferenceFps' | 'analysisFps' | 'elapsedMs' | 'backend'>;
   metrics?: ClipMetrics;
+  /** motion:batch --constraints: the constraint file applied right after recognition (the output is a version-2 clip). */
+  constraints?: BatchConstraintEntry;
 };
 export type BatchReport = { format: 'signlingo.motion-batch'; version: 1; environment: Environment; clips: ClipEntry[]; notice: string };
 export type CompareReport = { format: 'signlingo.motion-compare'; version: 1; environment: Environment; sampleHz: number; mirrored: boolean; versions: string[];
@@ -233,9 +236,13 @@ export function batchMarkdown(report: BatchReport): string {
       `- 손 채우기 관측 근거(동작 구간): ${evidence}`].join('\n');
   });
   const failed = report.clips.filter(c => c.error).map(c => `- ${escape(c.file)}: ${escape(c.error!)}`);
+  const constrained = report.clips.filter(c => c.constraints).map(c => { const k = c.constraints!;
+    return `- ${escape(c.file)}: \`${escape(k.file)}\` (SHA-256 \`${k.sha256.slice(0, 12)}…\`, ${k.count}개, 바뀐 프레임 ${k.changedFrames}) — ${k.results.map(r => `${escape(r.id)} ${residualText(r.beforeMax, r.unit)} → ${residualText(r.afterMax, r.unit)} (만족 ${r.satisfiedAfter}/${r.measuredCoreFrames})`).join(', ')}`; });
   return ['# 동작 일괄 처리 보고서', '', ...environmentLines(report.environment), '', ...DEFINITIONS, '',
     table(['클립', '프레임', '누락률 왼/오', '동작 구간 누락률 왼/오', '화면 밖 왼/오 (구간)', '화면 안 실패 왼/오 (구간)', 'held 왼/오', '영역 재검출로 추적 왼/오', '보정', '보간 왼/오', '채움 왼 / 오 (앞·중간·뒤)', '숨김 왼/오'], rows), '',
-    ...(failed.length ? ['## 실패', ...failed, ''] : []), '## 클립별 상세', '', details.join('\n\n'), '', `> ${report.notice}`, ''].join('\n');
+    ...(failed.length ? ['## 실패', ...failed, ''] : []),
+    ...(constrained.length ? ['## 인식 직후 적용한 제약 조건 (잔차 최대: 전 → 후, 구간 핵심 프레임)', ...constrained, ''] : []),
+    '## 클립별 상세', '', details.join('\n\n'), '', `> ${report.notice}`, ''].join('\n');
 }
 
 export function compareMarkdown(report: CompareReport): string {

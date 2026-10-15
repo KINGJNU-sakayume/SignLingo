@@ -8,7 +8,7 @@ import type { AvatarPose as Pose, HandFocus } from '../motion/display/types';
 import { fingerLengths, fingerOffsets, neutralRotations } from '../motion/rig';
 import { LENGTHS, normalizeBody, alignHand, arr } from '../motion/math';
 const ID: Quat=[0,0,0,1];
-function Joint({radius=0.023,color='#8b9ca6'}:{radius?:number;color?:string}) { return <mesh><sphereGeometry args={[radius,16,12]}/><meshStandardMaterial color={color} roughness={0.4}/></mesh>; }
+function Joint({radius=0.023,color='#8b9ca6',opacity=1}:{radius?:number;color?:string;opacity?:number}) { return <mesh><sphereGeometry args={[radius,16,12]}/><meshStandardMaterial color={color} roughness={0.4} transparent={opacity<1} opacity={opacity} depthWrite={opacity===1}/></mesh>; }
 function Segment({length,radius,color,skeleton,markers,opacity=1}:{length:number;radius:number;color:string;skeleton:boolean;markers:boolean;opacity?:number}) {
   return <><mesh position={[0,length/2,0]}><capsuleGeometry args={[radius,Math.max(0.001,length-radius*2),5,12]}/><meshStandardMaterial color={color} roughness={0.48} metalness={0.12} transparent opacity={skeleton?0.25:opacity} depthWrite={!skeleton&&opacity===1}/></mesh>{skeleton&&<mesh position={[0,length/2,0]}><cylinderGeometry args={[0.003,0.003,length,8]}/><meshBasicMaterial color="#e9ffff" depthTest={false}/></mesh>}{markers&&<Joint radius={radius*0.55} color="#affff1"/>}</>;
 }
@@ -25,12 +25,14 @@ function Fingers({side,rotations,color,skeleton,markers,opacity}:{side:Side;rota
   })}</>;
 }
 // Upper body only, as in broadcast signing: torso, neck, head and arms. Legs, pelvis and floor are not drawn.
-function Mannequin({pose,skeleton,markers,highlightSide,hideHead}:{pose:Pose|null;skeleton:boolean;markers:boolean;highlightSide?:Side;hideHead:boolean}) {
+// A `ghost` draws only the arms and hands, white and translucent: the uncorrected pose under a constraint preview.
+const GHOST='#f4f8fb',GHOST_OPACITY=.3;
+function Mannequin({pose,skeleton,markers,highlightSide,hideHead,ghost=false}:{pose:Pose|null;skeleton:boolean;markers:boolean;highlightSide?:Side;hideHead:boolean;ghost?:boolean}) {
   const rotations=pose?.rotations??neutralRotations();
   const active=!pose || pose.quality.body>0;
   return <group position={pose?.root??[0,1.3,0]} quaternion={rotations.torso}>
-    <mesh position={[0,-0.2,0]} scale={[0.21,0.29,0.12]}><sphereGeometry args={[1,32,24]}/><meshStandardMaterial color={active?'#7d909d':'#34414b'} roughness={0.55} transparent opacity={skeleton?0.35:1}/></mesh>
-    <group visible={!hideHead}>
+    {!ghost&&<mesh position={[0,-0.2,0]} scale={[0.21,0.29,0.12]}><sphereGeometry args={[1,32,24]}/><meshStandardMaterial color={active?'#7d909d':'#34414b'} roughness={0.55} transparent opacity={skeleton?0.35:1}/></mesh>}
+    <group visible={!hideHead&&!ghost}>
       <mesh position={[0,0.047,0]}><cylinderGeometry args={[0.045,0.055,0.13,20]}/><meshStandardMaterial color="#718591"/></mesh>
       <group position={[0,0.105,0]} quaternion={rotations.head}>
         <mesh position={[0,0.10,0]} scale={[0.09,0.12,0.087]}><sphereGeometry args={[1,32,24]}/><meshStandardMaterial color="#b4c4cb" roughness={0.6}/></mesh>
@@ -42,18 +44,20 @@ function Mannequin({pose,skeleton,markers,highlightSide,hideHead}:{pose:Pose|nul
       const evidence=pose?.evidence?.[side], shown=pose?.hands?.[side];
       const state=shown ? (shown==='observed'?'tracked':shown) : evidence ? (evidence.state==='unavailable'?'missing':evidence.state==='observed'?'tracked':evidence.state) : pose?.quality[`${side}State`]??'tracked';
       const visible=!pose || (active&&(pose.quality[`${side}Arm`]>0||evidence?.position==='interpolated'));
-      const color=highlightSide===side?'#ff79c6':state==='interpolated'?'#b49bea':pose ? (state==='tracked'?(side==='left'?'#53d5c0':'#e6af68'):'#75808a'):'#82949f';
+      const color=ghost?GHOST:highlightSide===side?'#ff79c6':state==='interpolated'?'#b49bea':pose ? (state==='tracked'?(side==='left'?'#53d5c0':'#e6af68'):'#75808a'):'#82949f';
       // Held (≤200 ms, stored) and filled (display-only) handshapes are estimates: translucent orange.
-      const estimated=state==='held'||state==='filled', handColor=estimated?'#f4b65f':color;
+      // A handshape a constraint set ("보정한 손 모양") is deliberate, not estimated: solid blue.
+      const estimated=state==='held'||state==='filled', handColor=ghost?GHOST:estimated?'#f4b65f':state==='constrained'?'#5b9dff':color;
+      const opacity=ghost?GHOST_OPACITY:1, segment={color,skeleton:skeleton&&!ghost,markers:markers&&!ghost,opacity};
       return <group key={side} position={[side==='left'?0.19:-0.19,0,0]} visible={visible} quaternion={rotations[`${side}.upper`]}>
-        <Joint radius={0.052}/><Segment length={LENGTHS.upper} radius={0.042} {...{color,skeleton,markers}}/>
+        <Joint radius={0.052} opacity={opacity} color={ghost?GHOST:undefined}/><Segment length={LENGTHS.upper} radius={0.042} {...segment}/>
         <group position={[0,LENGTHS.upper,0]} quaternion={rotations[`${side}.lower`]}>
-          <Joint radius={0.034}/><Segment length={LENGTHS.lower} radius={0.03} {...{color,skeleton,markers}}/>
+          <Joint radius={0.034} opacity={opacity} color={ghost?GHOST:undefined}/><Segment length={LENGTHS.lower} radius={0.03} {...segment}/>
           <group position={[0,LENGTHS.lower,0]} quaternion={rotations[`${side}.wrist`]}>
-            <Joint radius={0.022} color={state==='missing'?'#e57b7b':color}/>
+            <Joint radius={0.022} color={ghost?GHOST:state==='missing'?'#e57b7b':color} opacity={opacity}/>
             <group visible={state!=='missing'}>
-              <mesh position={[0,0.042,0]} scale={[0.037,0.047,0.014]}><sphereGeometry args={[1,20,16]}/><meshStandardMaterial color={handColor} transparent opacity={estimated?0.45:skeleton?0.3:1} depthWrite={!estimated}/></mesh>
-              {(state==='filled'||!evidence||evidence.fingers!=='unavailable')&&<Fingers {...{side,rotations,skeleton,markers}} color={handColor} opacity={estimated?0.6:1}/>}
+              <mesh position={[0,0.042,0]} scale={[0.037,0.047,0.014]}><sphereGeometry args={[1,20,16]}/><meshStandardMaterial color={handColor} transparent opacity={ghost?GHOST_OPACITY:estimated?0.45:skeleton?0.3:1} depthWrite={!estimated&&!ghost}/></mesh>
+              {(state==='filled'||state==='constrained'||!evidence||evidence.fingers!=='unavailable')&&<Fingers {...{side,rotations,skeleton:skeleton&&!ghost,markers:markers&&!ghost}} color={handColor} opacity={ghost?GHOST_OPACITY:estimated?0.6:1}/>}
             </group>
           </group>
         </group>
@@ -117,10 +121,10 @@ const THEMES={dark:{background:'#111e29'},light:{background:'#eef3f1'}};
  * `mirror` reflects the rendered scene only (a learner's mirror view): poses, colors and
  * anatomical sides are unchanged, and it is never applied to the first-person view.
  */
-export const Avatar = memo(function Avatar({pose,skeleton,markers,view,focus,mirror=false,resetKey=0,inspection,highlightSide,theme='dark'}:{pose:Pose|null;skeleton:boolean;markers:boolean;view:CameraView;focus?:HandFocus|null;mirror?:boolean;resetKey?:number;inspection?:MotionFrame;highlightSide?:Side;theme?:'dark'|'light'}) {
+export const Avatar = memo(function Avatar({pose,skeleton,markers,view,focus,mirror=false,resetKey=0,inspection,highlightSide,theme='dark',ghost}:{pose:Pose|null;skeleton:boolean;markers:boolean;view:CameraView;focus?:HandFocus|null;mirror?:boolean;resetKey?:number;inspection?:MotionFrame;highlightSide?:Side;theme?:'dark'|'light';ghost?:Pose|null}) {
   const colors=THEMES[theme],flip=mirror&&view!=='first';
   return <WebGLError><Canvas frameloop="demand" camera={{position:FRAMES.front.position,fov:FRAMES.front.fov}} dpr={[1,1.8]} gl={{antialias:true}} fallback={<div className="canvas-error">WebGL2 is required for the 3D viewer.</div>}>
     <color attach="background" args={[colors.background]}/><ambientLight intensity={1.2}/><directionalLight position={[3,5,4]} intensity={2.6}/><directionalLight position={[-3,2,-2]} color="#5fceb9" intensity={1.8}/>
-    <Suspense fallback={null}><group scale={[flip?-1:1,1,1]}><Mannequin {...{pose,skeleton,markers,highlightSide}} hideHead={view==='first'}/>{inspection&&<DetectedSkeleton frame={inspection}/>}</group></Suspense><Camera view={view} focus={focus} mirror={flip} resetKey={resetKey}/>
+    <Suspense fallback={null}><group scale={[flip?-1:1,1,1]}><Mannequin {...{pose,skeleton,markers,highlightSide}} hideHead={view==='first'}/>{ghost&&<Mannequin pose={ghost} skeleton={false} markers={false} hideHead ghost/>}{inspection&&<DetectedSkeleton frame={inspection}/>}</group></Suspense><Camera view={view} focus={focus} mirror={flip} resetKey={resetKey}/>
   </Canvas></WebGLError>;
 });

@@ -3,7 +3,7 @@ import { Camera, Check, Equal, EqualNot, Info, Play, RotateCcw, Volume2, VolumeX
 import { Avatar, type CameraView } from '../components/Avatar';
 import type { Catalog, Expression } from '../content/schema';
 import type { MotionClip } from '../motion/types';
-import { displayFor, handFocus, hasFilled } from '../motion/display';
+import { displayFor, handFocus, hasConstrained, hasFilled } from '../motion/display';
 import { BottomSheet } from '../design/BottomSheet';
 import { ChoiceCard } from '../design/ChoiceCard';
 import { ChunkyButton } from '../design/ChunkyButton';
@@ -13,7 +13,7 @@ import { ProgressBar } from '../design/ProgressBar';
 import { completeStep, currentStep, gradeAnswer, isFinished, isGraded, recordAnswer, sessionProgress, skipCamera, type CameraResult, type SessionState, type Step } from './session';
 import { playCue } from './sound';
 import { useSequencePlayback } from './usePlayback';
-import { ExpressionCaption, FilledLegend, MirrorBadge, MirrorToggle, SpeedToggle, ViewPicker } from './stage';
+import { ConstrainedLegend, ExpressionCaption, FilledLegend, MirrorBadge, MirrorToggle, SpeedToggle, ViewPicker } from './stage';
 
 type Props = {
   session: SessionState; catalog: Catalog; clips: Record<string, MotionClip>; sound: boolean; mirror: boolean;
@@ -170,6 +170,7 @@ export function LessonPlayer({ session, catalog, clips, sound, mirror, cameraRet
           <ViewPicker views={VIEWS} value={view} onChange={setView} />
         </div>
         {stageClips.some(hasFilled) && <FilledLegend />}
+        {stageClips.some(hasConstrained) && <ConstrainedLegend />}
         {(step.kind === 'intro' || step.kind === 'camera') && <ExpressionCaption items={[{ entry: target }]} />}
         {step.kind === 'same-different' && <div className="lp-pair" role="group" aria-label="시범 따로 보기">
           {['시범 1', '시범 2'].map((name, i) => <button type="button" key={name} className="sl-toggle" onClick={() => { setDemo([step.target, step.other][i]); player.play(0); }}><Play size={18} strokeWidth={2.5} aria-hidden="true" /><span>{name}</span></button>)}

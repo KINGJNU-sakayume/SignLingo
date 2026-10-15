@@ -30,6 +30,10 @@ export function MirrorBadge({ mirror, view }: { mirror: boolean; view: CameraVie
 export function FilledLegend() {
   return <p className="sl-filled-legend"><i aria-hidden="true" />추정으로 채운 손 모양</p>;
 }
+/** Hands a reviewed constraint correction set (corrected motion); not an observation. */
+export function ConstrainedLegend() {
+  return <p className="sl-filled-legend sl-constrained-legend"><i aria-hidden="true" />보정한 손 모양</p>;
+}
 /** Expert-written description and movement notes for the demonstration being watched. */
 export function ExpressionCaption({ items }: { items: { entry: Expression; label?: string }[] }) {
   return <div className="sl-caption">

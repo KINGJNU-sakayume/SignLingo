@@ -2,8 +2,8 @@ import { Vector3 } from 'three';
 import { blendPose, editedPose, timestampIndex, type BlendRules } from '../player';
 import { forwardHand } from '../rig';
 import { sequenceBoundary } from '../tracking';
-import { SIDES, type DisplayPose, type Side } from '../types';
-import type { AvatarPose, DisplayClip, DisplayFrame, DisplayHandState, DisplayInput, DisplayStage, HandFocus } from './types';
+import { SIDES, type ConstraintEvidence, type DisplayPose, type HandEvidence, type MotionFrame, type Side } from '../types';
+import type { AvatarPose, DisplayClip, DisplayFrame, DisplayHandState, DisplayInput, DisplayStage, HandAnnotation, HandFocus } from './types';
 
 function baseHand(pose: DisplayPose, side: Side): DisplayHandState {
   const evidence = pose.evidence?.[side];
@@ -15,18 +15,53 @@ function baseHand(pose: DisplayPose, side: Side): DisplayHandState {
 export function armVisible(pose: DisplayPose, side: Side) {
   return pose.quality.body > 0 && (pose.quality[`${side}Arm`] > 0 || pose.evidence?.[side].position === 'interpolated');
 }
-/** Finger rotations exist for this hand (fills supply them even when evidence does not). */
+/** Finger rotations exist for this hand (fills and constraints supply them even when evidence does not). */
 export function fingersShown(frame: DisplayFrame, side: Side) {
-  return frame.annotation.hands[side].state === 'filled' || frame.pose.evidence?.[side].fingers !== 'unavailable';
+  const state = frame.annotation.hands[side].state;
+  return state === 'filled' || state === 'constrained' || frame.pose.evidence?.[side].fingers !== 'unavailable';
+}
+/**
+ * Display state of a hand a constraint changed: `constrained` when the constraint set its fingers, or produced the
+ * values of a hand that was shown without an observation (held). A missing hand stays hidden unless its shape was set.
+ */
+export function constrainedState(state: DisplayHandState, fingers: boolean, evidence?: ConstraintEvidence): DisplayHandState {
+  if (fingers) return 'constrained';
+  return evidence === 'constrained' && state !== 'missing' ? 'constrained' : state;
+}
+const touches = (joints: readonly string[], side: Side, fingersOnly = false) =>
+  joints.some(joint => joint.startsWith(`${side}.`) && (!fingersOnly || joint.split('.').length === 3));
+/** Evidence of a stored hand, used where a corrected side replaces a temporal reconstruction. */
+function storedEvidence(frame: MotionFrame, side: Side, fingers: boolean): HandEvidence {
+  const quality = frame.pose.quality[`${side}State`];
+  const state = quality === 'tracked' ? 'observed' : quality === 'held' ? 'held' : 'unavailable';
+  return { state, position: 'observed', orientation: state, fingers: fingers ? 'observed' : state, identity: 'reliable' };
 }
 
-/** Stored poses with wrist edits applied, as playback has always shown them; the clip is not modified. */
+/**
+ * Stored poses with wrist edits applied, as playback has always shown them; the clip is not modified. Hands a
+ * corrected (version-2) clip records as changed start as `constrained`, and keep their stored values even when a
+ * temporal reconstruction supplies the other poses.
+ */
 export function baseFrames({ clip, temporal }: DisplayInput): DisplayFrame[] {
   let segment = 0;
   return clip.frames.map((frame, i) => {
     if (i > 0 && sequenceBoundary(clip.frames[i - 1], frame)) segment++;
-    const pose = editedPose(clip, i, temporal);
-    return { timestamp: frame.timestamp, segment, pose, annotation: { hands: { left: { state: baseHand(pose, 'left') }, right: { state: baseHand(pose, 'right') } }, stages: [] } };
+    let pose = editedPose(clip, i, temporal);
+    const record = frame.constraint, hands = {} as Record<Side, HandAnnotation>;
+    if (record && temporal) {
+      const stored = editedPose(clip, i), sides = SIDES.filter(side => touches(record.joints, side));
+      if (sides.length) {
+        const rotations = { ...pose.rotations };
+        for (const side of sides) for (const key of Object.keys(rotations)) if (key.startsWith(`${side}.`)) rotations[key] = stored.rotations[key];
+        pose = { ...pose, rotations, ...(pose.evidence ? { evidence: { ...pose.evidence, ...Object.fromEntries(sides.map(side => [side, storedEvidence(frame, side, touches(record.joints, side, true))])) } } : {}) };
+      }
+    }
+    for (const side of SIDES) {
+      const base = baseHand(pose, side);
+      const state = record ? constrainedState(base, touches(record.joints, side, true), record.evidence[side]) : base;
+      hands[side] = state === base ? { state } : { state, constraints: record!.applied.map(a => a.id) };
+    }
+    return { timestamp: frame.timestamp, segment, pose, annotation: { hands, stages: [] } };
   });
 }
 export function runDisplayPipeline(input: DisplayInput, stages: readonly DisplayStage[]): DisplayClip {
@@ -43,7 +78,7 @@ export function withPose(frame: DisplayFrame, pose: DisplayPose, stage: string, 
 }
 
 const displayRules = (frame: DisplayFrame): BlendRules<DisplayPose> => ({
-  hand: (_pose, side) => ['observed', 'interpolated', 'filled'].includes(frame.annotation.hands[side].state),
+  hand: (_pose, side) => ['observed', 'interpolated', 'filled', 'constrained'].includes(frame.annotation.hands[side].state),
   fingers: (_pose, side) => fingersShown(frame, side),
 });
 const avatarPose = (frame: DisplayFrame, pose: DisplayPose): AvatarPose =>
@@ -65,6 +100,9 @@ export function sampleDisplay(display: DisplayClip, seconds: number): AvatarPose
 }
 export const hasFilled = (display: DisplayClip | null | undefined) =>
   !!display?.frames.some(f => SIDES.some(side => f.annotation.hands[side].state === 'filled'));
+/** Whether any shown hand was set by a constraint (legend "보정한 손 모양"). */
+export const hasConstrained = (display: DisplayClip | null | undefined) =>
+  !!display?.frames.some(f => SIDES.some(side => f.annotation.hands[side].state === 'constrained' && armVisible(f.pose, side)));
 export const displayDuration = (display: DisplayClip) => (display.frames.at(-1)?.timestamp ?? 0) / 1000;
 
 /**
@@ -82,7 +120,7 @@ export function handFocus(displays: readonly DisplayClip[]): HandFocus | null {
     return points;
   };
   const points = collect(['observed', 'interpolated']);
-  if (!points.length) points.push(...collect(['held', 'filled']));
+  if (!points.length) points.push(...collect(['held', 'filled', 'constrained']));
   if (!points.length) return null;
   const axis = (k: 'x' | 'y' | 'z') => { const values = points.map(p => p[k]).sort((a, b) => a - b); return [values[Math.floor(.05 * (values.length - 1))], values[Math.ceil(.95 * (values.length - 1))]]; };
   const [x, y, z] = [axis('x'), axis('y'), axis('z')];

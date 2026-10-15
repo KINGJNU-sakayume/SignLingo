@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Camera, Check, ExternalLink, Pause, Play, Repeat, RotateCcw } from 'lucide-react';
 import { Avatar, type CameraView } from '../components/Avatar';
-import { displayDuration, displayFor, handFocus, hasFilled, sampleDisplay } from '../motion/display';
+import { displayDuration, displayFor, handFocus, hasConstrained, hasFilled, sampleDisplay } from '../motion/display';
 import type { MotionClip } from '../motion/types';
 import type { Expression } from '../content/schema';
 import { ChunkyButton } from '../design/ChunkyButton';
@@ -9,7 +9,7 @@ import { Mascot } from '../design/Mascot';
 import type { ContentSource } from '../learn/source';
 import { progressKey, type ProgressRecord } from './catalog';
 import { loopTime, NO_LOOP, type LoopRange } from '../learn/loop';
-import { ExpressionCaption, FilledLegend, LoopControls, MirrorBadge, MirrorToggle, Scrubber, SpeedToggle, ViewPicker } from '../learn/stage';
+import { ConstrainedLegend, ExpressionCaption, FilledLegend, LoopControls, MirrorBadge, MirrorToggle, Scrubber, SpeedToggle, ViewPicker } from '../learn/stage';
 
 const VIEWS: CameraView[] = ['front', 'side', 'first', 'hands'];
 
@@ -96,6 +96,7 @@ export function LessonDetail({ entry, source, progress, backLabel, mirror, onTog
         <LoopControls range={range} time={time} onChange={setRange} />
         <ViewPicker views={VIEWS} value={view} onChange={setView} label="시범 카메라 시점" />
         {display && hasFilled(display) && <FilledLegend />}
+        {display && hasConstrained(display) && <ConstrainedLegend />}
         <div className="ec-explain"><h2>움직임 살펴보기</h2><ExpressionCaption items={[{ entry }]} /></div>
         <p className="ec-hint">아바타를 드래그하면 시점을 돌릴 수 있어요. <strong>1인칭</strong>은 수어하는 사람이 자기 손을 내려다보는 시야예요. 이마·얼굴 가까이에서 하는 동작은 1인칭에서 잘 보이지 않아요. <strong>거울 모드</strong>는 좌우를 뒤집어 거울을 보듯 따라 할 수 있게 해요.</p>
       </section>
