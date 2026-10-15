@@ -24,7 +24,8 @@ export async function approvedFixture(id = catalog.expressions[0].id, { missingL
   entry.variant = { id: 'contract-test', status: 'identified', description: '테스트 전용' };
   entry.provenance = 'authorized-video'; entry.reconstructionVersion = clip.pipeline.version;
   entry.difficulty.cameraSuitability = 'suitable'; entry.movementNotes = ['테스트 화면 동작만 확인합니다. 한국수어가 아닙니다.'];
-  entry.assets.motion = { uri: `content/assets/${entry.id}/v1/reference.motion.json`, sha256: await sha256(bytes), bytes: bytes.length, mediaType: 'application/json', version: 1 };
+  entry.assets.motion = { uri: `content/assets/${entry.id}/v${entry.revision}/reference.motion.json`, sha256: await sha256(bytes), bytes: bytes.length, mediaType: 'application/json', version: entry.revision };
+  delete entry.constraints; // synthetic motion records no constraint correction
   entry.status = 'published';
   const subjectSha256 = await reviewSubject(entry);
   entry.reviews = { reconstruction: { status: 'approved', evidence, subjectSha256 }, linguistic: { status: 'approved', evidence, subjectSha256 } };
@@ -53,7 +54,8 @@ export async function approvedCatalogFixture(ids = ['ksl-thanks', 'ksl-okay', 'k
     entry.variant = { id: `contract-test-${id}`, status: 'identified', description: '테스트 전용' };
     entry.provenance = 'authorized-video'; entry.reconstructionVersion = clip.pipeline.version;
     entry.difficulty.cameraSuitability = 'suitable'; entry.movementNotes = ['테스트 화면 동작만 확인합니다. 한국수어가 아닙니다.'];
-    entry.assets.motion = { uri: `content/assets/${entry.id}/v1/reference.motion.json`, sha256: await sha256(bytes), bytes: bytes.length, mediaType: 'application/json', version: 1 };
+    entry.assets.motion = { uri: `content/assets/${entry.id}/v${entry.revision}/reference.motion.json`, sha256: await sha256(bytes), bytes: bytes.length, mediaType: 'application/json', version: entry.revision };
+    delete entry.constraints; // synthetic motion records no constraint correction
     entry.status = 'published';
     const subjectSha256 = await reviewSubject(entry);
     entry.reviews = { reconstruction: { status: 'approved', evidence, subjectSha256 }, linguistic: { status: 'approved', evidence, subjectSha256 } };

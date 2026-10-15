@@ -36,7 +36,7 @@ describe('guided lesson progress',()=>{
     const restored=readProgress(); expect(restored['first-expression'].attempts).toBe(2);
     expect(restored[progressKey(entry)].history).toHaveLength(20);
     expect(restored[progressKey(entry)].attempts).toBe(25);
-    expect(restored[progressKey({...entry,revision:2})]).toBeUndefined();
+    expect(restored[progressKey({...entry,revision:entry.revision+1})]).toBeUndefined();
   });
   it('continues working when browser storage is blocked',()=>{
     vi.stubGlobal('window',{localStorage:{getItem:()=>{throw new Error('blocked');},setItem:()=>{throw new Error('full');}}});

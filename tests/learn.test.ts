@@ -56,7 +56,7 @@ describe('learning path', () => {
     const catalog = learnCatalog(['ksl-thanks', 'ksl-sorry']), store = emptyStore();
     const lesson = buildPath(catalog, store, NOW).units[0].nodes[0];
     store.nodes[lesson.id] = { completedAt: NOW.toISOString(), runs: 1 };
-    catalog.expressions[1] = { ...catalog.expressions[1], revision: 2 };
+    catalog.expressions[1] = { ...catalog.expressions[1], revision: catalog.expressions[1].revision + 1 };
     const revised = buildPath(catalog, store, NOW).units[0].nodes[0];
     expect(revised.id).not.toBe(lesson.id); expect(revised.state).toBe('current');
   });
