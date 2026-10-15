@@ -22,7 +22,8 @@ test('a lesson runs from the path through feedback, a retried miss and completio
   for (const note of entries[0].movementNotes) await expect(caption).toContainText(note);
   const canvas = (await page.locator('.lp-stage canvas').boundingBox())!;
   expect((await caption.boundingBox())!.y).toBeGreaterThanOrEqual(canvas.y + canvas.height);
-  await caption.scrollIntoViewIfNeeded();
+  // Scroll it clear of the fixed footer (a caption above the fold can still sit under the footer).
+  await caption.evaluate(element => element.scrollIntoView({ block: 'center' }));
   expect(await caption.evaluate(element => { const box = element.getBoundingClientRect(); return element.contains(document.elementFromPoint(box.left + box.width / 2, box.bottom - 4)); })).toBe(true);
   const learner = new Learner(page, target, true);
   await learner.until(null);

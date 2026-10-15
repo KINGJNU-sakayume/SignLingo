@@ -26,7 +26,7 @@ function Fingers({side,rotations,color,skeleton,markers,opacity}:{side:Side;rota
 }
 // Upper body only, as in broadcast signing: torso, neck, head and arms. Legs, pelvis and floor are not drawn.
 // A `ghost` draws only the arms and hands, white and translucent: the uncorrected pose under a constraint preview.
-const GHOST='#f4f8fb',GHOST_OPACITY=.3;
+const GHOST='#f4f8fb',GHOST_OPACITY=.3,REST='#97a5ae';
 function Mannequin({pose,skeleton,markers,highlightSide,hideHead,ghost=false}:{pose:Pose|null;skeleton:boolean;markers:boolean;highlightSide?:Side;hideHead:boolean;ghost?:boolean}) {
   const rotations=pose?.rotations??neutralRotations();
   const active=!pose || pose.quality.body>0;
@@ -43,11 +43,13 @@ function Mannequin({pose,skeleton,markers,highlightSide,hideHead,ghost=false}:{p
     {SIDES.map(side=>{
       const evidence=pose?.evidence?.[side], shown=pose?.hands?.[side];
       const state=shown ? (shown==='observed'?'tracked':shown) : evidence ? (evidence.state==='unavailable'?'missing':evidence.state==='observed'?'tracked':evidence.state) : pose?.quality[`${side}State`]??'tracked';
-      const visible=!pose || (active&&(pose.quality[`${side}Arm`]>0||evidence?.position==='interpolated'));
-      const color=ghost?GHOST:highlightSide===side?'#ff79c6':state==='interpolated'?'#b49bea':pose ? (state==='tracked'?(side==='left'?'#53d5c0':'#e6af68'):'#75808a'):'#82949f';
+      const restArm=pose?.arms?.[side]==='rest';
+      const visible=!pose || (active&&(pose.quality[`${side}Arm`]>0||evidence?.position==='interpolated'||restArm));
+      // An arm or hand at rest before/after the sign (display only, not tracked) is drawn in the body's gray.
+      const color=ghost?GHOST:highlightSide===side?'#ff79c6':restArm?'#75808a':state==='interpolated'?'#b49bea':pose ? (state==='tracked'?(side==='left'?'#53d5c0':'#e6af68'):'#75808a'):'#82949f';
       // Held (≤200 ms, stored) and filled (display-only) handshapes are estimates: translucent orange.
       // A handshape a constraint set ("보정한 손 모양") is deliberate, not estimated: solid blue.
-      const estimated=state==='held'||state==='filled', handColor=ghost?GHOST:estimated?'#f4b65f':state==='constrained'?'#5b9dff':color;
+      const estimated=state==='held'||state==='filled', handColor=ghost?GHOST:estimated?'#f4b65f':state==='constrained'?'#5b9dff':state==='rest'?REST:color;
       const opacity=ghost?GHOST_OPACITY:1, segment={color,skeleton:skeleton&&!ghost,markers:markers&&!ghost,opacity};
       return <group key={side} position={[side==='left'?0.19:-0.19,0,0]} visible={visible} quaternion={rotations[`${side}.upper`]}>
         <Joint radius={0.052} opacity={opacity} color={ghost?GHOST:undefined}/><Segment length={LENGTHS.upper} radius={0.042} {...segment}/>
@@ -57,7 +59,7 @@ function Mannequin({pose,skeleton,markers,highlightSide,hideHead,ghost=false}:{p
             <Joint radius={0.022} color={ghost?GHOST:state==='missing'?'#e57b7b':color} opacity={opacity}/>
             <group visible={state!=='missing'}>
               <mesh position={[0,0.042,0]} scale={[0.037,0.047,0.014]}><sphereGeometry args={[1,20,16]}/><meshStandardMaterial color={handColor} transparent opacity={ghost?GHOST_OPACITY:estimated?0.45:skeleton?0.3:1} depthWrite={!estimated&&!ghost}/></mesh>
-              {(state==='filled'||state==='constrained'||!evidence||evidence.fingers!=='unavailable')&&<Fingers {...{side,rotations,skeleton:skeleton&&!ghost,markers:markers&&!ghost}} color={handColor} opacity={ghost?GHOST_OPACITY:estimated?0.6:1}/>}
+              {(state==='filled'||state==='constrained'||state==='rest'||!evidence||evidence.fingers!=='unavailable')&&<Fingers {...{side,rotations,skeleton:skeleton&&!ghost,markers:markers&&!ghost}} color={handColor} opacity={ghost?GHOST_OPACITY:estimated?0.6:1}/>}
             </group>
           </group>
         </group>

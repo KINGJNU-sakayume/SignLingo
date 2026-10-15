@@ -40,10 +40,10 @@ export const handShape = (pose: DisplayPose, side: Side) => {
   const { arm, frame } = bareForearm(pose, side);
   return { relative: frame.clone().invert().multiply(arm.palm).normalize(), fingers: fingerKeys(side).map(key => q(pose.rotations[key])) };
 };
-/** Observation-based anchors: the safeguard's evidence. */
+/** Observation-based anchors: the safeguard's evidence. A constraint that adjusted an observed hand keeps it observed. */
 const isObserved = (frame: DisplayFrame, side: Side) => {
-  const state = frame.annotation.hands[side].state;
-  return state === 'observed' || (state === 'interpolated' && fingersShown(frame, side));
+  const { state, evidence } = frame.annotation.hands[side];
+  return state === 'observed' || (state === 'interpolated' && fingersShown(frame, side)) || (state === 'constrained' && evidence === 'observed');
 };
 /** Shapes a fill may copy or blend: observations, and hands a constraint set (never filled over or hidden). */
 const isAnchor = (frame: DisplayFrame, side: Side) => isObserved(frame, side) || frame.annotation.hands[side].state === 'constrained';

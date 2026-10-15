@@ -202,6 +202,7 @@
 .sl-filled-legend i { flex: none; width: 14px; height: 14px; border-radius: 50%; background: rgba(244, 182, 95, .5); border: 2px solid #F4B65F; }
 .practice .sl-filled-legend { padding: 8px 0 0; font-size: 12px; }
 .sl-constrained-legend i { background: #5B9DFF; border-color: #2F6FD0; }
+.sl-rest-legend i { background: #97A5AE; border-color: #6F7E88; }
 .sl-caption { display: grid; gap: 12px; }
 .lp-stage-card > .sl-caption, .ec-explain { padding: 12px 12px 14px; border-top: 2px solid var(--line); }
 .ec-explain h2 { margin-bottom: 6px; }

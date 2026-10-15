@@ -56,7 +56,8 @@ function expectHandsPreserved(clip: MotionClip, display: DisplayClip, skipFilled
   display.frames.forEach((frame, i) => {
     for (const side of SIDES) {
       const original = clip.frames[i].pose;
-      if (!armVisible(original, side) || (skipFilled && frame.annotation.hands[side].state === 'filled')) continue;
+      // Filled and rest hands are display estimates, and hands the contact stage moved apart are checked by its own test.
+      if (!armVisible(original, side) || frame.annotation.contact || (skipFilled && ['filled', 'rest'].includes(frame.annotation.hands[side].state))) continue;
       const before = forwardHand(original, side), after = forwardHand(frame.pose, side), residual = frame.annotation.torso?.wristResidual[side] ?? 0;
       for (const [k, point] of before.points.entries()) expect(point.distanceTo(after.points[k])).toBeLessThanOrEqual(residual + 1e-6);
       expect(before.palm.angleTo(after.palm)).toBeLessThan(1e-6);
@@ -198,7 +199,7 @@ describe('published course 1 (read-only)', () => {
       expect(torsoShake(after)).toBeLessThan(torsoShake(before) * .1);
       // Fingertip-to-fingertip distance (contact in ksl-meet) wherever both hands are observed.
       display.frames.forEach((frame, i) => {
-        if (!SIDES.every(side => frame.annotation.hands[side].state === 'observed')) return;
+        if (!SIDES.every(side => frame.annotation.hands[side].state === 'observed') || frame.annotation.contact) return;
         const gap = (pose: Pose) => forwardHand(pose, 'left').points[8].distanceTo(forwardHand(pose, 'right').points[8]);
         expect(Math.abs(gap(frame.pose) - gap(clip.frames[i].pose))).toBeLessThan(.002);
       });

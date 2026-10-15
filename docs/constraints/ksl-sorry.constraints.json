@@ -2,36 +2,38 @@
   "format": "signlingo.constraints",
   "version": 1,
   "expression": "ksl-sorry",
-  "request": "오른손의 1·5지 끝을 맞대어 동그라미를 만들어 이마에 댔다가 1·5지를 펴며 내린다.",
+  "request": "오른손의 1·5지 끝을 맞대어 동그라미를 만들어 이마에 댔다가 1·5지를 펴며 내린다. (개정판 2 검토: 동그라미를 이마에 댄 장면 앞뒤만 자연스럽고 나머지 구간은 손이 부자연스럽다. 구간을 원본 관측에서 손끝이 이마에 가장 가까운 프레임 44–54 기준으로 다시 잡는다.)",
   "constraints": [
     {
       "id": "sorry-circle",
       "kind": "handshape",
-      "span": { "fraction": [0, 0.66] },
+      "span": { "frames": [36, 56] },
       "hand": "right",
       "preset": "index-thumb-circle",
       "fingers": ["index", "thumb"],
-      "note": "오른손 검지 끝과 엄지 끝을 맞대어 동그라미를 만들고, 내리기 전까지 유지한다. 나머지 손가락은 설명에 없으므로 관측값을 둔다."
+      "note": "손을 올리기 시작할 때(프레임 36)부터 이마에서 떼기 전(56)까지 오른손 검지 끝과 엄지 끝을 맞대어 동그라미를 만든다. 나머지 손가락은 관측값을 둔다."
     },
     {
       "id": "sorry-forehead",
       "kind": "contact",
-      "span": { "phase": "middle" },
+      "span": { "frames": [38, 60] },
+      "blendMs": 250,
       "a": "right.index.tip",
       "b": "head.forehead",
       "move": "right",
       "gapCm": 1,
       "toleranceCm": 1.5,
-      "note": "동그라미를 이마에 댄다."
+      "maxShiftCm": 45,
+      "note": "동그라미를 이마에 댄다. 손끝이 이마에 가장 가까운 프레임 44–54가 가운데에 오도록 잡았다. 단안 깊이 추정으로 손이 얼굴 앞 약 38 cm에 복원되어 이동 상한을 45 cm로 늘리고, 250 ms에 걸쳐 섞는다."
     },
     {
       "id": "sorry-open",
       "kind": "handshape",
-      "span": { "phase": "end" },
+      "span": { "frames": [57, 79] },
       "hand": "right",
       "preset": "spread",
       "fingers": ["index", "thumb"],
-      "note": "내리면서 검지와 엄지를 편다. 나머지 손가락은 관측값을 둔다."
+      "note": "이마에서 떼어 내리면서(프레임 57–79, 손이 쉬는 자리로 돌아가기 전까지) 검지와 엄지를 편다. 나머지 손가락은 관측값을 둔다."
     }
   ]
 }

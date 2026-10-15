@@ -287,15 +287,17 @@ describe('display stage and learner screens', () => {
   };
   it('runs after torso stabilization and before hand filling, never after it', () => {
     expect(() => runDisplayPipeline({ clip: clip() }, [fillHands(), constrain(shape)])).toThrow('before hand-fill');
-    expect(learnerStages(shape).map(s => s.id)).toEqual(['temporal-reconstruct', 'torso-stabilize', 'constraints', 'hand-fill']);
-    expect(PRESETS.learner().map(s => s.id)).toEqual(['temporal-reconstruct', 'torso-stabilize', 'hand-fill']);
+    expect(learnerStages(shape).map(s => s.id)).toEqual(['temporal-reconstruct', 'torso-stabilize', 'constraints', 'hand-fill', 'rest-pose', 'hand-contact']);
+    expect(learnerStages(shape, { presentation: false }).map(s => s.id)).toEqual(['temporal-reconstruct', 'torso-stabilize', 'constraints', 'hand-fill']);
+    expect(PRESETS.learner().map(s => s.id)).toEqual(['temporal-reconstruct', 'torso-stabilize', 'hand-fill', 'rest-pose', 'hand-contact']);
   });
   it('shows constrained hands, which hand filling neither overwrites nor hides', () => {
     const source = lateLeft();
-    const plain = runDisplayPipeline({ clip: source }, learnerStages());
+    // Fill semantics without the presentation stages (the synthetic hands start low, where they would rest).
+    const plain = runDisplayPipeline({ clip: source }, learnerStages(undefined, { presentation: false }));
     expect(plain.frames.slice(0, 9).map(f => f.annotation.hands.left.state)).toEqual(['filled', 'filled', 'missing', 'filled', 'filled', 'filled', 'filled', 'filled', 'filled']);
     expect(plain.frames[2].annotation.hands.left.hidden).toBe('offscreen');
-    const display = runDisplayPipeline({ clip: deepFreeze(source) }, learnerStages(shape));
+    const display = runDisplayPipeline({ clip: deepFreeze(source) }, learnerStages(shape, { presentation: false }));
     expect(display.frames.slice(0, 5).map(f => f.annotation.hands.left.state)).toEqual(Array(5).fill('constrained'));
     expect(display.frames[0].annotation.hands.left.constraints).toEqual(['shape']);
     expect(display.frames.slice(5, 9).every(f => f.annotation.hands.left.state === 'filled')).toBe(true);
@@ -314,11 +316,12 @@ describe('display stage and learner screens', () => {
     const source = lateLeft();
     source.pipeline = { ...source.pipeline, temporal: { algorithm: 'conservative-bidirectional-v1', maxGapMs: 150, applies: 'learner-display' } };
     const { clip: corrected } = await applyConstraints(source, shape);
-    const display = displayFor(corrected, 'learner');
+    const tracking = learnerStages(undefined, { presentation: false });
+    const display = runDisplayPipeline({ clip: corrected }, tracking);
     expect(display.frames.slice(0, 5).map(f => f.annotation.hands.left.state)).toEqual(Array(5).fill('constrained'));
     for (let i = 0; i < 5; i++) for (const key of Object.keys(presetRotations('fist', 'left'))) expect(display.frames[i].pose.rotations[key]).toEqual(corrected.frames[i].pose.rotations[key]);
     expect(hasConstrained(display)).toBe(true);
-    const unchanged = displayFor(source, 'learner');
+    const unchanged = runDisplayPipeline({ clip: source }, tracking);
     expect(display.frames.slice(10).map(f => f.annotation.hands)).toEqual(unchanged.frames.slice(10).map(f => f.annotation.hands));
   });
 });

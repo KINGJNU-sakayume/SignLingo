@@ -52,6 +52,6 @@ export const PHASE_LABELS = { start: '시작', middle: '중간', end: '끝', who
 export function spanLabel(span: { frames: [number, number] } | { ms: [number, number] } | { phase: keyof typeof PHASE_LABELS } | { fraction: [number, number] }): string {
   if ('frames' in span) return `프레임 ${span.frames[0]}–${span.frames[1]}`;
   if ('ms' in span) return `${(span.ms[0] / 1000).toFixed(2)}–${(span.ms[1] / 1000).toFixed(2)}초`;
-  if ('phase' in span) return `동작 구간 ${PHASE_LABELS[span.phase]}`;
-  return `동작 구간 ${Math.round(span.fraction[0] * 100)}–${Math.round(span.fraction[1] * 100)}%`;
+  if ('phase' in span) return `수어 구간 ${PHASE_LABELS[span.phase]}`;
+  return `수어 구간 ${Math.round(span.fraction[0] * 100)}–${Math.round(span.fraction[1] * 100)}%`;
 }

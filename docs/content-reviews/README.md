@@ -5,6 +5,7 @@ Records in this folder:
 - `own-recording-rights-2026-10-14.md`: permission record for 10 self-recorded clips (motion derivation and public repository/site allowed; original video and real names not published).
 - `course1-reconstruction-review-2026-10-14.md`, `course1-linguistic-review-2026-10-14.md`: approvals for `ksl-thanks`, `ksl-sorry`, `ksl-meet` (course `courtesy`), revision 1.
 - `course1-v2-reconstruction-review-2026-10-15.md`, `course1-v2-linguistic-review-2026-10-15.md`: approvals for the same three expressions at revision 2 (constraint-corrected motion).
+- `course1-v2-feedback-2026-10-15.md`: review findings on revision 2 (change request, not an approval) and the prepared revision 3, which needs both reviews before publishing.
 
 The other seven candidates have no review approval yet.
 
