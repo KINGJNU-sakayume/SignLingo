@@ -10,7 +10,8 @@ import { batchMarkdown, type BatchReport } from '../src/batch/report';
 import { batchConstraintEntry, constraintMarkdown, constraintReport } from '../src/batch/constraintReport';
 import { importMotion } from '../src/motion/serialization';
 import { applyConstraints, constraintHash, HANDSHAPES, parseConstraints, PRESET_IDS } from '../src/motion/constraints';
-import { FINGERS } from '../src/motion/types';
+import { FINGERS, SIDES } from '../src/motion/types';
+import { deepestPenetration, handsOf, leftward } from '../src/motion/handContact';
 
 const doc = readFileSync('docs/CONSTRAINTS.md', 'utf8');
 const blocks = [...doc.matchAll(/```json\n([\s\S]*?)```/g)].map(m => m[1]);
@@ -24,7 +25,8 @@ describe('docs/CONSTRAINTS.md', () => {
       const file = readFileSync(`docs/constraints/${id}.constraints.json`, 'utf8');
       expect(blocks.map(b => b.trim())).toContain(file.trim());
       const expression = catalog.expressions.find(e => e.id === id)!;
-      expect(parseConstraints(file).request).toBe(expression.description);
+      // A post-review correction (ksl-sorry, revision 3) keeps the description first and appends the review finding.
+      expect(parseConstraints(file).request!.startsWith(expression.description)).toBe(true);
     }
     expect(parsed.filter(set => set.request && !set.expression).length).toBeGreaterThan(0);
   });
@@ -41,7 +43,7 @@ describe('docs/CONSTRAINTS.md', () => {
 });
 
 describe('published course 1: the documented meet example (read only)', () => {
-  it('brings the index fingers together at one height without touching the asset', async () => {
+  it('brings the hands together until they touch, centered, without touching the asset', async () => {
     const file = 'public/content/assets/ksl-meet/v1/reference.motion.json';
     // Revision 1 is archived in the release record; the current revision is this example applied to it.
     const asset = releases.find(e => e.id === 'ksl-meet' && e.revision === 1)!.assets.motion!;
@@ -52,9 +54,15 @@ describe('published course 1: the documented meet example (read only)', () => {
       motion: { file, bytes: 1, sha256: asset.sha256, version: 1, pipeline: '0.2.0', frames: clip.frames.length, sampleHz: 30, duration: clip.source.duration }, generatedAt: 'test' });
     const result = (id: string) => report.results.find(r => r.id === id)!;
     expect(result('meet-touch').before.max!).toBeGreaterThan(.15);
-    expect(result('meet-touch').after.max!).toBeLessThanOrEqual(.005 + 1e-9);
-    expect(result('meet-touch').satisfiedAfter).toBe(result('meet-touch').measuredCoreFrames);
-    expect(result('meet-center').after.max!).toBeLessThan(result('meet-center').before.max!);
+    // The curled fingers of the two fists touch before the index fingers can (avatar fist geometry): the solver stops
+    // there instead of pushing the hands into each other, and reports those frames as blocked.
+    expect(result('meet-touch').after.max!).toBeLessThan(result('meet-touch').before.max! / 1.5);
+    expect(result('meet-touch').blockedFrames).toBeGreaterThan(0);
+    expect(result('meet-center').after.max!).toBeLessThanOrEqual(.02 + 1e-9);
+    for (const frame of corrected.frames) {
+      const hands = handsOf(frame.pose);
+      if (frame.constraint && SIDES.every(side => frame.pose.quality[`${side}Arm`] > 0)) expect(deepestPenetration(hands.left, hands.right, leftward(frame.pose))?.depth ?? 0).toBeLessThanOrEqual(.001);
+    }
     expect(result('meet-index-shape').after.max).toBe(0);
     expect(report.changes.outsideSpans).toBe(0);
     expect(report.changes.hands.left.constrained + report.changes.hands.right.constrained).toBeGreaterThan(0);
@@ -89,10 +97,10 @@ describe('command-line arguments and batch report', () => {
     const set = parseConstraints(readFileSync('docs/constraints/ksl-meet.constraints.json', 'utf8'));
     const applied = await applyConstraints(clip, set);
     const entry = batchConstraintEntry('docs/constraints/ksl-meet.constraints.json', await constraintHash(set), applied.clip, applied.solution);
-    expect(entry).toMatchObject({ count: 4, changedFrames: 72 });
+    expect(entry).toMatchObject({ count: 4, changedFrames: 60 });
     const report: BatchReport = { format: 'signlingo.motion-batch', version: 1, environment: { generatedAt: 'test' }, notice: 'test',
       clips: [{ file: 'ksl-meet.webm', bytes: 1, sha256: 'a'.repeat(64), pipeline: '0.2.0', sampleHz: 30, mirrored: false, constraints: entry }] };
     expect(batchMarkdown(report)).toContain('## 인식 직후 적용한 제약 조건');
-    expect(batchMarkdown(report)).toContain('meet-touch 20.6 cm → 0.5 cm');
+    expect(batchMarkdown(report)).toContain('meet-touch 20.6 cm → 11.0 cm');
   });
 });

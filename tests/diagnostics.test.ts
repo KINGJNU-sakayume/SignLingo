@@ -95,7 +95,7 @@ describe('hand-fill safeguard', () => {
     const c = clip((d, i) => { if (i > 2) dropSide(d, 'left'); });
     const before = learner(c, old), after = learner(c), guard = after.reports[FILL_GUARD_REPORT] as FillGuardReport;
     expect((before.reports['hand-fill'] as FillReport).left.trail).toBeGreaterThan(20);
-    expect((after.reports['hand-fill'] as FillReport).left).toEqual({ lead: 0, gap: 0, trail: 0 });
+    expect((after.reports['hand-fill'] as FillReport).left).toMatchObject({ lead: 0, gap: 0, trail: 0 });
     expect(guard.sides.left.sufficient).toBe(false);
     expect(guard.sides.left.fraction).toBeLessThan(.15);
     expect(after.frames.filter(f => f.annotation.hands.left.state === 'filled' || f.annotation.hands.left.state === 'held')).toHaveLength(0);

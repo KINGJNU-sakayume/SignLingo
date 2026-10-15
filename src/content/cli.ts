@@ -52,6 +52,106 @@ async function writePrepared(directory: string, prepared: Expression, clip: Moti
   return entry;
 }
 
+/** Validates a ready-to-publish package and copies its approved assets into the static release (never a video). */
+async function publishPackage(directory: string | undefined) {
+  if (!directory || !/^private-data\/[a-z0-9-]+$/.test(directory)) throw new Error('publish private-data/<package>');
+  const entry = expressionSchema.parse(await json(path.join(directory, 'entry.json')));
+  if (entry.status !== 'ready-to-publish') throw new Error('Complete both reviews before publishing');
+  const published = transition(entry, 'published');
+  const catalog = parseCatalog(await json('src/content/catalog.json'));
+  await validatePublic(catalog, 'public', await json('public/content/releases.json'));
+  const old = catalog.expressions.find(e => e.id === entry.id);
+  if (!old) throw new Error('Register the candidate in the catalog first');
+  if (old.status === 'published' && entry.revision <= old.revision) throw new Error('Published revisions are immutable; increment revision');
+  // The catalog and its generated manifest record when this release was made; published entries stay immutable.
+  const next = parseCatalog({ ...catalog, updatedAt: releaseDate(new Date(), published.updatedAt, catalog.updatedAt),
+    expressions: catalog.expressions.map(e => e.id === entry.id ? published : e) });
+  await validatePackage({ ...next, expressions: [published] }, directory);
+  // Every validation, including external media availability, completes before any public copy.
+  for (const asset of Object.values(published.assets)) {
+    if (asset.uri.startsWith('https://')) {
+      const response = await fetch(asset.uri, { redirect: 'error', signal: AbortSignal.timeout(30000) });
+      if (!response.ok || !response.headers.get('access-control-allow-origin')) throw new Error('External host requires stable HTTPS and CORS');
+      const { verifyAsset } = await import('./assets');
+      await verifyAsset(asset, new Uint8Array(await response.arrayBuffer()));
+    } else {
+      try { await access(path.join('public', asset.uri)); throw new Error('Asset version already exists; use a new revision'); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+    }
+  }
+  const releases: Expression[] = await json('public/content/releases.json');
+  if (old.status === 'published') releases.push(old);
+  for (const asset of Object.values(published.assets)) if (!asset.uri.startsWith('https://')) {
+    await mkdir(path.dirname(path.join('public', asset.uri)), { recursive: true });
+    await copyFile(path.join(directory, asset.uri), path.join('public', asset.uri));
+  }
+  await save('src/content/catalog.json', next);
+  await save('public/content/releases.json', releases);
+  await save('public/content/manifest.json', publicManifest(next));
+}
+
+/**
+ * `approve [--date YYYY-MM-DD] [--publish] --feedback "<owner's words>" private-data/<package>...`
+ * Under the review rule (docs/content-reviews/review-process.md), the repository owner's approving feedback on a
+ * candidate is the result of both reviews. This writes one review record for the packages (subject, motion and
+ * constraint hashes computed here, never typed by hand), approves both reviews against it, moves each package to
+ * ready-to-publish and, with --publish, publishes it. The current revision comes from the package itself.
+ */
+async function approve(argv: string[]) {
+  let feedback = '', date = new Date().toISOString().slice(0, 10), publish = false;
+  const packages: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--feedback') feedback = argv[++i] ?? '';
+    else if (argv[i] === '--date') date = argv[++i] ?? '';
+    else if (argv[i] === '--publish') publish = true;
+    else packages.push(argv[i]);
+  }
+  if (!feedback.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !packages.length || !packages.every(p => PACKAGE.test(p))) {
+    throw new Error('approve [--date YYYY-MM-DD] [--publish] --feedback "<검토자 피드백>" private-data/<package>...');
+  }
+  const reviewers = await json('src/content/reviewers.json') as { rule: string } & Record<'reconstruction' | 'linguistic', { reviewer: string; qualification: string }>;
+  const entries = await Promise.all(packages.map(async directory => expressionSchema.parse(await json(path.join(directory, 'entry.json')))));
+  for (const entry of entries) {
+    if (entry.status !== 'reconstruction-review-required' && entry.status !== 'linguistic-review-required') throw new Error(`${entry.id}: 검수 대기 상태가 아닙니다(${entry.status}).`);
+    const errors = stateErrors(entry); if (errors.length) throw new Error(`${entry.id}: ${errors.join(' ')}`);
+  }
+  // One record per review session: docs/content-reviews/review-<date>[-n].md
+  let n = 1, file = '';
+  for (;; n++) {
+    file = `docs/content-reviews/review-${date}${n > 1 ? `-${n}` : ''}.md`;
+    try { await access(file); } catch { break; }
+  }
+  const reference = `SL-REV-${date}${n > 1 ? `-${n}` : ''}`;
+  const rows = await Promise.all(entries.map(async entry => `| ${entry.id} (${entry.displayName}) | ${entry.revision} | ${await reviewSubject(entry)} | ${entry.assets.motion?.sha256 ?? '-'} | ${entry.constraints ? `${entry.constraints.sha256} (${entry.constraints.count})` : '-'} | ${entry.reconstructionVersion ?? '-'} |`));
+  const record = [
+    `# 검수 기록 ${reference}`, '',
+    '`npm run content -- approve`가 만든 기록입니다. 대상 해시는 명령이 계산했습니다.', '',
+    `- 검수일: ${date}`,
+    `- 근거 규칙: [검수 규칙](${path.basename(reviewers.rule)}). 저장소 소유자의 승인 피드백은 소유자와 검수자가 함께 본 두 검수의 결과입니다.`,
+    `- 3D 복원 검수: ${reviewers.reconstruction.reviewer} · ${reviewers.reconstruction.qualification}`,
+    `- 한국수어 검수: ${reviewers.linguistic.reviewer} · ${reviewers.linguistic.qualification}`,
+    '- 결정: **승인** (아래 대상 해시). 설명·변이·자산·제약 조건이 바뀌면 승인은 무효가 됩니다.', '',
+    '## 피드백 원문', '', ...feedback.trim().split('\n').map(line => `> ${line}`), '',
+    '## 대상', '',
+    '| 표현 | 개정판 | 대상 해시 | 동작 파일 SHA-256 | 제약 조건 SHA-256 (개수) | 복원 버전 |',
+    '| --- | --- | --- | --- | --- | --- |', ...rows, '',
+  ].join('\n');
+  await writeFile(file, record);
+  const document = { path: file, sha256: await sha256(new TextEncoder().encode(record)) };
+  const notes = feedback.trim().replace(/\s+/g, ' ').slice(0, 1000);
+  for (const [k, original] of entries.entries()) {
+    const subjectSha256 = await reviewSubject(original);
+    const evidence = (role: 'reconstruction' | 'linguistic') => ({ ...reviewers[role], date, reference, notes, document });
+    let entry: Expression = { ...original, reviews: { ...original.reviews, reconstruction: { status: 'approved', evidence: evidence('reconstruction'), subjectSha256 } } };
+    if (entry.status === 'reconstruction-review-required') entry = transition(entry, 'linguistic-review-required');
+    entry = transition({ ...entry, reviews: { ...entry.reviews, linguistic: { status: 'approved', evidence: evidence('linguistic'), subjectSha256 } } }, 'ready-to-publish');
+    await verifyReviews(entry);
+    await save(path.join(packages[k], 'entry.json'), entry);
+    if (publish) await publishPackage(packages[k]);
+    console.log(`${entry.id} 개정판 ${entry.revision}: 두 검수 승인${publish ? ', 공개' : ''} (${file}).`);
+  }
+}
+
 try {
   if (command === 'register') {
     const [id, directory] = args;
@@ -124,42 +224,10 @@ try {
     await verifyReviews(entry);
     await save(file, entry);
   } else if (command === 'publish') {
-    const [directory] = args;
-    if (!directory || !/^private-data\/[a-z0-9-]+$/.test(directory)) throw new Error('publish private-data/<package>');
-    const entry = expressionSchema.parse(await json(path.join(directory, 'entry.json')));
-    if (entry.status !== 'ready-to-publish') throw new Error('Complete both reviews before publishing');
-    const published = transition(entry, 'published');
-    const catalog = parseCatalog(await json('src/content/catalog.json'));
-    await validatePublic(catalog, 'public', await json('public/content/releases.json'));
-    const old = catalog.expressions.find(e => e.id === entry.id);
-    if (!old) throw new Error('Register the candidate in the catalog first');
-    if (old.status === 'published' && entry.revision <= old.revision) throw new Error('Published revisions are immutable; increment revision');
-    // The catalog and its generated manifest record when this release was made; published entries stay immutable.
-    const next = parseCatalog({ ...catalog, updatedAt: releaseDate(new Date(), published.updatedAt, catalog.updatedAt),
-      expressions: catalog.expressions.map(e => e.id === entry.id ? published : e) });
-    await validatePackage({ ...next, expressions: [published] }, directory);
-    // Every validation, including external media availability, completes before any public copy.
-    for (const asset of Object.values(published.assets)) {
-      if (asset.uri.startsWith('https://')) {
-        const response = await fetch(asset.uri, { redirect: 'error', signal: AbortSignal.timeout(30000) });
-        if (!response.ok || !response.headers.get('access-control-allow-origin')) throw new Error('External host requires stable HTTPS and CORS');
-        const { verifyAsset } = await import('./assets');
-        await verifyAsset(asset, new Uint8Array(await response.arrayBuffer()));
-      } else {
-        try { await access(path.join('public', asset.uri)); throw new Error('Asset version already exists; use a new revision'); }
-        catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
-      }
-    }
-    const releases: Expression[] = await json('public/content/releases.json');
-    if (old.status === 'published') releases.push(old);
-    for (const asset of Object.values(published.assets)) if (!asset.uri.startsWith('https://')) {
-      await mkdir(path.dirname(path.join('public', asset.uri)), { recursive: true });
-      await copyFile(path.join(directory, asset.uri), path.join('public', asset.uri));
-    }
-    await save('src/content/catalog.json', next);
-    await save('public/content/releases.json', releases);
-    await save('public/content/manifest.json', publicManifest(next));
+    await publishPackage(args[0]);
     console.log('정적 공개 패키지 생성 완료. 변경 내용을 검토한 뒤 PR로 제출하세요.');
+  } else if (command === 'approve') {
+    await approve(args);
   } else if (command === 'validate') {
     const catalog = parseCatalog(await json('src/content/catalog.json'));
     const manifest = parseCatalog(await json('public/content/manifest.json'));

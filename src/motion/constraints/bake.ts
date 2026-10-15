@@ -4,7 +4,11 @@ import type { MotionClip, MotionFrame, Quat, Side } from '../types';
 import { CONSTRAINT_FORMAT, type ConstraintSet } from './schema';
 import { solveConstraints, type ConstraintSolution, type HandSource } from './solve';
 
-export const CONSTRAINT_SOLVER = 'signlingo-constraint-solver-v1';
+/**
+ * v2: phase/fraction spans follow `signingInterval` (hands raised from rest) instead of Practice's motion heuristic,
+ * and the two hands never pass into each other. Clips baked by v1 keep their record.
+ */
+export const CONSTRAINT_SOLVER = 'signlingo-constraint-solver-v2';
 export const storedHand = (frame: MotionFrame, side: Side): HandSource => {
   const state = frame.pose.quality[`${side}State`];
   return state === 'tracked' ? 'observed' : state;
@@ -31,7 +35,9 @@ export function solveStored(clip: MotionClip, set: ConstraintSet): ConstraintSol
 }
 
 const pick = (rotations: Record<string, Quat>, keys: string[]) => Object.fromEntries(keys.map(key => [key, rotations[key]]));
-const same = (a: Quat, b: Quat) => a.every((x, k) => x === b[k]);
+// A rotation the solver did not change can still differ in the last bits after a JSON round trip; such joints are
+// not changes (the same 1e-12 tolerance the solver uses).
+const same = (a: Quat, b: Quat) => a.every((x, k) => Math.abs(x - b[k]) < 1e-12);
 
 /**
  * A corrected MotionClip (version 2). Landmarks, quality, warnings, corrections and the pipeline record are the

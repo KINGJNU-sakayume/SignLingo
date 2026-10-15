@@ -87,6 +87,16 @@ For larger videos, a licensed stable HTTPS external host can be recorded instead
 
 ## 4. Record two independent approvals
 
+**Owner feedback (from 2026-10-15).** Under [the review rule](content-reviews/review-process.md) the repository owner's approving feedback on a candidate is the result of both reviews. Record it in one step instead of the manual steps below:
+
+```sh
+npm run content -- approve --publish --feedback "<feedback, verbatim>" private-data/ksl-meet private-data/ksl-thanks
+```
+
+It computes each package's subject, motion and constraint hashes, writes `docs/content-reviews/review-<date>[-n].md`, approves both reviews against that record (reviewer names from `src/content/reviewers.json`), moves the package to `ready-to-publish` and publishes it with `--publish`. The revision is the package's own; nothing is typed by hand.
+
+The manual flow:
+
 Run `subject` **after** finalizing metadata and assets. Each approved review needs `status: approved`, a full `evidence` record above and `subjectSha256` from this command. The record document should identify the subject hash, findings and explicit approval. Changing review evidence does not recursively change the subject; changing source, asset bytes/hash, license, description, variant, revision or pipeline does.
 
 - Reconstruction reviewer: compare original and final rendered avatar; document hand tracking gaps, finger/palm/joint errors, timing, corrections, remaining limits and acceptability.

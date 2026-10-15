@@ -26,7 +26,7 @@ export function constrain(set: ConstraintSet): DisplayStage {
       for (const side of SIDES) {
         if (!change.evidence[side]) continue;
         const state = constrainedState(hands[side].state, !!change.fingers[side], change.evidence[side]);
-        hands[side] = { ...hands[side], state, constraints: change.applied.map(a => a.id) } satisfies HandAnnotation;
+        hands[side] = { ...hands[side], state, constraints: change.applied.map(a => a.id), evidence: change.evidence[side] } satisfies HandAnnotation;
       }
       frames[change.index] = withPose(frame, solution.poses[change.index], CONSTRAINT_STAGE, { hands });
     }

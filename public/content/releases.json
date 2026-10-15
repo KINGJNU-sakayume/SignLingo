@@ -316,5 +316,225 @@
     },
     "status": "published",
     "updatedAt": "2026-10-14"
+  },
+  {
+    "id": "ksl-meet",
+    "revision": 2,
+    "displayName": "만나다, 직면",
+    "gloss": null,
+    "category": "인사와 예의",
+    "lessonId": "courtesy",
+    "order": 2,
+    "difficulty": {
+      "level": "beginner",
+      "rationale": "한국수어 검수자 B가 카메라 연습에 적합하다고 판단했습니다(2026-10-14).",
+      "cameraSuitability": "suitable"
+    },
+    "description": "두 주먹의 1지를 펴서 마주 세웠다가 중앙으로 모아 마주 댄다.",
+    "meaning": "만남과 관련된 한국어 대응 표현입니다. 문맥에 따른 뜻을 검토해야 합니다.",
+    "movementNotes": [
+      "손이 맞닿아야 함"
+    ],
+    "source": {
+      "title": "SignLingo 자체 촬영 — 만나다, 직면",
+      "url": "https://github.com/KINGJNU-sakayume/signlingo/blob/main/docs/content-reviews/own-recording-rights-2026-10-14.md",
+      "owner": "저장소 소유자 (촬영자·권리자)",
+      "attribution": "수어: 출연자 A · 촬영: 저장소 소유자 (실명 비공개)",
+      "locator": "ksl-meet.webm",
+      "entryId": "SL-REC-2026-10-14/ksl-meet",
+      "checkedAt": "2026-10-14",
+      "videoAvailability": "confirmed",
+      "videoSha256": "758df0fb788243576952d2f95a4e562b66eff6ddeed083d5d8b6b1a029311465"
+    },
+    "license": {
+      "type": "자체 촬영 — 출연자 동의 범위 내 이용",
+      "policyUrl": "https://github.com/KINGJNU-sakayume/signlingo/blob/main/docs/content-reviews/own-recording-rights-2026-10-14.md",
+      "notes": "권리자(저장소 소유자)의 2026-10-14 진술에 따른 출연자 A의 동의 범위: 3D 변환, 동작 파일 배포, 공개 저장소, 웹 공개 허락. 원본 영상 공개는 불허. 실명은 비공개.",
+      "permissions": {
+        "importVideo": "allowed",
+        "deriveMotion": "allowed",
+        "publishMotion": "allowed",
+        "publishVideo": "denied",
+        "externalVideo": "denied",
+        "publicRepository": "allowed",
+        "publicWebsite": "allowed"
+      },
+      "approval": {
+        "reviewer": "저장소 소유자",
+        "qualification": "영상 촬영자 및 권리자 (실명 비공개)",
+        "date": "2026-10-14",
+        "reference": "SL-REC-2026-10-14",
+        "notes": "출연자 동의 범위를 권리자가 확인함. 원본 영상 비공개. 언어·복원 검수는 별도.",
+        "document": {
+          "path": "docs/content-reviews/own-recording-rights-2026-10-14.md",
+          "sha256": "b923b5069b39453a03bf000a5ce201e76abe6d1eb6dc18b38476c4ddacad94e3"
+        },
+        "sourceSha256": "758df0fb788243576952d2f95a4e562b66eff6ddeed083d5d8b6b1a029311465"
+      }
+    },
+    "variant": {
+      "id": "12165",
+      "description": "한국수어 검수자 B가 식별한 변이: 12165. 한국어 대응 표현은 언어학적 글로스가 아닙니다.",
+      "status": "identified"
+    },
+    "assets": {
+      "motion": {
+        "uri": "content/assets/ksl-meet/v2/reference.motion.json",
+        "sha256": "9908045add58a221a8bd0187420481332c4dbd9e12e79cc37dd4b938e00a4e94",
+        "bytes": 1967942,
+        "mediaType": "application/json",
+        "version": 2
+      }
+    },
+    "reconstructionVersion": "0.2.0",
+    "constraints": {
+      "sha256": "a727d625a3af35fbf37e12958e0c6b247d8a85135e11ae5367340781f3c29190",
+      "count": 4
+    },
+    "provenance": "authorized-video",
+    "reviews": {
+      "reconstruction": {
+        "status": "approved",
+        "evidence": {
+          "reviewer": "저장소 소유자",
+          "qualification": "SignLingo 복원 파이프라인 운영자 (실명 비공개)",
+          "date": "2026-10-15",
+          "reference": "SL-REV-RECON-2026-10-15",
+          "notes": "제약 조건 보정본(개정판 2). 세 동작 모두 개정판 1에 비해 좋아진 것을 확인. 수정 요청 없음.",
+          "document": {
+            "path": "docs/content-reviews/course1-v2-reconstruction-review-2026-10-15.md",
+            "sha256": "38d82a482f788a1ac42a5923928ce1e060dc2320a4b0d0431c4dcb466cac3420"
+          }
+        },
+        "subjectSha256": "9ebe143b2679a98a0cbe60bf6f0389d1bc83539f641f2de97a04a399714dc513"
+      },
+      "linguistic": {
+        "status": "approved",
+        "evidence": {
+          "reviewer": "검수자 B",
+          "qualification": "수어 경력 5년 (실명 비공개)",
+          "date": "2026-10-15",
+          "reference": "SL-REV-KSL-2026-10-15",
+          "notes": "변이 12165 유지. 이전보다 실제와 더 같아짐. 기술적 한계를 전달받았고 설명 문구와 함께 제공하면 학습에 도움이 됨. 수정 요청 없음.",
+          "document": {
+            "path": "docs/content-reviews/course1-v2-linguistic-review-2026-10-15.md",
+            "sha256": "ec5f5e59c8d0b4d7a828e937eef4155e8b8f2c2afddaeab2d3f5c46061c19bc2"
+          }
+        },
+        "subjectSha256": "9ebe143b2679a98a0cbe60bf6f0389d1bc83539f641f2de97a04a399714dc513"
+      }
+    },
+    "status": "published",
+    "updatedAt": "2026-10-14"
+  },
+  {
+    "id": "ksl-thanks",
+    "revision": 2,
+    "displayName": "고맙다, 감사",
+    "gloss": null,
+    "category": "인사와 예의",
+    "lessonId": "courtesy",
+    "order": 0,
+    "difficulty": {
+      "level": "beginner",
+      "rationale": "한국수어 검수자 B가 카메라 연습에 적합하다고 판단했습니다(2026-10-14).",
+      "cameraSuitability": "suitable"
+    },
+    "description": "손끝이 밖으로 향하게 펴서 모로 세운 오른손의 4지 옆면을 손바닥이 아래로 향하게 편 왼 손등에 두 번 댄다.",
+    "meaning": "고마움과 관련된 한국어 대응 표현입니다.",
+    "movementNotes": [
+      "손등 방향"
+    ],
+    "source": {
+      "title": "SignLingo 자체 촬영 — 고맙다, 감사",
+      "url": "https://github.com/KINGJNU-sakayume/signlingo/blob/main/docs/content-reviews/own-recording-rights-2026-10-14.md",
+      "owner": "저장소 소유자 (촬영자·권리자)",
+      "attribution": "수어: 출연자 A · 촬영: 저장소 소유자 (실명 비공개)",
+      "locator": "ksl-thanks.webm",
+      "entryId": "SL-REC-2026-10-14/ksl-thanks",
+      "checkedAt": "2026-10-14",
+      "videoAvailability": "confirmed",
+      "videoSha256": "c61fceb74240999fa509a2c3d2903c85b471e007f0490700a58b1e24da8d9e80"
+    },
+    "license": {
+      "type": "자체 촬영 — 출연자 동의 범위 내 이용",
+      "policyUrl": "https://github.com/KINGJNU-sakayume/signlingo/blob/main/docs/content-reviews/own-recording-rights-2026-10-14.md",
+      "notes": "권리자(저장소 소유자)의 2026-10-14 진술에 따른 출연자 A의 동의 범위: 3D 변환, 동작 파일 배포, 공개 저장소, 웹 공개 허락. 원본 영상 공개는 불허. 실명은 비공개.",
+      "permissions": {
+        "importVideo": "allowed",
+        "deriveMotion": "allowed",
+        "publishMotion": "allowed",
+        "publishVideo": "denied",
+        "externalVideo": "denied",
+        "publicRepository": "allowed",
+        "publicWebsite": "allowed"
+      },
+      "approval": {
+        "reviewer": "저장소 소유자",
+        "qualification": "영상 촬영자 및 권리자 (실명 비공개)",
+        "date": "2026-10-14",
+        "reference": "SL-REC-2026-10-14",
+        "notes": "출연자 동의 범위를 권리자가 확인함. 원본 영상 비공개. 언어·복원 검수는 별도.",
+        "document": {
+          "path": "docs/content-reviews/own-recording-rights-2026-10-14.md",
+          "sha256": "b923b5069b39453a03bf000a5ce201e76abe6d1eb6dc18b38476c4ddacad94e3"
+        },
+        "sourceSha256": "c61fceb74240999fa509a2c3d2903c85b471e007f0490700a58b1e24da8d9e80"
+      }
+    },
+    "variant": {
+      "id": "2372",
+      "description": "한국수어 검수자 B가 식별한 변이: 2372. 한국어 대응 표현은 언어학적 글로스가 아닙니다.",
+      "status": "identified"
+    },
+    "assets": {
+      "motion": {
+        "uri": "content/assets/ksl-thanks/v2/reference.motion.json",
+        "sha256": "bd9a73ddea754ca9dbe4ac0bc6771474d839daace865258faef7fd96f179a570",
+        "bytes": 1989237,
+        "mediaType": "application/json",
+        "version": 2
+      }
+    },
+    "reconstructionVersion": "0.2.0",
+    "constraints": {
+      "sha256": "2365146142f2807db00cad5c96bdf371a6ebef31dd4170c17794e35d8996a05b",
+      "count": 4
+    },
+    "provenance": "authorized-video",
+    "reviews": {
+      "reconstruction": {
+        "status": "approved",
+        "evidence": {
+          "reviewer": "저장소 소유자",
+          "qualification": "SignLingo 복원 파이프라인 운영자 (실명 비공개)",
+          "date": "2026-10-15",
+          "reference": "SL-REV-RECON-2026-10-15",
+          "notes": "제약 조건 보정본(개정판 2). 세 동작 모두 개정판 1에 비해 좋아진 것을 확인. 수정 요청 없음.",
+          "document": {
+            "path": "docs/content-reviews/course1-v2-reconstruction-review-2026-10-15.md",
+            "sha256": "38d82a482f788a1ac42a5923928ce1e060dc2320a4b0d0431c4dcb466cac3420"
+          }
+        },
+        "subjectSha256": "2add9ab2189ac3ba32aeac0ed60f166a1b1921ce04f8651604f81e73cc2d95bc"
+      },
+      "linguistic": {
+        "status": "approved",
+        "evidence": {
+          "reviewer": "검수자 B",
+          "qualification": "수어 경력 5년 (실명 비공개)",
+          "date": "2026-10-15",
+          "reference": "SL-REV-KSL-2026-10-15",
+          "notes": "변이 2372 유지. 이전보다 실제와 더 같아짐. 기술적 한계를 전달받았고 설명 문구와 함께 제공하면 학습에 도움이 됨. 수정 요청 없음.",
+          "document": {
+            "path": "docs/content-reviews/course1-v2-linguistic-review-2026-10-15.md",
+            "sha256": "ec5f5e59c8d0b4d7a828e937eef4155e8b8f2c2afddaeab2d3f5c46061c19bc2"
+          }
+        },
+        "subjectSha256": "2add9ab2189ac3ba32aeac0ed60f166a1b1921ce04f8651604f81e73cc2d95bc"
+      }
+    },
+    "status": "published",
+    "updatedAt": "2026-10-14"
   }
 ]

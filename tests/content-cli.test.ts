@@ -132,3 +132,28 @@ it('constrains a published package into a new private revision, resets reviews a
   await saveEntry(entry);
   expect(fixture.entry.id).toBe(ID);
 }, 30000);
+
+it('approves both reviews from the owner feedback with a generated record, and publishes the next revision', async () => {
+  // Continues from the corrected revision-2 package above.
+  await writeFile(path.join(root, 'src/content/reviewers.json'), await readFile('src/content/reviewers.json'));
+  const before = await readEntry();
+  expect(before).toMatchObject({ revision: 2, status: 'reconstruction-review-required' });
+  expect(failure('approve', `private-data/${ID}`)).toContain('--feedback');
+  const output = command('approve', '--date', '2026-10-16', '--publish', '--feedback', '충분합니다.\n공개해 주세요.', `private-data/${ID}`);
+  expect(output).toContain('개정판 2: 두 검수 승인, 공개');
+  const record = await readFile(path.join(root, 'docs/content-reviews/review-2026-10-16.md'), 'utf8');
+  const subject = await reviewSubject(before);
+  expect(record).toContain(subject); expect(record).toContain('> 충분합니다.'); expect(record).toContain('> 공개해 주세요.');
+  const entry = await readEntry();
+  expect(entry.status).toBe('ready-to-publish');
+  for (const review of Object.values(entry.reviews)) {
+    expect(review).toMatchObject({ status: 'approved', subjectSha256: subject, evidence: { date: '2026-10-16', reference: 'SL-REV-2026-10-16',
+      document: { path: 'docs/content-reviews/review-2026-10-16.md', sha256: await sha256(new TextEncoder().encode(record)) } } });
+  }
+  expect(entry.reviews.linguistic.evidence!.reviewer).toBe('검수자 B');
+  const published = JSON.parse(await readFile(path.join(root, 'src/content/catalog.json'), 'utf8'));
+  expect(published.expressions.find((e: { id: string }) => e.id === ID)).toMatchObject({ revision: 2, status: 'published' });
+  expect(JSON.parse(await readFile(path.join(root, 'public/content/releases.json'), 'utf8')).map((e: { revision: number }) => e.revision)).toEqual([1]);
+  // A second session the same day gets its own record; a published package is not approvable again.
+  expect(failure('approve', '--feedback', '좋아요', `private-data/${ID}`)).toContain('검수 대기 상태가 아닙니다');
+}, 30000);

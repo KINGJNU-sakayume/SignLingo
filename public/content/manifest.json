@@ -42,7 +42,7 @@
   "expressions": [
     {
       "id": "ksl-thanks",
-      "revision": 2,
+      "revision": 3,
       "displayName": "고맙다, 감사",
       "gloss": null,
       "category": "인사와 예의",
@@ -102,11 +102,11 @@
       },
       "assets": {
         "motion": {
-          "uri": "content/assets/ksl-thanks/v2/reference.motion.json",
-          "sha256": "bd9a73ddea754ca9dbe4ac0bc6771474d839daace865258faef7fd96f179a570",
-          "bytes": 1989237,
+          "uri": "content/assets/ksl-thanks/v3/reference.motion.json",
+          "sha256": "28eb02e7b96dd114fbe00cd868597646c1550a966b3592804aedb40e6d74d579",
+          "bytes": 1912629,
           "mediaType": "application/json",
-          "version": 2
+          "version": 3
         }
       },
       "reconstructionVersion": "0.2.0",
@@ -122,14 +122,14 @@
             "reviewer": "저장소 소유자",
             "qualification": "SignLingo 복원 파이프라인 운영자 (실명 비공개)",
             "date": "2026-10-15",
-            "reference": "SL-REV-RECON-2026-10-15",
-            "notes": "제약 조건 보정본(개정판 2). 세 동작 모두 개정판 1에 비해 좋아진 것을 확인. 수정 요청 없음.",
+            "reference": "SL-REV-2026-10-15",
+            "notes": "만나다의 경우 개정판3이 훌륭합니다. 저정도면 충분합니다. 공통 쉬는 자세 좋습니다. (고맙다 개정판 3도 만나다와 함께 공개할지 묻는 질문에) 공개",
             "document": {
-              "path": "docs/content-reviews/course1-v2-reconstruction-review-2026-10-15.md",
-              "sha256": "38d82a482f788a1ac42a5923928ce1e060dc2320a4b0d0431c4dcb466cac3420"
+              "path": "docs/content-reviews/review-2026-10-15.md",
+              "sha256": "e5fa59e45518f491f2ca9439fddc368626da26a2a225ff5568d04b2dcb2196c1"
             }
           },
-          "subjectSha256": "2add9ab2189ac3ba32aeac0ed60f166a1b1921ce04f8651604f81e73cc2d95bc"
+          "subjectSha256": "2048403e7636246dc1db5cddd4fe7b0ff7d7220ae4e9829695e626d284abda6b"
         },
         "linguistic": {
           "status": "approved",
@@ -137,14 +137,14 @@
             "reviewer": "검수자 B",
             "qualification": "수어 경력 5년 (실명 비공개)",
             "date": "2026-10-15",
-            "reference": "SL-REV-KSL-2026-10-15",
-            "notes": "변이 2372 유지. 이전보다 실제와 더 같아짐. 기술적 한계를 전달받았고 설명 문구와 함께 제공하면 학습에 도움이 됨. 수정 요청 없음.",
+            "reference": "SL-REV-2026-10-15",
+            "notes": "만나다의 경우 개정판3이 훌륭합니다. 저정도면 충분합니다. 공통 쉬는 자세 좋습니다. (고맙다 개정판 3도 만나다와 함께 공개할지 묻는 질문에) 공개",
             "document": {
-              "path": "docs/content-reviews/course1-v2-linguistic-review-2026-10-15.md",
-              "sha256": "ec5f5e59c8d0b4d7a828e937eef4155e8b8f2c2afddaeab2d3f5c46061c19bc2"
+              "path": "docs/content-reviews/review-2026-10-15.md",
+              "sha256": "e5fa59e45518f491f2ca9439fddc368626da26a2a225ff5568d04b2dcb2196c1"
             }
           },
-          "subjectSha256": "2add9ab2189ac3ba32aeac0ed60f166a1b1921ce04f8651604f81e73cc2d95bc"
+          "subjectSha256": "2048403e7636246dc1db5cddd4fe7b0ff7d7220ae4e9829695e626d284abda6b"
         }
       },
       "status": "published",
@@ -262,7 +262,7 @@
     },
     {
       "id": "ksl-meet",
-      "revision": 2,
+      "revision": 3,
       "displayName": "만나다, 직면",
       "gloss": null,
       "category": "인사와 예의",
@@ -322,11 +322,11 @@
       },
       "assets": {
         "motion": {
-          "uri": "content/assets/ksl-meet/v2/reference.motion.json",
-          "sha256": "9908045add58a221a8bd0187420481332c4dbd9e12e79cc37dd4b938e00a4e94",
-          "bytes": 1967942,
+          "uri": "content/assets/ksl-meet/v3/reference.motion.json",
+          "sha256": "cae5ecd66ea0bcb725a80d257799915ca26f1e191bad79bc69f6d7d643ade814",
+          "bytes": 1942908,
           "mediaType": "application/json",
-          "version": 2
+          "version": 3
         }
       },
       "reconstructionVersion": "0.2.0",
@@ -342,14 +342,14 @@
             "reviewer": "저장소 소유자",
             "qualification": "SignLingo 복원 파이프라인 운영자 (실명 비공개)",
             "date": "2026-10-15",
-            "reference": "SL-REV-RECON-2026-10-15",
-            "notes": "제약 조건 보정본(개정판 2). 세 동작 모두 개정판 1에 비해 좋아진 것을 확인. 수정 요청 없음.",
+            "reference": "SL-REV-2026-10-15",
+            "notes": "만나다의 경우 개정판3이 훌륭합니다. 저정도면 충분합니다. 공통 쉬는 자세 좋습니다. (고맙다 개정판 3도 만나다와 함께 공개할지 묻는 질문에) 공개",
             "document": {
-              "path": "docs/content-reviews/course1-v2-reconstruction-review-2026-10-15.md",
-              "sha256": "38d82a482f788a1ac42a5923928ce1e060dc2320a4b0d0431c4dcb466cac3420"
+              "path": "docs/content-reviews/review-2026-10-15.md",
+              "sha256": "e5fa59e45518f491f2ca9439fddc368626da26a2a225ff5568d04b2dcb2196c1"
             }
           },
-          "subjectSha256": "9ebe143b2679a98a0cbe60bf6f0389d1bc83539f641f2de97a04a399714dc513"
+          "subjectSha256": "653f0f4336484b1b5935118c65cc04a7f50f6131b0741103d7553df5a71b99ab"
         },
         "linguistic": {
           "status": "approved",
@@ -357,14 +357,14 @@
             "reviewer": "검수자 B",
             "qualification": "수어 경력 5년 (실명 비공개)",
             "date": "2026-10-15",
-            "reference": "SL-REV-KSL-2026-10-15",
-            "notes": "변이 12165 유지. 이전보다 실제와 더 같아짐. 기술적 한계를 전달받았고 설명 문구와 함께 제공하면 학습에 도움이 됨. 수정 요청 없음.",
+            "reference": "SL-REV-2026-10-15",
+            "notes": "만나다의 경우 개정판3이 훌륭합니다. 저정도면 충분합니다. 공통 쉬는 자세 좋습니다. (고맙다 개정판 3도 만나다와 함께 공개할지 묻는 질문에) 공개",
             "document": {
-              "path": "docs/content-reviews/course1-v2-linguistic-review-2026-10-15.md",
-              "sha256": "ec5f5e59c8d0b4d7a828e937eef4155e8b8f2c2afddaeab2d3f5c46061c19bc2"
+              "path": "docs/content-reviews/review-2026-10-15.md",
+              "sha256": "e5fa59e45518f491f2ca9439fddc368626da26a2a225ff5568d04b2dcb2196c1"
             }
           },
-          "subjectSha256": "9ebe143b2679a98a0cbe60bf6f0389d1bc83539f641f2de97a04a399714dc513"
+          "subjectSha256": "653f0f4336484b1b5935118c65cc04a7f50f6131b0741103d7553df5a71b99ab"
         }
       },
       "status": "published",

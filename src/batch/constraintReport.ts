@@ -10,7 +10,7 @@ export const CONSTRAINT_NOTICE = 'Avatar-geometry residuals of a constraint corr
 export type ConstraintResultRow = {
   id: string; kind: string; note: string; unit: 'm' | 'deg'; tolerance: number; span: ResolvedSpan | null;
   activeFrames: number; coreFrames: number; measuredCoreFrames: number;
-  unavailableFrames: number; unreachableFrames: number; cappedFrames: number; limitedFrames: number;
+  unavailableFrames: number; unreachableFrames: number; cappedFrames: number; limitedFrames: number; blockedFrames: number;
   before: Stats; after: Stats; satisfiedBefore: number; satisfiedAfter: number;
 };
 export type ConstraintReport = {
@@ -86,18 +86,18 @@ export function constraintMarkdown(report: ConstraintReport): string {
   const m = report.motion, c = report.constraints, ch = report.changes, g = report.integrity;
   const rows = report.results.map(r => [escape(r.id), KINDS[r.kind] ?? r.kind, spanText(r.span), residualText(r.tolerance, r.unit), `${r.activeFrames}`, `${r.coreFrames}`,
     stats(r.before, r.unit), stats(r.after, r.unit), `${r.satisfiedBefore} → ${r.satisfiedAfter} / ${r.measuredCoreFrames}`,
-    `${r.unavailableFrames}`, `${r.unreachableFrames}`, `${r.cappedFrames}`, `${r.limitedFrames}`]);
+    `${r.unavailableFrames}`, `${r.unreachableFrames}`, `${r.cappedFrames}`, `${r.limitedFrames}`, `${r.blockedFrames}`]);
   const jointRows = Object.entries(ch.joints).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([joint, n]) => [joint, `${n}`]);
   return ['# 제약 조건 보정 보고서', '',
     `- 생성: ${report.generatedAt}`,
     `- 동작: \`${m.file}\` (SHA-256 \`${m.sha256}\`, MotionClip v${m.version}, 파이프라인 ${m.pipeline}, ${m.frames}프레임, ${m.sampleHz} Hz, ${m.duration.toFixed(2)} s)`,
     `- 제약 조건: \`${c.file}\` (canonical SHA-256 \`${c.sha256}\`, ${c.count}개${c.expression ? `, 표현 ${c.expression}` : ''})`,
     ...(c.request ? [`- 요청 원문: ${escape(c.request)}`] : []),
-    `- 동작 구간(activeInterval): ${report.interval.start.toFixed(2)}–${report.interval.end.toFixed(2)} s (${report.interval.method}). phase·fraction 구간의 기준입니다.`,
+    `- 수어 구간(signingInterval): ${report.interval.start.toFixed(2)}–${report.interval.end.toFixed(2)} s (${report.interval.method}). phase·fraction 구간의 기준입니다.`,
     '- 기준: 저장된 프레임(손목 수동 보정 반영). 시간 복원·몸통 고정·손 채우기 같은 표시 후처리는 넣지 않았습니다.', '',
     '## 조건별 잔차', '',
     '잔차는 구간의 핵심 프레임(섞임 가중치 1)에서 잰 값입니다. 최대 / 평균. 허용 오차 이하이면 만족으로 셉니다.', '',
-    table(['id', '종류', '구간', '허용', '적용 프레임', '핵심 프레임', '전 (최대/평균)', '후 (최대/평균)', '만족 전 → 후 / 측정', '측정 불가', '도달 불가', '이동 상한', '손목 제한'], rows), '',
+    table(['id', '종류', '구간', '허용', '적용 프레임', '핵심 프레임', '전 (최대/평균)', '후 (최대/평균)', '만족 전 → 후 / 측정', '측정 불가', '도달 불가', '이동 상한', '손목 제한', '다른 곳이 먼저 닿음'], rows), '',
     '- 측정 불가: 팔이 숨겨졌거나, 위치 조건에서 손이 관측되지 않은 프레임(관측 없는 손은 옮기지 않습니다). 도달 불가: 고정 팔 길이로 닿지 않음. 이동 상한: `maxShiftCm`에 걸림. 손목 제한: 손목 관절 제한으로 덜 돌림.', '',
     '## 바뀐 관절과 프레임', '',
     `- 바뀐 프레임: ${ch.frames} / ${ch.totalFrames} (모든 구간 밖에서 바뀐 프레임 ${ch.outsideSpans}, 원본 손목 수동 보정 ${ch.sourceEdits}건 반영)`,

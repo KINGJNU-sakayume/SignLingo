@@ -67,7 +67,7 @@ test('prepackaged reference loads into Practice and keeps per-version history af
   await expect(page.getByText(entry.license.type, { exact: false })).toBeVisible();
   expect(errors).toEqual([]);
 });
-test('expression card: description, filled-hand legend, persistent mirror mode and A–B repeat', async ({ page }) => {
+test('expression card: description, rest legend, persistent mirror mode and A–B repeat', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   const { entry } = await fixtureRoutes(page, { missingLeadHand: true });
   await page.goto('/'); await openCard(page, entry.displayName);
@@ -75,7 +75,9 @@ test('expression card: description, filled-hand legend, persistent mirror mode a
   const explain = page.locator('.ec-explain');
   await expect(explain).toContainText(entry.description);
   for (const note of entry.movementNotes) await expect(explain).toContainText(note);
-  await expect(page.getByText('추정으로 채운 손 모양', { exact: true })).toBeVisible();
+  // A hand lost before the sign rests (gray, legend) instead of showing an estimated sign handshape.
+  await expect(page.getByText('회색 팔·손: 수어 앞뒤의 쉬는 자세', { exact: true })).toBeVisible();
+  await expect(page.getByText('추정으로 채운 손 모양', { exact: true })).toHaveCount(0);
 
   const mirror = page.getByRole('button', { name: '거울 모드', exact: true }), badge = page.locator('.ec-stage .sl-mirror-badge');
   const views = page.getByRole('group', { name: '시범 카메라 시점' });

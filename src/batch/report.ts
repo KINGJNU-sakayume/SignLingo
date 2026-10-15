@@ -1,6 +1,6 @@
 // Per-clip extraction metrics and Korean summaries for the batch tools. Pure: reads a MotionClip, writes nothing.
 // Every number is a tracking/display proxy, never a KSL accuracy or linguistic judgement.
-import { displayFor, FILL_GUARD_REPORT, FILL_STAGE, TEMPORAL_STAGE, type DisplayHandState, type FillGuardReport, type FillReport, type TemporalReport } from '../motion/display';
+import { FILL_GUARD_REPORT, learnerStages, runDisplayPipeline, FILL_STAGE, TEMPORAL_STAGE, type DisplayHandState, type FillGuardReport, type FillReport, type TemporalReport } from '../motion/display';
 import { HAND_REGION_DEFAULTS, handSeparation } from '../motion/handRegions';
 import { assignHandsDetailed, wristInImage, type HandFate } from '../motion/tracking';
 import { SIDES, type MotionClip, type MotionFrame, type Side } from '../motion/types';
@@ -51,7 +51,7 @@ export type ClipMetrics = {
   /** Count of warning messages per normalized kind (one frame can carry several of a kind). */
   warnings: Record<string, number>;
   corrections: { total: number; frames: number; byKind: Record<string, number> };
-  /** displayFor(clip, 'learner'): `interpolated` = 보간으로 메운 프레임, `fill` = 추정으로 채운 프레임 (exclusive final states). */
+  /** Learner stages without presentation (rest pose, hand contact): `interpolated` = 보간으로 메운 프레임, `fill` = 추정으로 채운 프레임 (exclusive final states). */
   learner: { temporal: { applied: boolean; reason?: string }; hands: Record<Side, LearnerSide> };
 };
 
@@ -148,11 +148,12 @@ export function clipMetrics(clip: MotionClip, options: { interval?: Interval } =
   for (const frame of frames) for (const message of frame.warnings) { const kind = warningKind(message); warnings[kind] = (warnings[kind] ?? 0) + 1; }
   const byKind: Record<string, number> = {};
   for (const frame of frames) for (const c of frame.corrections) byKind[c.kind] = (byKind[c.kind] ?? 0) + 1;
-  const display = displayFor(clip, 'learner');
+  // Tracking evidence: the learner stages without the presentation-only rest pose and hand contact.
+  const display = runDisplayPipeline({ clip }, learnerStages(undefined, { presentation: false }));
   const fill = display.reports[FILL_STAGE] as FillReport | undefined, temporal = display.reports[TEMPORAL_STAGE] as TemporalReport | undefined;
   const guard = display.reports[FILL_GUARD_REPORT] as FillGuardReport | undefined;
   const learner = Object.fromEntries(SIDES.map(side => {
-    const states: Record<DisplayHandState, number> = { observed: 0, interpolated: 0, held: 0, filled: 0, constrained: 0, missing: 0 };
+    const states: Record<DisplayHandState, number> = { observed: 0, interpolated: 0, held: 0, filled: 0, constrained: 0, rest: 0, missing: 0 };
     for (const frame of display.frames) states[frame.annotation.hands[side].state]++;
     const g = guard?.sides[side];
     return [side, { ...states, fill: { ...(fill?.[side] ?? { lead: 0, gap: 0, trail: 0 }) },
@@ -207,7 +208,7 @@ const DEFINITIONS = [
   '- **누락률**: 저장된 손 상태가 `tracked`가 아닌 프레임(held 포함) ÷ 프레임 수. **동작 구간** 누락률은 `activeInterval`(Practice의 동작 구간 추정) 안의 프레임만 셉니다. 비교표는 두 버전 구간의 합집합을 같이 씁니다.',
   '- **화면 밖**: 누락 프레임 중 pose 손목이 화면 밖(가장자리 2%)이거나 신뢰도 0.45 미만. **화면 안 실패**: 몸통이 있고 손목이 화면 안인데 추적하지 못한 프레임.',
   '- **held**: 복원기가 마지막 손 모양을 ≤200 ms 유지한 프레임(신뢰도 0).',
-  '- **보간**: 학습자 표시(`displayFor(clip, \'learner\')`)에서 시간 복원이 앞뒤 관측 사이를 메운 프레임. 0.3.x 클립에만 적용됩니다.',
+  '- **보간**: 학습자 표시(rest·접촉 표현 단계를 뺀 `learnerStages`)에서 시간 복원이 앞뒤 관측 사이를 메운 프레임. 0.3.x 클립에만 적용됩니다.',
   '- **채움 앞·중간·뒤**: 같은 학습자 표시에서 손 채우기가 첫 관측 전·관측 사이·마지막 관측 후를 추정으로 채운 프레임. 보간과 겹치지 않습니다.',
   '- **숨김**: 손 채우기 안전장치가 채우는 대신 숨긴 프레임(관측 근거 부족 또는 손목이 화면 밖).',
   '- **버림**: 저장된 손 중 tracking.ts가 어느 쪽에도 배정하지 않은 손. **중복 쌍**: 같은 손이 두 번 저장된 것으로 보이는 쌍(융합의 같은 손 기준).',

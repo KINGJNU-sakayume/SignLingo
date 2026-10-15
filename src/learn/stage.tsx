@@ -34,6 +34,10 @@ export function FilledLegend() {
 export function ConstrainedLegend() {
   return <p className="sl-filled-legend sl-constrained-legend"><i aria-hidden="true" />보정한 손 모양</p>;
 }
+/** Gray arms and hands: the rest before and after the sign, not tracked (display only). */
+export function RestLegend() {
+  return <p className="sl-filled-legend sl-rest-legend"><i aria-hidden="true" />회색 팔·손: 수어 앞뒤의 쉬는 자세</p>;
+}
 /** Expert-written description and movement notes for the demonstration being watched. */
 export function ExpressionCaption({ items }: { items: { entry: Expression; label?: string }[] }) {
   return <div className="sl-caption">

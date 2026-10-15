@@ -21,7 +21,7 @@ type Draft = {
 };
 const KINDS = Object.keys(KIND_LABELS) as ConstraintKind[];
 const SIDE_OPTIONS = [['both', '양손'], ['left', '왼손'], ['right', '오른손']] as const;
-const STATUS: Record<string, string> = { ok: '적용', unavailable: '측정 불가', 'no-torso': '몸통 없음', unreachable: '팔이 닿지 않음', capped: '이동 상한', limited: '손목 제한' };
+const STATUS: Record<string, string> = { ok: '적용', unavailable: '측정 불가', 'no-torso': '몸통 없음', unreachable: '팔이 닿지 않음', capped: '이동 상한', limited: '손목 제한', blocked: '다른 곳이 먼저 닿음' };
 const format = (value: number | null | undefined, unit: 'm' | 'deg') => value == null ? '–' : unit === 'm' ? `${(value * 100).toFixed(1)} cm` : `${value.toFixed(1)}°`;
 const scale = (unit: 'm' | 'deg') => unit === 'm' ? 100 : 1;
 const download = (text: string, name: string) => {
@@ -172,7 +172,7 @@ export function ConstraintPanel(props: Props & { timestamps: number[] }) {
     <fieldset className="constraint-add"><legend>조건 추가</legend>
       <label>종류<select aria-label="조건 종류" value={draft.kind} onChange={e => update({ kind: e.target.value as ConstraintKind })}>{KINDS.map(k => <option key={k} value={k}>{KIND_LABELS[k]} ({k})</option>)}</select></label>
       <label>구간<select aria-label="조건 구간" value={draft.span} onChange={e => update({ span: e.target.value as Draft['span'] })}>
-        <option value="start">동작 구간 시작</option><option value="middle">동작 구간 중간</option><option value="end">동작 구간 끝</option><option value="whole">동작 구간 전체</option>
+        <option value="start">수어 구간 시작</option><option value="middle">수어 구간 중간</option><option value="end">수어 구간 끝</option><option value="whole">수어 구간 전체</option>
         <option value="ab" disabled={!activeRange(range)}>A–B 구간</option><option value="here">현재 시각 ±0.25초</option></select></label>
       {(draft.kind === 'sameHeight' || draft.kind === 'contact') && <>{pointSelect('점 A', draft.a, 'a')}{pointSelect('점 B', draft.b, 'b')}</>}
       {draft.kind === 'contact' && <label>목표 거리 (cm)<input type="number" min={0} max={30} step={.5} value={draft.gap} onChange={e => update({ gap: Number(e.target.value) })} /></label>}

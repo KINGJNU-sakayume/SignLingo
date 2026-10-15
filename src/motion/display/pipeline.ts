@@ -18,7 +18,7 @@ export function armVisible(pose: DisplayPose, side: Side) {
 /** Finger rotations exist for this hand (fills and constraints supply them even when evidence does not). */
 export function fingersShown(frame: DisplayFrame, side: Side) {
   const state = frame.annotation.hands[side].state;
-  return state === 'filled' || state === 'constrained' || frame.pose.evidence?.[side].fingers !== 'unavailable';
+  return state === 'filled' || state === 'constrained' || state === 'rest' || frame.pose.evidence?.[side].fingers !== 'unavailable';
 }
 /**
  * Display state of a hand a constraint changed: `constrained` when the constraint set its fingers, or produced the
@@ -28,8 +28,14 @@ export function constrainedState(state: DisplayHandState, fingers: boolean, evid
   if (fingers) return 'constrained';
   return evidence === 'constrained' && state !== 'missing' ? 'constrained' : state;
 }
-const touches = (joints: readonly string[], side: Side, fingersOnly = false) =>
+const jointsTouch = (joints: readonly string[], side: Side, fingersOnly = false) =>
   joints.some(joint => joint.startsWith(`${side}.`) && (!fingersOnly || joint.split('.').length === 3));
+/**
+ * Whether a corrected frame's record changed this side. The solver records evidence for every side it changed;
+ * joints listed without evidence differ only by floating-point round-off (revision-2 bakes compared exactly).
+ */
+const touches = (record: NonNullable<MotionFrame['constraint']>, side: Side, fingersOnly = false) =>
+  !!record.evidence[side] && jointsTouch(record.joints, side, fingersOnly);
 /** Evidence of a stored hand, used where a corrected side replaces a temporal reconstruction. */
 function storedEvidence(frame: MotionFrame, side: Side, fingers: boolean): HandEvidence {
   const quality = frame.pose.quality[`${side}State`];
@@ -49,17 +55,17 @@ export function baseFrames({ clip, temporal }: DisplayInput): DisplayFrame[] {
     let pose = editedPose(clip, i, temporal);
     const record = frame.constraint, hands = {} as Record<Side, HandAnnotation>;
     if (record && temporal) {
-      const stored = editedPose(clip, i), sides = SIDES.filter(side => touches(record.joints, side));
+      const stored = editedPose(clip, i), sides = SIDES.filter(side => touches(record, side));
       if (sides.length) {
         const rotations = { ...pose.rotations };
         for (const side of sides) for (const key of Object.keys(rotations)) if (key.startsWith(`${side}.`)) rotations[key] = stored.rotations[key];
-        pose = { ...pose, rotations, ...(pose.evidence ? { evidence: { ...pose.evidence, ...Object.fromEntries(sides.map(side => [side, storedEvidence(frame, side, touches(record.joints, side, true))])) } } : {}) };
+        pose = { ...pose, rotations, ...(pose.evidence ? { evidence: { ...pose.evidence, ...Object.fromEntries(sides.map(side => [side, storedEvidence(frame, side, touches(record, side, true))])) } } : {}) };
       }
     }
     for (const side of SIDES) {
       const base = baseHand(pose, side);
-      const state = record ? constrainedState(base, touches(record.joints, side, true), record.evidence[side]) : base;
-      hands[side] = state === base ? { state } : { state, constraints: record!.applied.map(a => a.id) };
+      const state = record ? constrainedState(base, touches(record, side, true), record.evidence[side]) : base;
+      hands[side] = state === base ? { state } : { state, constraints: record!.applied.map(a => a.id), ...(record!.evidence[side] ? { evidence: record!.evidence[side] } : {}) };
     }
     return { timestamp: frame.timestamp, segment, pose, annotation: { hands, stages: [] } };
   });
@@ -78,11 +84,14 @@ export function withPose(frame: DisplayFrame, pose: DisplayPose, stage: string, 
 }
 
 const displayRules = (frame: DisplayFrame): BlendRules<DisplayPose> => ({
-  hand: (_pose, side) => ['observed', 'interpolated', 'filled', 'constrained'].includes(frame.annotation.hands[side].state),
+  hand: (_pose, side) => ['observed', 'interpolated', 'filled', 'constrained', 'rest'].includes(frame.annotation.hands[side].state),
   fingers: (_pose, side) => fingersShown(frame, side),
 });
-const avatarPose = (frame: DisplayFrame, pose: DisplayPose): AvatarPose =>
-  ({ ...pose, hands: { left: frame.annotation.hands.left.state, right: frame.annotation.hands.right.state } });
+function avatarPose(frame: DisplayFrame, pose: DisplayPose): AvatarPose {
+  const { hands, arms } = frame.annotation;
+  const rest = Object.fromEntries(SIDES.flatMap(side => hands[side].restWeight === undefined ? [] : [[side, { weight: hands[side].restWeight!, ...(hands[side].under ? { under: hands[side].under } : {}) }]]));
+  return { ...pose, hands: { left: hands.left.state, right: hands.right.state }, ...(arms ? { arms } : {}), ...(Object.keys(rest).length ? { rest } : {}) };
+}
 
 export function displayPose(display: DisplayClip, index: number): AvatarPose | null {
   const frame = display.frames[Math.max(0, Math.min(index, display.frames.length - 1))];
@@ -100,6 +109,9 @@ export function sampleDisplay(display: DisplayClip, seconds: number): AvatarPose
 }
 export const hasFilled = (display: DisplayClip | null | undefined) =>
   !!display?.frames.some(f => SIDES.some(side => f.annotation.hands[side].state === 'filled'));
+/** Whether any hand or arm is drawn at rest (legend "쉬는 자세"). */
+export const hasRest = (display: DisplayClip | null | undefined) =>
+  !!display?.frames.some(f => SIDES.some(side => f.annotation.hands[side].state === 'rest' || f.annotation.arms?.[side] === 'rest'));
 /** Whether any shown hand was set by a constraint (legend "보정한 손 모양"). */
 export const hasConstrained = (display: DisplayClip | null | undefined) =>
   !!display?.frames.some(f => SIDES.some(side => f.annotation.hands[side].state === 'constrained' && armVisible(f.pose, side)));

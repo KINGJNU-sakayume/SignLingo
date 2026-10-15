@@ -5,7 +5,8 @@ import { forwardArm } from '../rig';
 import { SIDES, type ConstraintEvidence, type DisplayPose, type MotionClip, type Quat, type Side } from '../types';
 import { armVisible } from '../display/pipeline';
 import { chordalMean } from '../display/quaternion';
-import { activeInterval } from '../../practice/features';
+import { signingInterval } from '../signing';
+import { separateHands, TOUCH_METERS } from '../handContact';
 import { pointSide, type Direction, type Facing, type PointName } from './names';
 import { cloneHand, fingerKeys, handPoint, handState, pointPosition, type HandState } from './points';
 import { presetRotations } from './presets';
@@ -15,7 +16,7 @@ import { blendWeight, resolveSpan, type ResolvedSpan, type SigningInterval } fro
 /** What the source shows of a hand at a frame: an observation, a short hold (no measurement), or nothing. */
 export type HandSource = 'observed' | 'held' | 'missing';
 export type SolveInput = {
-  /** Used only for the signing interval of phase/fraction spans (Practice's `activeInterval`, from landmarks). */
+  /** Used only for the signing interval of phase/fraction spans (`signingInterval`: hands raised from rest). */
   clip: MotionClip;
   poses: readonly DisplayPose[];
   timestamps: readonly number[];
@@ -28,14 +29,15 @@ export type SolveInput = {
 export type ResidualUnit = 'm' | 'deg';
 /**
  * `unavailable`: a needed arm or hand is not shown (position constraints also skip hands with no observation);
- * `unreachable`: the fixed-length arm cannot reach; `capped`: the move hit `maxShiftCm`; `limited`: the wrist joint limit stopped the turn.
+ * `unreachable`: the fixed-length arm cannot reach; `capped`: the move hit `maxShiftCm`; `limited`: the wrist joint limit stopped the turn;
+ * `blocked`: other parts of the two hands touched first, and the hands were kept from passing into each other.
  */
-export type FrameStatus = 'ok' | 'unavailable' | 'no-torso' | 'unreachable' | 'capped' | 'limited';
+export type FrameStatus = 'ok' | 'unavailable' | 'no-torso' | 'unreachable' | 'capped' | 'limited' | 'blocked';
 export type ResidualRow = { weight: number; core: boolean; before: number | null; after: number | null; status: FrameStatus };
 export type Stats = { max: number | null; mean: number | null };
 export type ConstraintSummary = {
   activeFrames: number; coreFrames: number; measuredCoreFrames: number;
-  unavailableFrames: number; unreachableFrames: number; cappedFrames: number; limitedFrames: number;
+  unavailableFrames: number; unreachableFrames: number; cappedFrames: number; limitedFrames: number; blockedFrames: number;
   /** Over measured core frames (blend weight 1); `null` when nothing could be measured. */
   before: Stats; after: Stats; satisfiedBefore: number; satisfiedAfter: number;
 };
@@ -76,12 +78,7 @@ const unitOf = (c: Constraint): ResidualUnit =>
 const sidesOf = (hand: 'left' | 'right' | 'both'): Side[] => hand === 'both' ? [...SIDES] : [hand];
 const deg = (radians: number) => radians * 180 / Math.PI;
 const mirror = (r: Quaternion) => new Quaternion(r.x, -r.y, -r.z, r.w);
-const intervals = new WeakMap<MotionClip, SigningInterval>();
-function signingInterval(clip: MotionClip): SigningInterval {
-  let interval = intervals.get(clip);
-  if (!interval) intervals.set(clip, interval = activeInterval(clip));
-  return interval;
-}
+const spanBasis = (clip: MotionClip): SigningInterval => { const { start, end, method } = signingInterval(clip); return { start, end, method }; };
 const DIRECTIONS: Record<Exclude<Direction, 'inward' | 'outward'>, [number, number, number]> = {
   up: [0, 1, 0], down: [0, -1, 0], forward: [0, 0, 1], back: [0, 0, -1], left: [1, 0, 0], right: [-1, 0, 0],
 };
@@ -241,7 +238,7 @@ const sameQuat = (a: Quat, b: Quat) => a.every((x, k) => Math.abs(x - b[k]) < 1e
  */
 export function solveConstraints(input: SolveInput): ConstraintSolution {
   const { poses, timestamps, set } = input;
-  const interval = input.interval ?? signingInterval(input.clip);
+  const interval = input.interval ?? spanBasis(input.clip);
   const shown = input.armShown ?? ((i: number, side: Side) => armVisible(poses[i], side));
   const spans = set.constraints.map(c => resolveSpan(c.span, timestamps, interval));
   const holds = set.constraints.map((c, k) => c.kind === 'hold' && spans[k] ? holdReferences(c, spans[k]!, input, shown) : undefined);
@@ -337,10 +334,16 @@ export function solveConstraints(input: SolveInput): ConstraintSolution {
       if (shift.length() > sideCap[side] + 1e-12) { shift.setLength(sideCap[side]); capped[side] = true; }
       f.hands[side].wrist = start[side].clone().add(shift);
     }
+    // The hands never pass into each other: where their volumes overlap after the moves above, both shown hands
+    // move apart (equal shares) until their surfaces touch. A contact therefore ends at the first touching surfaces.
+    const lateral = new Vector3(1, 0, 0).applyQuaternion(torso);
+    const mirrored = active.some(({ c }) => c.kind === 'symmetry' && c.axis === 'lateral');
+    const blocked = handAvailable(f, 'left') && handAvailable(f, 'right')
+      && separateHands(f.hands.left, f.hands.right, lateral, .5, mirrored ? lateral : undefined).before > TOUCH_METERS;
 
     // Re-solve changed arms.
     const rotations = { ...pose.rotations }, flags = { left: new Set<FrameStatus>(), right: new Set<FrameStatus>() };
-    for (const side of SIDES) if (capped[side]) flags[side].add('capped');
+    for (const side of SIDES) { if (capped[side]) flags[side].add('capped'); if (blocked) flags[side].add('blocked'); }
     for (const side of SIDES) {
       const hand = f.hands[side], old = before[side];
       const moved = hand.wrist.distanceTo(old.wrist) > 1e-9, turned = hand.palm.angleTo(old.palm) > 1e-9;
@@ -377,7 +380,7 @@ export function solveConstraints(input: SolveInput): ConstraintSolution {
       const oriented = c.kind === 'palmFacing' || c.kind === 'wristOffset' || c.kind === 'symmetry' || (c.kind === 'hold' && c.parts.includes('orientation'));
       const has = (flag: FrameStatus) => involved.some(side => flags[side].has(flag));
       const status: FrameStatus = value === null ? 'unavailable' : positional && has('unreachable') ? 'unreachable' : positional && has('capped') ? 'capped'
-        : oriented && has('limited') ? 'limited' : 'ok';
+        : positional && has('blocked') ? 'blocked' : oriented && has('limited') ? 'limited' : 'ok';
       rows[k][i] = { weight: w, core: blend >= 1, before: residualBefore[n], after: value, status };
     });
     if (!joints.length) return pose;
@@ -458,7 +461,7 @@ function summarize(rows: (ResidualRow | null)[], tolerance: number): ConstraintS
     activeFrames: active.length, coreFrames: core.length, measuredCoreFrames: measured.length,
     unavailableFrames: active.filter(r => r.status === 'unavailable' || r.status === 'no-torso').length,
     unreachableFrames: active.filter(r => r.status === 'unreachable').length, cappedFrames: active.filter(r => r.status === 'capped').length,
-    limitedFrames: active.filter(r => r.status === 'limited').length,
+    limitedFrames: active.filter(r => r.status === 'limited').length, blockedFrames: active.filter(r => r.status === 'blocked').length,
     before: stats(before), after: stats(after),
     satisfiedBefore: before.filter(x => x <= tolerance + 1e-9).length, satisfiedAfter: after.filter(x => x <= tolerance + 1e-9).length,
   };

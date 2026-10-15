@@ -12,7 +12,7 @@ import { pipelineInfo, preservesSourcePalm, TEMPORAL_POLICY } from '../src/motio
 import { editedPose } from '../src/motion/player';
 import { exportMotion, importMotion } from '../src/motion/serialization';
 import { eulerQuat, q, rad } from '../src/motion/math';
-import { displayFor, fillHands, runDisplayPipeline, stabilizeTorso, temporalReconstruct, TEMPORAL_STAGE, type TemporalReport } from '../src/motion/display';
+import { displayFor, fillHands, learnerStages, restPose, runDisplayPipeline, separate, stabilizeTorso, temporalReconstruct, TEMPORAL_STAGE, type TemporalReport } from '../src/motion/display';
 import { MODELS, SIDES, type MotionClip } from '../src/motion/types';
 
 /** 36 frames at 30 Hz of a slowly changing two-handed shape; hands hidden at the given frames. */
@@ -30,7 +30,8 @@ function clipWith(version: '0.2.0' | '0.3.1', hidden: number[] = []): MotionClip
   });
   return clip;
 }
-const states = (clip: MotionClip, side: 'left' | 'right') => displayFor(clip, 'learner').frames.map(f => f.annotation.hands[side].state);
+// Tracking states: the learner stages without the presentation-only rest pose (these synthetic hands start low).
+const states = (clip: MotionClip, side: 'left' | 'right') => runDisplayPipeline({ clip }, learnerStages(undefined, { presentation: false })).frames.map(f => f.annotation.hands[side].state);
 
 /** A clip as pipeline 0.3.0 recorded it (all-hands fusion record): read-only, no longer produced. */
 function legacy(): MotionClip {
@@ -92,7 +93,7 @@ describe('learner temporal stage', () => {
   it('runs first for clips that record the 0.3.x policy, so short gaps are interpolated rather than filled', () => {
     const current = clipWith('0.3.1', hidden), previous = clipWith('0.2.0', hidden);
     const display = displayFor(current, 'learner'), report = display.reports[TEMPORAL_STAGE] as TemporalReport;
-    expect(display.stages).toEqual([TEMPORAL_STAGE, 'torso-stabilize', 'hand-fill']);
+    expect(display.stages).toEqual([TEMPORAL_STAGE, 'torso-stabilize', 'hand-fill', 'rest-pose', 'hand-contact']);
     expect(report.applied).toBe(true);
     for (const side of SIDES) {
       expect(states(current, side).slice(15, 18)).toEqual(['interpolated', 'interpolated', 'interpolated']);
@@ -106,7 +107,7 @@ describe('learner temporal stage', () => {
   it('leaves 0.2.0 and published clips exactly as the previous learner preset showed them', () => {
     const files = ['ksl-thanks', 'ksl-sorry', 'ksl-meet'].map(id => importMotion(readFileSync(`public/content/assets/${id}/v1/reference.motion.json`, 'utf8')));
     for (const clip of [clipWith('0.2.0', hidden), ...files]) {
-      const display = displayFor(clip, 'learner'), before = runDisplayPipeline({ clip }, [stabilizeTorso(), fillHands()]);
+      const display = displayFor(clip, 'learner'), before = runDisplayPipeline({ clip }, [stabilizeTorso(), fillHands(), restPose(), separate()]);
       expect(display.frames).toEqual(before.frames);
       expect((display.reports[TEMPORAL_STAGE] as TemporalReport).reason).toBe('not-recorded');
     }
