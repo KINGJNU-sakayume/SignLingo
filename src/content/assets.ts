@@ -12,6 +12,9 @@ export function parseLessonMotion(entry: Expression, bytes: Uint8Array) {
   const clip = importMotion(new TextDecoder().decode(bytes));
   if (clip.frames.length < 3 || clip.pipeline.version !== entry.reconstructionVersion) throw new Error('동작 프레임 또는 복원 버전이 올바르지 않습니다.');
   if (/synthetic|fixture|not-ksl/i.test(clip.pipeline.detector + ' ' + clip.source.name) || entry.provenance === 'synthetic-test') throw new Error('합성 테스트 동작은 학습 콘텐츠로 공개할 수 없습니다.');
+  // A corrected (version-2) motion must be the one the entry, and so its reviews, records.
+  const recorded = clip.constraints ? { sha256: clip.constraints.sha256, count: clip.constraints.document.constraints.length } : undefined;
+  if (recorded?.sha256 !== entry.constraints?.sha256 || recorded?.count !== entry.constraints?.count) throw new Error('동작 파일의 제약 조건 기록이 콘텐츠 정보와 다릅니다.');
   return clip;
 }
 export async function fetchAsset(asset: Asset, signal?: AbortSignal) {

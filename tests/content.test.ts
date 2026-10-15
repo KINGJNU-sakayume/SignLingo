@@ -10,6 +10,7 @@ import { assetUrl, loadLessonMotion, parseLessonMotion, verifyAsset } from '../s
 import { publicManifest, readContained, releaseDate, validatePackage, validatePublic, verifyCompatibility } from '../src/content/package';
 import { approvedFixture } from './content-fixtures';
 import { practiceClip } from './practice-fixtures';
+import { applyConstraints, parseConstraints } from '../src/motion/constraints';
 
 const temporary: string[] = [];
 afterEach(async () => { vi.unstubAllGlobals(); await Promise.all(temporary.splice(0).map(directory => rm(directory, { recursive: true, force: true }))); });
@@ -75,6 +76,20 @@ describe('content release contract', () => {
     const legacy = practiceClip(); legacy.source.name = 'old-camera.mp4'; legacy.pipeline.detector = 'camera'; legacy.pipeline.version = '0.1.0';
     expect(parseLessonMotion({ ...entry, reconstructionVersion: '0.1.0' }, new TextEncoder().encode(JSON.stringify(legacy))).pipeline.version).toBe('0.1.0');
     expect(() => parseLessonMotion(entry, new TextEncoder().encode(JSON.stringify(practiceClip())))).toThrow('합성');
+  });
+  it('reads a constraint-corrected (version-2) motion only when the entry records the same constraint hash', async () => {
+    const { entry, clip } = await approvedFixture();
+    const set = parseConstraints({ format: 'signlingo.constraints', version: 1, constraints: [{ id: 'shape', kind: 'handshape', span: { frames: [0, 10] }, hand: 'left', preset: 'flat', note: '왼손 편손 (계약 테스트)' }] });
+    const { clip: corrected } = await applyConstraints(clip, set);
+    const bytes = new TextEncoder().encode(JSON.stringify(corrected));
+    const recorded = { ...entry, constraints: { sha256: corrected.constraints!.sha256, count: 1 } };
+    expect(parseLessonMotion(recorded, bytes).version).toBe(2);
+    expect(() => parseLessonMotion(entry, bytes)).toThrow('제약 조건');
+    expect(() => parseLessonMotion({ ...entry, constraints: { sha256: 'b'.repeat(64), count: 1 } }, bytes)).toThrow('제약 조건');
+    expect(() => parseLessonMotion(recorded, new TextEncoder().encode(JSON.stringify(clip)))).toThrow('제약 조건');
+    // The constraint hash is part of the review subject: correcting the motion invalidates approvals.
+    expect(await reviewSubject(recorded)).not.toBe(await reviewSubject(entry));
+    await expect(verifyReviews(recorded)).rejects.toThrow('검수');
   });
   it('rejects missing assets, missing/altered evidence documents and unregistered public media', async () => {
     const fixture = await packageFixture();
