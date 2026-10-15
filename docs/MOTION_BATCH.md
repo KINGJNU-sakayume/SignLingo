@@ -6,15 +6,33 @@
 
 | 명령 | 하는 일 | 결과 위치 |
 | --- | --- | --- |
-| `npm run motion:batch -- <영상 또는 폴더...> --out <폴더> [--hz 30\|15] [--pipeline 0.2.0\|0.3.1] [--mirrored]` | 영상마다 MotionClip JSON을 만듭니다 | `<폴더>/<영상 이름>.motion.json`, `work/batch-report.json`, `work/batch-report.md` |
+| `npm run motion:batch -- <영상 또는 폴더...> --out <폴더> [--hz 30\|15] [--pipeline 0.2.0\|0.3.1] [--mirrored] [--constraints <폴더>]` | 영상마다 MotionClip JSON을 만듭니다. `--constraints`가 있으면 같은 이름의 제약 조건을 인식 직후 적용합니다 | `<폴더>/<영상 이름>.motion.json`, `work/batch-report.json`, `work/batch-report.md` |
 | `npm run motion:compare -- <영상 폴더 또는 영상...> [--hz 30\|15] [--mirrored] [--trace <영상 파일 이름>]...` | 영상마다 0.2.0과 0.3.1을 모두 실행하고 비교표를 만듭니다. `--trace`로 지정한 클립은 프레임별 진단도 씁니다 | `work/compare/0.2.0/`, `work/compare/0.3.0/`, `work/compare-report.json`, **`work/compare-report.md`**, `work/trace-<이름>.json`, **`work/trace-<이름>.md`** |
 | `npm run motion:report -- <motion.json 또는 폴더...>` | 이미 있는 JSON의 지표만 계산합니다(추론 없음) | `work/motion-report.json`, `work/motion-report.md` |
+| `npm run motion:constrain-report -- <motion.json> <constraints.json>` | 제약 조건 적용 전후 잔차와 바뀐 관절·프레임 수를 계산합니다(추론 없음, 입력 파일은 바꾸지 않음) | `work/constraint-report.json`, `work/constraint-report.md` |
 
 - 기본값은 30 Hz, 파이프라인 **0.2.0**, 좌우 반전 없음입니다. 0.3.1은 `--pipeline 0.3.1` 또는 Motion Lab의 "실험: 손 영역 재검출"로만 씁니다. 보고서 경로는 `--report <파일>.json`으로 바꿀 수 있으며, 같은 이름의 `.md`도 함께 만듭니다.
 - 폴더를 주면 그 안의 `.mp4`/`.webm`(report는 `.json`)을 이름순으로 처리합니다. 하위 폴더는 보지 않습니다. Windows 셸은 `*.mp4`를 펼치지 않으므로 폴더를 주는 쪽이 편합니다.
 - `--mirrored`는 **저장된 파일**이 좌우 반전된 경우에만 씁니다. 목록의 모든 영상에 똑같이 적용되므로, 반전 여부가 다른 영상은 따로 실행합니다.
 - 영상 하나가 실패해도 나머지는 계속 처리하고, 실패 내용은 보고서에 남깁니다. 실패가 하나라도 있으면 종료 코드는 1입니다.
 - 출력 JSON의 `source.name`·`source.size`는 원본 파일과 같습니다. 도구가 내보낸 직후 `importMotion`으로 다시 읽고 이 두 값을 확인합니다(`content prepare`와 같은 검사).
+
+## 제약 조건 (사전 의도, `--constraints`)
+
+검수자의 설명 문구로 미리 써 둔 [제약 조건](CONSTRAINTS.md)을 인식 직후 적용합니다.
+
+- 영상 `ksl-meet.webm`에는 `<폴더>/ksl-meet.constraints.json`을 씁니다(확장자를 뺀 영상 이름 + `.constraints.json`). 파일이 없는 영상은 지금처럼 그대로 저장합니다.
+- 적용 기준은 방금 인식한 저장 프레임입니다. 출력 `<영상 이름>.motion.json`은 보정본(MotionClip v2)이며, 원본 관측값과 적용한 문서·해시가 함께 들어 있습니다. 파이프라인 버전(기본 0.2.0)은 그대로 기록됩니다. 도구는 내보낸 직후 다시 읽어 `source.name`·`source.size`와 v2 여부를 확인합니다.
+- 제약 조건 파일이 잘못되었으면 그 영상은 실패로 보고합니다(조용히 건너뛰지 않음).
+- `work/batch-report.md`에 클립별 제약 조건 파일, 해시, 바뀐 프레임 수, 조건별 잔차 최대(전 → 후)와 만족 프레임이 나옵니다.
+- 코스 1 설명 문구를 옮긴 예시가 `docs/constraints/`에 있습니다.
+
+```sh
+npm run motion:batch -- private-data/videos --out private-data/exports/constrained --constraints docs/constraints
+npm run motion:constrain-report -- private-data/exports/rev2-candidates/ksl-meet.motion.json docs/constraints/ksl-meet.constraints.json
+```
+
+`--constraints`는 `motion:batch`에서만 씁니다. 이미 있는 동작에는 `motion:constrain-report`(보고서만), Motion Lab(미리보기·보정본 내보내기), `content constrain`(검수 패키지)을 씁니다. 비공개 평가 워크플로가 `work/*report*`를 수집하므로 보고서 이름(`work/constraint-report.*`)을 바꾸지 않습니다.
 
 ## 준비 (Windows · macOS · Linux)
 
@@ -179,7 +197,7 @@ npm run motion:compare -- private-data/videos --trace ksl-no.webm
 2. `npm run motion:compare -- private-data/videos`를 실행합니다. 반전된 영상이 섞여 있으면 반전 여부별로 나눠 두 번 실행합니다(`--report`로 이름을 다르게).
 3. `work/compare-report.md`에는 클립별 표 세 개(누락률·held·보간·채움·숨김 / 동작 구간·화면 밖·화면 안 실패 / 손 출처·버림·중복)와 전체 합계가 있습니다. PR에는 합계 요약만 옮기고 클립별 원시 표는 싣지 않습니다.
 4. 나빠진 클립은 `--trace <파일 이름>`으로 다시 실행해 `work/trace-<이름>.md`의 바뀐 구간과 사유 순위를 봅니다.
-5. 코스 1의 revision 2 후보는 `npm run motion:batch -- <코스 1 원본 3개> --out private-data/exports/rev2-candidates`로 만들어 비공개로 보관합니다. `content prepare`, 검수 기록, 단계 전환, 공개는 검수를 시작할 때 따로 합니다([콘텐츠 준비·검수·공개](CONTENT_PUBLISHING.md)).
+5. 코스 1의 revision 2 후보는 `npm run motion:batch -- <코스 1 원본 3개> --out private-data/exports/rev2-candidates`로 만들어 비공개로 보관합니다. 설명 문구 제약 조건을 함께 적용하려면 `--constraints docs/constraints`를 더합니다. `content prepare`, 검수 기록, 단계 전환, 공개는 검수를 시작할 때 따로 합니다([콘텐츠 준비·검수·공개](CONTENT_PUBLISHING.md)).
 
 공개된 v1의 0.2.0 기준값은 저장소 안에서 바로 계산할 수 있습니다.
 

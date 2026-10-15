@@ -2,6 +2,8 @@
 
 3D 시범을 **화면에 보여 주는 방식만** 바꾸는 계층입니다. 저장된 MotionClip, `public/content/assets/`의 공개 자산, 검수 기록과 MotionClip 스키마는 바꾸지 않습니다. 그래서 이 계층을 바꿔도 재검수가 필요하지 않습니다.
 
+[제약 조건 보정](CONSTRAINTS.md)의 **미리보기**도 이 계층의 단계이므로 같은 규칙을 따릅니다. 제약 조건을 실제로 적용한 보정본(MotionClip v2)은 이 계층 밖에서 저장된 프레임을 기준으로 만들며, 새 revision이므로 다시 검수합니다.
+
 ```
 MotionClip (+ 시간 복원 결과) ──► baseFrames ──► [단계 1] ──► [단계 2] ──► … ──► DisplayClip
    저장값 · 수정 금지              editedPose()     순수 함수     순수 함수             표시용 프레임 + 프레임별 주석
@@ -20,29 +22,30 @@ MotionClip (+ 시간 복원 결과) ──► baseFrames ──► [단계 1] �
 | --- | --- |
 | `DisplayInput` | `{ clip, temporal? }`. 시간 복원 결과는 Motion Lab에서만 넘깁니다. `learner` preset은 단계 0이 직접 계산합니다. |
 | `DisplayFrame` | `{ timestamp, segment, pose, annotation }`. `segment`는 `sequenceBoundary()`(장면 전환·150 ms 넘는 검출 공백)에서 바뀌며, 어떤 단계도 segment를 넘어 값을 잇지 않습니다. |
-| `DisplayAnnotation` | `hands[side] = { state, fill?, anchors? }`. state는 `observed / interpolated / held / filled / missing`입니다. `torso?`(모드·편차·손목 잔차·팔꿈치 이동)와 이 프레임을 바꾼 단계 id 목록 `stages`가 붙습니다. |
+| `DisplayAnnotation` | `hands[side] = { state, fill?, anchors?, hidden?, constraints? }`. state는 `observed / interpolated / held / filled / constrained / missing`입니다. `torso?`(모드·편차·손목 잔차·팔꿈치 이동)와 이 프레임을 바꾼 단계 id 목록 `stages`가 붙습니다. |
 | `DisplayClip` | `{ frames, stages, reports }`. `reports[stageId]`에 단계별 클립 단위 요약이 들어갑니다. |
 | `DisplayStage` | `{ id, run(display, input) => DisplayClip }`. 클립 전체를 받습니다(통계와 양방향 필터에 필요). |
 
 - `runDisplayPipeline(input, stages)`는 `baseFrames`에서 시작해 단계를 목록 순서대로 실행합니다. 기준 프레임에는 `editedPose()`(손목 수동 보정 반영)를 씁니다.
-- `sampleDisplay(display, t)`는 `samplePose()`와 같은 규칙으로 보간합니다. 200 ms 넘는 간격, 몸통 없는 프레임, segment 경계에서는 보간하지 않습니다. 차이는 `filled` 손도 보간 대상이라는 점 하나입니다. 단계가 없으면 결과가 `samplePose()`와 정확히 같습니다(회귀 테스트).
+- `sampleDisplay(display, t)`는 `samplePose()`와 같은 규칙으로 보간합니다. 200 ms 넘는 간격, 몸통 없는 프레임, segment 경계에서는 보간하지 않습니다. 차이는 `filled`·`constrained` 손도 보간 대상이라는 점입니다. 단계가 없으면 결과가 `samplePose()`와 정확히 같습니다(회귀 테스트).
+- `baseFrames`는 보정본(v2)의 프레임 기록을 읽어, 제약 조건이 손 모양을 정했거나 관측 없이 값을 만든 손을 `constrained`로 시작합니다. 시간 복원 결과를 쓸 때도 그 손은 저장된 보정값을 유지합니다.
 - `displayPose(display, i)`는 Practice처럼 프레임 번호로 재생하는 화면에서 씁니다.
 - `handFocus(displays)`는 "손 확대" 시점의 고정 구도입니다. 관측된 손목·손끝 위치의 5–95 백분위 상자를 씁니다. 카메라가 매 프레임 손을 따라가면 그 자체가 멀미를 일으키므로, 클립(또는 한 문제의 클립 묶음)마다 한 번만 정합니다.
 
-### 새 단계 추가하기 (예: 제약 조건 보정)
+### 새 단계 추가하기
 
 ```ts
-const constraints: DisplayStage = {
-  id: 'anatomical-constraints',
+const stage: DisplayStage = {
+  id: 'my-stage',
   run(display) {
-    const frames = display.frames.map(frame => needsFix(frame) ? withPose(frame, fixed(frame.pose), 'anatomical-constraints') : frame);
-    return { ...display, frames, reports: { ...display.reports, 'anatomical-constraints': summary } };
+    const frames = display.frames.map(frame => needsFix(frame) ? withPose(frame, fixed(frame.pose), 'my-stage') : frame);
+    return { ...display, frames, reports: { ...display.reports, 'my-stage': summary } };
   },
 };
-runDisplayPipeline({ clip }, [stabilizeTorso(), constraints, fillHands()]);
+runDisplayPipeline({ clip }, [stabilizeTorso(), stage, fillHands()]);
 ```
 
-`withPose()`가 주석에 단계 id를 남깁니다. 바꾸지 않은 프레임은 같은 객체를 그대로 돌려주면 됩니다. 새 단계에서도 위의 불변식(입력 불변, 표시 전용, 추정 표시)을 지킵니다. `tests/display-pipeline.test.ts`에 끼워 넣기 테스트가 있습니다.
+`withPose()`가 주석에 단계 id를 남깁니다. 바꾸지 않은 프레임은 같은 객체를 그대로 돌려주면 됩니다. 새 단계에서도 위의 불변식(입력 불변, 표시 전용, 추정 표시)을 지킵니다. 실제 예가 아래 단계 2 `constrain()`입니다.
 
 ## 단계 0 · 시간 복원 `temporal-reconstruct` (`learner`만, 파이프라인 0.3.x 클립)
 
@@ -78,7 +81,16 @@ runDisplayPipeline({ clip }, [stabilizeTorso(), constraints, fillHands()]);
 - 공식만 썼다면 손이 쪽마다 최대 2.8 / 6.5 / 2.3 cm 움직였을 것입니다.
 - IK 보정을 쓰면 양손이 모두 관측된 프레임에서 두 검지 끝 사이 거리 변화가 2 mm보다 작습니다. ksl-meet에서는 수치 오차 수준(10⁻¹⁵ m)입니다.
 
-## 단계 2 · 손 채우기 `hand-fill`
+## 단계 2 · 제약 조건 `constraints` (미리보기)
+
+`constrain(set)`(`constraints.ts`)은 [제약 조건 문서](CONSTRAINTS.md)를 표시 프레임에 적용합니다. 순서는 **시간 복원 → 몸통 고정 → 제약 조건 → 손 채우기**이며, `learnerStages(set)`가 이 순서를 만듭니다. 손 채우기 뒤에 두면 오류입니다.
+
+- 해결기는 보정본 내보내기와 같은 순수 함수 `solveConstraints`입니다. 차이는 입력뿐입니다. 미리보기는 몸통 고정 뒤의 표시 프레임에, 보정본은 저장된 프레임에 적용합니다.
+- 제약 조건이 손가락을 정한 손, 또는 관측이 없던(held) 손에 값을 만든 경우 그 손은 **`constrained`** 상태가 되고 주석 `constraints`에 조건 id가 붙습니다. 아바타는 파란 손으로 그리고, 범례 **"보정한 손 모양"** 을 보여 줍니다(레슨·표현 카드·Practice 기준 아바타·Motion Lab).
+- 보고서 `reports.constraints`: 조건별 프레임 잔차(전·후), 요약, 프레임별 적용 내역.
+- `learner` preset 자체에는 이 단계가 없습니다. 보정본은 제약 조건이 이미 저장 프레임에 들어 있으므로 다시 적용하지 않습니다(상대 회전 `wristOffset`이 두 번 들어가는 일을 막습니다).
+
+## 단계 3 · 손 채우기 `hand-fill`
 
 팔이 보이는데 손이 `held` 또는 `missing`인 프레임을 채웁니다(손가락이 없는 시간 보간 프레임은 손가락만 채웁니다).
 
@@ -90,7 +102,8 @@ runDisplayPipeline({ clip }, [stabilizeTorso(), constraints, fillHands()]);
 
 - **손 모양**은 손가락 15개의 회전과 **손목의 상대 회전**입니다.
 - 상대 회전은 roll을 뺀 아래팔 프레임 기준입니다. 이 프레임은 팔 형상에서 `solveArm`과 같은 방식(`boneQuaternion(아래팔 방향, 위팔×아래팔)`)으로 다시 계산합니다. 채운 뒤에는 `distributeForearmRoll`로 아래팔 roll과 손목에 다시 나눕니다. 따라서 손은 팔의 움직임을 따라가고, 손목 끝 위치는 바뀌지 않습니다.
-- 기준(anchor)은 관측된 손입니다(시간 보간 손은 손가락까지 있을 때만 씁니다). segment를 넘지 않고, 팔이 숨겨진 프레임은 채우지 않습니다.
+- 기준(anchor)은 관측된 손입니다(시간 보간 손은 손가락까지 있을 때만 씁니다). `constrained` 손도 기준으로 쓰지만, 안전장치의 관측 비율에는 넣지 않습니다. segment를 넘지 않고, 팔이 숨겨진 프레임은 채우지 않습니다.
+- **`constrained` 손은 채우지도 숨기지도 않습니다.** 화면 밖 손목이나 관측 근거 부족 규칙도 적용하지 않습니다(제약 조건이 정한 값이며, 표시 상태로 구분됩니다).
 - `reconstruct.ts`의 200 ms 유지 규칙과 저장된 `held` 상태는 그대로이며, Motion Lab 진단 패널은 원래 상태(예: "임시 유지")를 그대로 보여 줍니다.
 
 ### 손 채우기 안전장치
@@ -120,6 +133,7 @@ runDisplayPipeline({ clip }, [stabilizeTorso(), constraints, fillHands()]);
 | Practice 기준 아바타 | `learner` | 시간 복원(0.3.x 클립) → 몸통 고정 → 손 채우기(안전장치) |
 | Practice 내 시도 아바타 | `attempt` | 몸통 고정만. 추적 공백이 그대로 보여야 피드백과 맞습니다. |
 | Motion Lab | `lab-original` (기본) / `lab-stabilized` | 기본은 원본 그대로입니다. "몸통 고정" 체크박스로 켤 수 있고, 기술 진단 모드에서는 꺼집니다. 손 채우기는 쓰지 않습니다. |
+| Motion Lab 제약 조건 미리보기 | (몸통 고정) → 제약 조건 | 보정본이면 원본(`sourceClip`)에서 다시 계산합니다. 시간 복원은 쓰지 않습니다. "보정 전 겹쳐 보기"는 같은 단계에서 제약 조건만 뺀 자세를 흰 반투명 팔로 겹쳐 그립니다. |
 
 `displayFor(clip, preset)`는 클립 객체마다 결과를 캐시합니다(불러온 클립은 바꾸지 않으므로).
 
@@ -141,6 +155,7 @@ runDisplayPipeline({ clip }, [stabilizeTorso(), constraints, fillHands()]);
   - 입력이 바뀌지 않는지, 단계를 끼워 넣을 수 있는지, `samplePose`와 같은 결과인지
   - 공개 코스 1 측정값
 - `tests/pipeline-0.3.test.ts`: 시간 복원 단계의 적용 조건, 보간과 채움의 분리, 0.2.0·공개 클립에서 이전 preset과 같은 결과, `attempt` 제외
+- `tests/constraints.test.ts`: 제약 조건 단계의 순서, `constrained` 손을 채우거나 숨기지 않음, 보정본의 학습자 표시(시간 복원 포함)
 - 브라우저 테스트(`tests/browser/content.spec.ts`, `learn.spec.ts`, `app.spec.ts`): 시점 버튼, 거울 모드 배지와 유지, 설명 위치(390 px), 채점 문항의 설명 공개 시점, A–B 반복, Motion Lab 기본값
 - 디자인 캡처: `SCREENSHOTS=1 npx playwright test screens`. 표현 카드의 정면·측면·1인칭·손 확대가 포함됩니다.
 - 검수 미리보기(`npm run dev` → `/?review=1`)는 무시 대상인 `private-data/`의 패키지를 같은 화면과 같은 `learner` preset으로 보여 줍니다.

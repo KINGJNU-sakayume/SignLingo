@@ -17,6 +17,7 @@ npm run content -- register ksl-thanks private-data/ksl-thanks
 npm run content -- transition private-data/ksl-thanks/entry.json source-approved
 npm run content -- transition private-data/ksl-thanks/entry.json motion-processing-required
 npm run content -- prepare private-data/ksl-thanks private-data/original.mp4 private-data/export.motion.json
+npm run content -- constrain private-data/ksl-thanks docs/constraints/ksl-thanks.constraints.json   # optional
 npm run content -- subject private-data/ksl-thanks/entry.json
 npm run content -- transition private-data/ksl-thanks/entry.json linguistic-review-required
 npm run content -- transition private-data/ksl-thanks/entry.json ready-to-publish
@@ -62,6 +63,20 @@ After source approval, open **동작 복원**, select the authorized local video
 
 **로컬 자료로 학습 흐름 점검** under Motion Lab retains Phase 4's upload-based observation/practice loop for operators. It never changes a publication status. Its legacy progress remains under `first-expression`, separate from published expression/version records.
 
+### Optional: constraint correction
+
+Constraint documents ([docs/CONSTRAINTS.md](CONSTRAINTS.md)) correct a finished motion, e.g. "the hands meet at the same height". Preview them in Motion Lab's **제약 조건 보정** panel, then apply them to the package:
+
+```sh
+npm run content -- constrain private-data/ksl-meet docs/constraints/ksl-meet.constraints.json
+```
+
+- The source is the package's motion asset (or, for a published revision, the identical `public/` file, read only), checked against its recorded SHA-256. A corrected (version-2) source is solved again from its original observations, so constraints never stack.
+- **Revision**: the catalog (`src/content/catalog.json`), not the private `entry.json`, says what is published. If the entry is published and the package revision is not above it, the corrected motion becomes revision *published + 1*. A package that is already at a higher unpublished revision keeps it and only its private asset is rebuilt; re-running `constrain` never increments again. Other private assets (a local video) are copied to the new revision path; `public/` is never written.
+- The motion is written to `content/assets/<id>/v<revision>/reference.motion.json` inside the package, the applied document is saved as `constraints.json`, and the entry records `constraints: { sha256, count }`. That field is part of the review subject, so every earlier approval stops verifying. Status returns to `reconstruction-review-required` and both reviews to `pending`; `license.approval` (bound to the video hash), description, variant and movement notes are kept.
+- `inspection.json` is regenerated with the constraint hash, changed frames and joints, hands whose values were produced without an observation (`constrained`), residuals and notes.
+- `prepare` with a version-2 export (from `motion:batch --constraints` or Motion Lab's 보정본 내보내기) records the same `constraints` field. `parseLessonMotion` reads version 2 and rejects a motion whose constraint hash differs from the entry. Publishing at or below the published revision is refused as before.
+
 ## 3. Complete package metadata before approving it
 
 Set expert-written Korean meaning, description and movement notes; identify the chosen source entry and variant; record whether camera practice is suitable. Set the exact reconstruction pipeline version from the export. This is a separate field from publication state. The MotionClip's `nonmanual.linguisticValidation: not-performed` remains intact: AI reconstruction never becomes a linguistic validator.
@@ -93,7 +108,7 @@ An urgent rights withdrawal is different from an ordinary content update: remove
 
 ## Learner behavior and failure handling
 
-Learners start on the Korean learning path. Only published, validated entries can load a 3D lesson; upcoming categories have no start button. Lesson playback supports 0.5× speed, repeat, A–B section repeat, scrub, front/side/first-person/hand close-up views, a per-device mirror view and camera rotation. Learner screens steady the torso and fill missing handshapes for display only; the published MotionClip, its hash and its reviews are unaffected ([display pipeline](DISPLAY_PIPELINE.md)). Practice receives the reference automatically, retains mobile recording/offline processing, and returns to the selected lesson. Feedback describes observed movement differences, not a KSL correctness percentage. Recognition/observation and repetition are the core flow; no additional scoring system is introduced.
+Learners start on the Korean learning path. Only published, validated entries can load a 3D lesson; upcoming categories have no start button. Lesson playback supports 0.5× speed, repeat, A–B section repeat, scrub, front/side/first-person/hand close-up views, a per-device mirror view and camera rotation. Learner screens steady the torso and fill missing handshapes for display only; the published MotionClip, its hash and its reviews are unaffected ([display pipeline](DISPLAY_PIPELINE.md)). A reviewed constraint-corrected motion shows its constrained hands in blue with the legend "보정한 손 모양"; hand filling never overwrites or hides them. Practice receives the reference automatically, retains mobile recording/offline processing, and returns to the selected lesson. Feedback describes observed movement differences, not a KSL correctness percentage. Recognition/observation and repetition are the core flow; no additional scoring system is introduced.
 
 Local progress keeps the original v1 storage key and legacy records. New records use expression ID, revision and asset hash, with at most 20 practice summaries and 8 Korean feedback notes per summary. Raw recordings/landmarks are never persisted in progress. Missing/blocked storage does not break learning. Missing, offline, oversized or hash-mismatched motion disables practice and exposes retry; an unavailable original video does not block a valid 3D demonstration. Offline caching and cross-device progress synchronization are not implemented.
 

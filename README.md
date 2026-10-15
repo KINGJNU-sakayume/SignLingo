@@ -66,8 +66,9 @@ MediaPipe code is Apache 2.0; consult upstream model cards/terms for selected mo
 | `tracking.ts` | Unique anatomical wrist association, confidence gating, ambiguous-crossing rejection |
 | `reconstruct.ts` | Torso/head estimation, fixed-length rig retargeting, finger constraints, adaptive filtering and diagnostics |
 | `player.ts` | Timestamp lookup, quaternion interpolation, bounded manual edits; video as master clock |
-| `display/` | Pure display-only post-processing (torso steadying with arm IK compensation, handshape filling), per-screen presets; never stored or compared ([details](docs/DISPLAY_PIPELINE.md)) |
-| `serialization.ts`, `types.ts` | Versioned KSL motion contract, strict import validation, raw observations and correction metadata |
+| `display/` | Pure display-only post-processing (torso steadying with arm IK compensation, constraint preview, handshape filling), per-screen presets; never stored or compared ([details](docs/DISPLAY_PIPELINE.md)) |
+| `constraints/` | `signlingo.constraints` v1 documents and a pure solver: same height, contact, symmetry, handshape presets, palm facing, hold and wrist offsets, re-solved with the fixed-length arm IK; corrected clips are MotionClip version 2 ([details](docs/CONSTRAINTS.md)) |
+| `serialization.ts`, `types.ts` | Versioned KSL motion contract (version 1, and version 2 for constraint-corrected poses), strict import validation, raw observations and correction metadata |
 | `components/Avatar.tsx` | Procedural upper-body mesh rig with 30 finger segment joints; front/side/first-person/hand close-up views, render-only mirror view |
 | `components/Overlay.tsx`, `App.tsx` | Synchronized comparison, source overlays, diagnostics and correction controls |
 | `src/batch/` | Local `motion:batch` / `motion:compare` / `motion:report` tools: headless Chromium runs the same extraction path; per-clip reports ([details](docs/MOTION_BATCH.md)) |
@@ -81,7 +82,7 @@ The default 0.2.0 solver preserves source finger directions through the rendered
 
 Enable **Technical inspection mode** after processing or importing motion. Compare original 0.1.0 and improved 0.2.0 on identical detections, inspect detected/rendered joints, direction residuals, joint-angle timelines, coverage, abrupt rotations, identity clues, elbow instability and per-joint corrections. The optional lab preserves the main upload, playback, camera and manual-edit workflow. Summary numbers are proxies, never linguistic accuracy.
 
-See [the reproducible consented evaluation workflow](docs/EVALUATION.md) for separate handshape, palm, location, path, coordination, temporal and anatomical review. `npm run evaluate -- --motion private-data/clip.motion.json --consent` produces a local summary in `work/evaluation/`. No real KSL validation is claimed. Schema version 1 and all 38 local joint names remain compatible; the pipeline version identifies solver behavior.
+See [the reproducible consented evaluation workflow](docs/EVALUATION.md) for separate handshape, palm, location, path, coordination, temporal and anatomical review. `npm run evaluate -- --motion private-data/clip.motion.json --consent` produces a local summary in `work/evaluation/`. No real KSL validation is claimed. Schema version 1 and all 38 local joint names remain compatible; the pipeline version identifies solver behavior. Constraint-corrected clips are version 2: they keep every observation, the pipeline record and the original rotations of each changed joint.
 
 ## Phase 3: webcam practice
 
@@ -125,3 +126,7 @@ The learner display's hand filling has a safeguard: hands with too little observ
 `npm run motion:batch`, `motion:compare` (with `--trace <file>` for frame-by-frame diagnostics) and `motion:report` process local videos in headless Chromium through the same `extractMotion()` path, with all off-machine requests blocked. Reports go to `work/` and contain numbers and coordinates only.
 
 See [batch processing and 0.3.1](docs/MOTION_BATCH.md) and the [recording guide](docs/RECORDING_GUIDE.md) for contributors. Real-video comparisons run privately; private videos and derived JSON are never committed.
+
+### Constraint correction
+
+A finished motion can be corrected with a constraint document (`signlingo.constraints` v1): "the hands meet at the same height", "index fingers extended", "palm facing down". A person, or an LLM working outside the app from [docs/CONSTRAINTS.md](docs/CONSTRAINTS.md), writes the JSON; the static app never calls an LLM. Motion Lab previews it over the original with residual graphs and exports a corrected version-2 clip; `npm run content -- constrain` applies it to a review package (new revision, reviews reset); `motion:batch --constraints <folder>` applies reviewer-written intent right after recognition; `npm run motion:constrain-report` writes before/after residuals to `work/constraint-report.*`. Facial expression, nonmanual signals and unobserved fine finger movement are never generated.

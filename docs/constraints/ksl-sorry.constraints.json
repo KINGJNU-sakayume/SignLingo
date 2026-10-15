@@ -1,0 +1,37 @@
+{
+  "format": "signlingo.constraints",
+  "version": 1,
+  "expression": "ksl-sorry",
+  "request": "오른손의 1·5지 끝을 맞대어 동그라미를 만들어 이마에 댔다가 1·5지를 펴며 내린다.",
+  "constraints": [
+    {
+      "id": "sorry-circle",
+      "kind": "handshape",
+      "span": { "fraction": [0, 0.66] },
+      "hand": "right",
+      "preset": "index-thumb-circle",
+      "fingers": ["index", "thumb"],
+      "note": "오른손 검지 끝과 엄지 끝을 맞대어 동그라미를 만들고, 내리기 전까지 유지한다. 나머지 손가락은 설명에 없으므로 관측값을 둔다."
+    },
+    {
+      "id": "sorry-forehead",
+      "kind": "contact",
+      "span": { "phase": "middle" },
+      "a": "right.index.tip",
+      "b": "head.forehead",
+      "move": "right",
+      "gapCm": 1,
+      "toleranceCm": 1.5,
+      "note": "동그라미를 이마에 댄다."
+    },
+    {
+      "id": "sorry-open",
+      "kind": "handshape",
+      "span": { "phase": "end" },
+      "hand": "right",
+      "preset": "spread",
+      "fingers": ["index", "thumb"],
+      "note": "내리면서 검지와 엄지를 편다. 나머지 손가락은 관측값을 둔다."
+    }
+  ]
+}

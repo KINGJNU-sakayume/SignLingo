@@ -4,7 +4,9 @@ import { DiagnosticsLab, type PipelineView } from './components/DiagnosticsLab';
 import { reconstructTemporalAsync } from './motion/temporalReconstruction';
 import { reconstructClip } from './motion/comparison';
 import { Avatar, type CameraView } from './components/Avatar';
-import { handFocus, runDisplayPipeline, sampleDisplay, stabilizeTorso } from './motion/display';
+import { constrain, CONSTRAINT_STAGE, handFocus, hasConstrained, runDisplayPipeline, sampleDisplay, stabilizeTorso, type ConstraintReport } from './motion/display';
+import { applyConstraints, sourceClip, type ConstraintSet } from './motion/constraints';
+import { ConstraintPanel } from './components/ConstraintPanel';
 import { activeRange, loopTime, NO_LOOP, type LoopRange } from './learn/loop';
 import { Overlay } from './components/Overlay';
 import { extractMotion } from './motion/extract';
@@ -26,6 +28,8 @@ export default function App({active=true}:{active?:boolean}){
   const [steady,setSteady]=useState(false),[range,setRange]=useState<LoopRange>(NO_LOOP);
   const [mirrored,setMirrored]=useState(false),[handRegions,setHandRegions]=useState(false),[sampleHz,setSampleHz]=useState(30),[progress,setProgress]=useState<Progress|null>(null),[error,setError]=useState('');
   const [correctionSide,setCorrectionSide]=useState<Side>('left'),[edit,setEdit]=useState<Vec3>([0,0,0]);
+  // Constraint correction: preview on the source of a corrected clip, never stacked on its stored corrections.
+  const [constraints,setConstraints]=useState<ConstraintSet|null>(null),[constraintPreview,setConstraintPreview]=useState(true),[ghost,setGhost]=useState(true),[exporting,setExporting]=useState(false);
   const video=useRef<HTMLVideoElement>(null),upload=useRef<HTMLInputElement>(null),jsonInput=useRef<HTMLInputElement>(null),abort=useRef<AbortController|null>(null);
   const [temporal,setTemporal]=useState<TemporalMotion|null>(null),[temporalView,setTemporalView]=useState('enhanced'),[temporalProgress,setTemporalProgress]=useState<Progress|null>(null),[temporalRequest,setTemporalRequest]=useState(0);
   const temporalAbort=useRef<AbortController|null>(null);
@@ -43,12 +47,25 @@ export default function App({active=true}:{active?:boolean}){
   const length=clip?.source.duration??duration;const offset=clip?.source.timeOffset??0;
   const index=clip?frameIndex(clip,time):0,frame=displayedClip?.frames[index];
   // Hand filling is never applied here: the evidence panel and avatar keep the original hand states.
-  const display=useMemo(()=>clip&&!technical?runDisplayPipeline({clip,temporal:temporalView==='enhanced'?temporal??undefined:undefined},steady?[stabilizeTorso()]:[]):null,[clip,technical,temporal,temporalView,steady]);
+  const source=useMemo(()=>clip?sourceClip(clip):null,[clip]);
+  const previewing=!!(clip&&!technical&&constraints&&constraintPreview);
+  const display=useMemo(()=>{
+    if(!clip||technical)return null;
+    const torso=steady?[stabilizeTorso()]:[];
+    // The preview solves the source's stored frames (plus the torso display), without temporal reconstruction.
+    if(previewing&&source&&constraints)return runDisplayPipeline({clip:source},[...torso,constrain(constraints)]);
+    return runDisplayPipeline({clip,temporal:temporalView==='enhanced'?temporal??undefined:undefined},torso);
+  },[clip,source,technical,temporal,temporalView,steady,previewing,constraints]);
+  const ghostDisplay=useMemo(()=>previewing&&ghost&&source?runDisplayPipeline({clip:source},steady?[stabilizeTorso()]:[]):null,[previewing,ghost,source,steady]);
+  const constraintReport=previewing?(display?.reports[CONSTRAINT_STAGE] as ConstraintReport|undefined)??null:null;
   const focus=useMemo(()=>display?handFocus([display]):null,[display]);
   const pose=useMemo<DisplayPose|null>(()=>technical?frame?.pose??null:display?sampleDisplay(display,time):null,[display,time,technical,frame]);
+  const ghostPose=useMemo(()=>ghostDisplay?sampleDisplay(ghostDisplay,time):null,[ghostDisplay,time]);
   const suspects=useMemo(()=>displayedClip?.frames.flatMap((f,i)=>f.warnings.length?[i]:[])??[],[displayedClip]);
   const trackCounts=useMemo(()=>displayedClip?SIDES.map(side=>displayedClip.frames.filter(f=>f.pose.quality[`${side}State`]==='tracked').length):[0,0],[displayedClip]);
   useEffect(()=>setRange(NO_LOOP),[clip?.frames]);
+  // A corrected clip brings its recorded constraint document into the panel.
+  useEffect(()=>{if(clip?.constraints)setConstraints(clip.constraints.document);},[clip?.constraints]);
   useEffect(()=>()=>{abort.current?.abort();},[]);
   useEffect(()=>{if(!active){video.current?.pause();setPlaying(false);abort.current?.abort();temporalAbort.current?.abort();setTemporalProgress(null);}},[active]);
   useEffect(()=>()=>{if(url)URL.revokeObjectURL(url);},[url]);
@@ -91,6 +108,12 @@ export default function App({active=true}:{active?:boolean}){
       setClip(motion);setMirrored(motion.source.mirrored);setDuration(motion.source.duration);setTime(0);clock.current=0;if(video.current)video.current.currentTime=motion.source.timeOffset??0;
     }catch(e){setError(`불러오기 실패: ${koMessage(e instanceof Error?e.message:String(e))}`);}
   }
+  async function exportConstrained(){
+    if(!clip||!constraints)return;pause();setExporting(true);setError('');
+    try{const {clip:corrected}=await applyConstraints(clip,constraints);downloadMotion(corrected,'.constrained');}
+    catch(e){setError(`보정본 내보내기 실패: ${koMessage(e instanceof Error?e.message:String(e))}`);}
+    finally{setExporting(false);}
+  }
   function saveEdit(){if(!clip)return;pause();setClip({...clip,edits:[...clip.edits.filter(e=>e.frame!==index||e.side!==correctionSide),{frame:index,side:correctionSide,degrees:edit}]});}
   const progressValue=progress?.total?Math.round(progress.done/progress.total*100):0;
   return <div className="app-shell">
@@ -114,7 +137,7 @@ export default function App({active=true}:{active?:boolean}){
           <div className="panel-toolbar"><label className="check"><input type="checkbox" checked={overlay} onChange={e=>setOverlay(e.target.checked)}/><ScanLine size={15}/> 관절 추적 표시</label><span>{file?`${(file.size/1024/1024).toFixed(1)} MB`:'영상은 이 기기에서만 처리됩니다.'}</span></div>
         </section>
         <section className="viewer-panel avatar-panel"><div className="panel-heading"><div><span className="panel-number">02</span><h2>3D 동작 복원</h2></div><span className={`tag ${clip?'live':''}`}>{clip?(clip.pipeline.detector.includes('synthetic')?'합성 테스트':'추출된 동작'):'아바타 미리보기'}</span></div>
-          <div className="avatar-stage"><Avatar pose={pose} skeleton={skeleton||technical} markers={markers||technical} view={view} focus={focus} resetKey={cameraReset} inspection={technical?frame:undefined}/><div className="camera-presets" aria-label="카메라 시점">{VIEWS.map(([value,label])=><button key={value} className={view===value?'selected':''} aria-pressed={view===value} onClick={()=>setView(value)}>{label}</button>)}<button aria-label="카메라 시점 초기화" onClick={()=>{setView('front');setCameraReset(n=>n+1);}}><RotateCcw size={13}/></button></div><div className="avatar-state">{clip?<><span className="status-dot"/> 프레임 {index+1} / {clip.frames.length}</>:<><Box size={13}/> 기본 자세 · 동작을 불러오지 않았습니다</>}</div><div className="orbit-hint"><Focus size={14}/> 드래그로 회전 · 스크롤로 확대</div><div className="axis-key"><i className="left-key"/>L <i className="right-key"/>R <span>수어 동작자의 실제 좌우</span></div></div>
+          <div className="avatar-stage"><Avatar pose={pose} ghost={ghostPose} skeleton={skeleton||technical} markers={markers||technical} view={view} focus={focus} resetKey={cameraReset} inspection={technical?frame:undefined}/>{previewing&&<div className="constraint-stage-key" aria-label="보정 미리보기 범례">{hasConstrained(display)&&<span><i className="key-constrained"/>보정한 손 모양</span>}{ghostPose&&<span><i className="key-ghost"/>보정 전</span>}<span>보정 미리보기</span></div>}<div className="camera-presets" aria-label="카메라 시점">{VIEWS.map(([value,label])=><button key={value} className={view===value?'selected':''} aria-pressed={view===value} onClick={()=>setView(value)}>{label}</button>)}<button aria-label="카메라 시점 초기화" onClick={()=>{setView('front');setCameraReset(n=>n+1);}}><RotateCcw size={13}/></button></div><div className="avatar-state">{clip?<><span className="status-dot"/> 프레임 {index+1} / {clip.frames.length}</>:<><Box size={13}/> 기본 자세 · 동작을 불러오지 않았습니다</>}</div><div className="orbit-hint"><Focus size={14}/> 드래그로 회전 · 스크롤로 확대</div><div className="axis-key"><i className="left-key"/>L <i className="right-key"/>R <span>수어 동작자의 실제 좌우</span></div></div>
           <div className="panel-toolbar"><div className="toolbar-checks"><label className="check"><input type="checkbox" checked={skeleton} onChange={e=>setSkeleton(e.target.checked)}/>뼈대 표시</label><label className="check"><input type="checkbox" checked={markers} onChange={e=>setMarkers(e.target.checked)}/>관절 표시</label><label className="check" title="학습 화면처럼 몸통 흔들림을 줄여 표시합니다. 손목 위치와 손 모양은 그대로이며 저장 데이터는 바뀌지 않습니다. 기술 진단 모드에서는 원본만 표시합니다."><input type="checkbox" checked={steady&&!technical} disabled={technical} onChange={e=>setSteady(e.target.checked)}/>몸통 고정</label></div><span>고정 길이 관절형 아바타</span></div>
         </section>
       </div>
@@ -130,6 +153,9 @@ export default function App({active=true}:{active?:boolean}){
       {clip&&<div className="technical-toggle"><label className="check"><input type="checkbox" checked={technical} onChange={e=>{pause();setTechnical(e.target.checked);setPipelineView('stored');}}/>기술 진단 모드</label><span>복원 방식별 결과, 분석 프레임 및 기하학적 차이를 비교합니다.</span></div>}
       {technical&&comparisons&&<DiagnosticsLab clips={comparisons} view={pipelineView} onView={value=>{pause();setPipelineView(value);}} index={index} onSeek={t=>{pause();seek(t);}} onAdopt={()=>{pause();setClip(comparisons[pipelineView]);setPipelineView('stored');}}/>}
       {technical&&<p className="confidence-note">JSON 내보내기는 저장된 복원 결과와 수정 사항을 포함합니다. 다른 복원 결과를 사용하려면 선택한 복원 방식을 적용하세요. 기술 진단을 종료하면 손목을 직접 보정할 수 있습니다.</p>}
+      {clip&&!technical&&<ConstraintPanel set={constraints} onSet={set=>{setConstraints(set);if(set)setConstraintPreview(true);}} report={constraintReport} recorded={clip.constraints?.sha256??null}
+        preview={constraintPreview} onPreview={setConstraintPreview} ghost={ghost} onGhost={setGhost} time={time} duration={length} range={range} timestamps={(source??clip).frames.map(f=>f.timestamp)}
+        name={clip.source.name.replace(/\.[^.]+$/,'')} postEdits={clip.version===2?clip.edits.length:0} busy={exporting||busy} onSeek={t=>{pause();seek(t);}} onExport={exportConstrained} onError={message=>setError(message)}/>}
       {clip&&!technical&&<details className="manual-corrections"><summary>손목 직접 보정 <span>선택 사항 · 현재 프레임만 · JSON에 저장</span></summary><div className="correction-controls"><select aria-label="보정할 손" value={correctionSide} onChange={e=>setCorrectionSide(e.target.value as Side)}><option value="left">왼쪽 손목</option><option value="right">오른쪽 손목</option></select>{['굽힘','비틀림','편위'].map((label,i)=><label key={label}>{label} {edit[i]}°<input aria-label={`${label} correction`} type="range" min={-45} max={45} value={edit[i]} onChange={e=>{const n=[...edit] as Vec3;n[i]=Number(e.target.value);setEdit(n);}}/></label>)}<button className="button secondary" onClick={saveEdit}>현재 프레임 보정 저장</button><button className="text-button" onClick={()=>{setClip({...clip,edits:clip.edits.filter(e=>e.frame!==index||e.side!==correctionSide)});}}>프레임 보정 초기화</button></div><p>보정은 ±45° 범위이며 주변 프레임 사이에 보간됩니다. 이전 0.1 버전의 손목 제한도 유지됩니다. 저장된 보정: {clip.edits.length}건. 다시 분석하면 보정이 초기화됩니다.</p></details>}
       <footer><span><span className="footer-dot"/> 기술적인 동작 복원 결과이며 수어의 정답 판정이 아닙니다.</span><span>단일 영상의 깊이 추정에는 한계가 있으며 표정 문법은 복원되지 않습니다.</span><a href="https://github.com/KINGJNU-sakayume/SignLingo" target="_blank" rel="noreferrer">소스 코드 및 기술 보고서 ↗</a></footer>
     </main>
