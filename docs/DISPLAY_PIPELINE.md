@@ -44,11 +44,11 @@ runDisplayPipeline({ clip }, [stabilizeTorso(), constraints, fillHands()]);
 
 `withPose()`가 주석에 단계 id를 남깁니다. 바꾸지 않은 프레임은 같은 객체를 그대로 돌려주면 됩니다. 새 단계에서도 위의 불변식(입력 불변, 표시 전용, 추정 표시)을 지킵니다. `tests/display-pipeline.test.ts`에 끼워 넣기 테스트가 있습니다.
 
-## 단계 0 · 시간 복원 `temporal-reconstruct` (`learner`만, 파이프라인 0.3.0 클립)
+## 단계 0 · 시간 복원 `temporal-reconstruct` (`learner`만, 파이프라인 0.3.x 클립)
 
 `learner` preset의 첫 단계입니다(`temporal.ts`). 기존 시간 복원(`reconstructTemporal`, `conservative-bidirectional-v1`)을 그대로 실행해 기준 프레임을 다시 만들고, 앞뒤 관측 사이의 짧은 공백(≤150 ms)을 `interpolated` 손으로 메웁니다. 남은 `held`·`missing` 손만 다음 단계의 손 채우기가 추정으로 채웁니다.
 
-- **적용 조건**: 클립의 `pipeline.temporal`이 있음(0.3.0 추출이 기록), `sampleHz ≥ 15`, 프레임 3–1800개. 하나라도 아니면 프레임을 그대로 넘기고 보고서에 `applied: false`와 이유(`not-recorded` / `sample-rate` / `frame-count`)를 남깁니다.
+- **적용 조건**: 클립의 `pipeline.temporal`이 있음(0.3.x 추출이 기록), `sampleHz ≥ 15`, 프레임 3–1800개. 하나라도 아니면 프레임을 그대로 넘기고 보고서에 `applied: false`와 이유(`not-recorded` / `sample-rate` / `frame-count`)를 남깁니다.
 - 공개 코스 1(v1, 0.2.0)에는 `pipeline.temporal`이 없으므로 **검수받은 화면이 그대로** 보입니다. 테스트가 이전 preset과 프레임 단위로 같은지 확인합니다.
 - 반드시 첫 단계여야 합니다(다른 단계 뒤에 두면 오류). `attempt` preset, Motion Lab(자체 시간 복원 UI 유지), 저장되는 MotionClip, Practice 비교에는 쓰지 않습니다.
 - 보고서 `reports['temporal-reconstruct']`: 적용 여부와 쪽별 상태 개수(관측·보간·유지·없음).
@@ -116,8 +116,8 @@ runDisplayPipeline({ clip }, [stabilizeTorso(), constraints, fillHands()]);
 
 | 화면 | preset | 단계 |
 | --- | --- | --- |
-| 레슨(`LessonPlayer`), 표현 카드(`LessonDetail`), 로컬 학습 흐름 점검 | `learner` | 시간 복원(0.3.0 클립) → 몸통 고정 → 손 채우기(안전장치) |
-| Practice 기준 아바타 | `learner` | 시간 복원(0.3.0 클립) → 몸통 고정 → 손 채우기(안전장치) |
+| 레슨(`LessonPlayer`), 표현 카드(`LessonDetail`), 로컬 학습 흐름 점검 | `learner` | 시간 복원(0.3.x 클립) → 몸통 고정 → 손 채우기(안전장치) |
+| Practice 기준 아바타 | `learner` | 시간 복원(0.3.x 클립) → 몸통 고정 → 손 채우기(안전장치) |
 | Practice 내 시도 아바타 | `attempt` | 몸통 고정만. 추적 공백이 그대로 보여야 피드백과 맞습니다. |
 | Motion Lab | `lab-original` (기본) / `lab-stabilized` | 기본은 원본 그대로입니다. "몸통 고정" 체크박스로 켤 수 있고, 기술 진단 모드에서는 꺼집니다. 손 채우기는 쓰지 않습니다. |
 

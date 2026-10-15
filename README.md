@@ -60,7 +60,7 @@ MediaPipe code is Apache 2.0; consult upstream model cards/terms for selected mo
 |---|---|
 | `src/motion/video.ts` | Bounded local video decoding, frame seeks, sampling, pixel unmirroring, progress/cancel |
 | `detector.ts`, `detector.worker.ts` | Replaceable detector contract; real Pose + Hand Tasks inference in a worker or iOS document-backed CPU adapter |
-| `handRegions.ts`, `visionResult.ts` | 0.3.0 hand-region re-detection: pose-predicted crops, crop→frame inverse, confidence fusion |
+| `handRegions.ts`, `visionResult.ts`, `association.ts` | Experimental 0.3.1 hand-region gap-fill: pose-predicted crops for sides the wrist rule left empty, crop→frame inverse, one hand per side; the single-frame wrist association it shares with the solver |
 | `extract.ts`, `pipeline.ts` | Shared Motion Lab / batch extraction entry; pipeline version metadata |
 | `math.ts` | Explicit coordinate conversion, hand registration, two-bone IK, quaternion frames and wrist limits |
 | `tracking.ts` | Unique anatomical wrist association, confidence gating, ambiguous-crossing rejection |
@@ -110,18 +110,18 @@ Learning Mode now starts from `public/content/manifest.json`. Approved expressio
 
 See [source and rights research](docs/KSL_CONTENT_RESEARCH.md) and [content preparation, review and publishing](docs/CONTENT_PUBLISHING.md). `npm run content:validate` checks rights, separate reviews, evidence documents, asset integrity and published-version compatibility; production builds run it automatically. Motion Lab and its local inspection flow remain available.
 
-## Batch processing and the experimental pipeline 0.3.0
+## Batch processing and the experimental pipeline 0.3.1
 
-Motion Lab and `npm run motion:batch` extract with pipeline **0.2.0** by default. Pipeline **0.3.0** is an opt-in experiment: Motion Lab's **실험: 손 영역 재검출** checkbox or `--pipeline 0.3.0`.
+Motion Lab and `npm run motion:batch` extract with pipeline **0.2.0** by default. Pipeline **0.3.1** is an opt-in experiment: Motion Lab's **실험: 손 영역 재검출** checkbox or `--pipeline 0.3.1`.
 
-- After the unchanged full-frame pass, 0.3.0 re-detects each hand in a pose-predicted crop sized from the image-space forearm. The crop is upscaled to 320 px and run through an IMAGE-mode HandLandmarker.
-- Region hands are fused with full-frame hands by handedness score. Duplicates are recognized by landmark correspondence, and left/right assignment keeps the existing wrist rules.
-- 0.3.0 clips record `pipeline.handRegions`, a learner-display temporal policy, and each hand's `origin`, all within schema 1.
+- 0.3.1 keeps the full-frame hands exactly as 0.2.0 stores them. Only a side the wrist rule left without a hand gets a pose-predicted crop, sized from the image-space forearm, upscaled to 320 px and run through an IMAGE-mode HandLandmarker.
+- At most one crop hand per side is added, chosen by distance to that side's pose wrist, never by handedness label.
+- A fill is kept only if the same wrist rule still assigns every full-frame hand as before. A frame whose full-frame pass found two hands is therefore identical to 0.2.0.
+- 0.3.1 clips record `pipeline.handRegions` (method `pose-forearm-roi-v2-gapfill`), a learner-display temporal policy, and each hand's `origin`, all within schema 1.
+- The earlier 0.3.0 let crop hands compete with full-frame hands by score. On the private evaluation it did not reduce missing hands and, with two nearby hands, displaced correctly tracked ones. Its clips still load but are no longer produced.
 
-On the private real-video evaluation (run-2), 0.3.0 did not reduce missing hands and cost more than 2× throughput, so it stays experimental.
-
-The learner display's hand filling now has a safeguard: hands with too little observed evidence in the signing interval, or with off-screen wrists, are hidden rather than filled. On published course 1, this changes 2 frames per hand in ksl-meet.
+The learner display's hand filling has a safeguard: hands with too little observed evidence in the signing interval, or with off-screen wrists, are hidden rather than filled.
 
 `npm run motion:batch`, `motion:compare` (with `--trace <file>` for frame-by-frame diagnostics) and `motion:report` process local videos in headless Chromium through the same `extractMotion()` path, with all off-machine requests blocked. Reports go to `work/` and contain numbers and coordinates only.
 
-See [batch processing and 0.3.0](docs/MOTION_BATCH.md) and the [recording guide](docs/RECORDING_GUIDE.md) for contributors. Real-video comparisons run privately; private videos and derived JSON are never committed.
+See [batch processing and 0.3.1](docs/MOTION_BATCH.md) and the [recording guide](docs/RECORDING_GUIDE.md) for contributors. Real-video comparisons run privately; private videos and derived JSON are never committed.
