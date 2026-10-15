@@ -6,8 +6,8 @@ export const arr = (a: Vector3): Vec3 => [a.x, a.y, a.z];
 export const qa = (a: Quaternion): Quat => [a.x, a.y, a.z, a.w];
 export const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x));
 export const rad = (d: number) => d * Math.PI / 180;
-export const valid = (p: Landmark | undefined): p is Landmark => !!p && [p.x, p.y, p.z].every(Number.isFinite);
-export const confidence = (p: Landmark | undefined) => valid(p) ? Math.min(p.visibility ?? 1, p.presence ?? 1) : 0;
+import { confidence, valid } from './landmark';
+export { confidence, valid };
 export const cameraToAvatar = (p: Landmark) => new Vector3(p.x, -p.y, -p.z);
 export const unmirrorImage = (p: Landmark): Landmark => ({ ...p, x: 1 - p.x });
 export function normalizeBody(points: Landmark[]) {

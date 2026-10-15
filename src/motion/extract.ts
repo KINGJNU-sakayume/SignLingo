@@ -9,9 +9,9 @@ export type ExtractOptions = {
   pipeline: PipelineVersion; mirrored: boolean; sampleHz: number; signal: AbortSignal;
   progress: (p: Progress) => void; measurements?: (m: ExtractionMeasurements) => void;
 };
-/** 0.2.0: the full-frame detector exactly as before. 0.3.0: plus pose-guided hand-region re-detection. */
+/** 0.2.0: the full-frame detector exactly as before. 0.3.1: plus pose-guided re-detection for empty sides only. */
 export function detectorFor(pipeline: PipelineVersion): LandmarkDetector {
-  return pipeline === '0.3.0' ? new MediaPipeDetector(undefined, { handRegions: HAND_REGION_DEFAULTS }) : new MediaPipeDetector();
+  return pipeline === '0.3.1' ? new MediaPipeDetector(undefined, { handRegions: HAND_REGION_DEFAULTS }) : new MediaPipeDetector();
 }
 /**
  * Motion Lab's extraction path. The batch tool calls this same function in headless Chromium, so a batch

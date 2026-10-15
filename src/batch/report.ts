@@ -18,14 +18,14 @@ export type StateCounts = {
   onscreenFailure: number;
 };
 export type SideMetrics = StateCounts & {
-  /** Tracked frames whose assigned hand came from a region crop (0.3.0). */
+  /** Tracked frames whose assigned hand came from a region crop (0.3.x). */
   regionTracked: number;
   reasons: Record<MissingReason, number>;
 };
 export type Interval = { start: number; end: number; method: string };
 export type DiscardReason = Extract<HandFate, { discarded: string }>['discarded'];
 export type DetectionMetrics = {
-  /** Hands stored after detection (and 0.3.0 fusion), by origin; 0.1.0/0.2.0 hands are full-frame. */
+  /** Hands stored after detection (and 0.3.x region re-detection), by origin; 0.1.0/0.2.0 hands are full-frame. */
   stored: { frame: number; region: number };
   assigned: { frame: number; region: number };
   /** Stored hands tracking.ts did not assign to either side, and why. */
@@ -204,7 +204,7 @@ const DEFINITIONS = [
   '- **누락률**: 저장된 손 상태가 `tracked`가 아닌 프레임(held 포함) ÷ 프레임 수. **동작 구간** 누락률은 `activeInterval`(Practice의 동작 구간 추정) 안의 프레임만 셉니다. 비교표는 두 버전 구간의 합집합을 같이 씁니다.',
   '- **화면 밖**: 누락 프레임 중 pose 손목이 화면 밖(가장자리 2%)이거나 신뢰도 0.45 미만. **화면 안 실패**: 몸통이 있고 손목이 화면 안인데 추적하지 못한 프레임.',
   '- **held**: 복원기가 마지막 손 모양을 ≤200 ms 유지한 프레임(신뢰도 0).',
-  '- **보간**: 학습자 표시(`displayFor(clip, \'learner\')`)에서 시간 복원이 앞뒤 관측 사이를 메운 프레임. 0.3.0 클립에만 적용됩니다.',
+  '- **보간**: 학습자 표시(`displayFor(clip, \'learner\')`)에서 시간 복원이 앞뒤 관측 사이를 메운 프레임. 0.3.x 클립에만 적용됩니다.',
   '- **채움 앞·중간·뒤**: 같은 학습자 표시에서 손 채우기가 첫 관측 전·관측 사이·마지막 관측 후를 추정으로 채운 프레임. 보간과 겹치지 않습니다.',
   '- **숨김**: 손 채우기 안전장치가 채우는 대신 숨긴 프레임(관측 근거 부족 또는 손목이 화면 밖).',
   '- **버림**: 저장된 손 중 tracking.ts가 어느 쪽에도 배정하지 않은 손. **중복 쌍**: 같은 손이 두 번 저장된 것으로 보이는 쌍(융합의 같은 손 기준).',
@@ -263,7 +263,7 @@ export function compareMarkdown(report: CompareReport): string {
   const summary = report.versions.map(v => { const t = totals[v]; return [v, `${t.frames}`, rate(t.notTracked.left, t.frames), rate(t.notTracked.right, t.frames),
     rate(t.activeNotTracked.left, t.activeFrames), rate(t.activeNotTracked.right, t.activeFrames), pair(t.offscreen.left, t.offscreen.right), pair(t.onscreen.left, t.onscreen.right),
     pair(t.held.left, t.held.right), pair(t.interpolated.left, t.interpolated.right), pair(t.filled.left, t.filled.right), pair(t.hidden.left, t.hidden.right)]; });
-  return ['# 파이프라인 0.2.0 / 0.3.0 비교', '', ...environmentLines(report.environment),
+  return [`# 파이프라인 ${report.versions.join(' / ')} 비교`, '', ...environmentLines(report.environment),
     `- 조건: 같은 영상·같은 브라우저 세션, ${report.sampleHz} Hz, 좌우 반전 ${report.mirrored ? '예' : '아니요'}, 분석 최대 960 px`, '', ...DEFINITIONS, '',
     table(['클립', '버전', '프레임', '왼손 누락률', '오른손 누락률', 'held 왼/오', '보간 왼/오', '채움 왼손 앞·중간·뒤', '채움 오른손 앞·중간·뒤', '채움 대신 숨김 왼/오'], rows), '',
     '## 동작 구간 (두 버전 구간의 합집합)', '', table(['클립', '버전', '구간', '프레임', '왼손 누락률', '오른손 누락률', '화면 밖 왼/오', '화면 안 실패 왼/오'], activeRows), '',

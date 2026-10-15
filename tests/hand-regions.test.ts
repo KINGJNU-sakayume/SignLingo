@@ -1,6 +1,8 @@
-// Pipeline 0.3.0 hand-region geometry and fusion. Synthetic landmarks only; no MediaPipe, no signer.
+// Pipeline 0.3.1 hand-region geometry and gap-fill. Synthetic landmarks only; no MediaPipe, no signer.
 import { describe, expect, it, vi } from 'vitest';
-import { fuseHands, HAND_REGION_DEFAULTS, handSeparation, predictHandRegions, refineHands, toFrameHand, type HandRegion } from '../src/motion/handRegions';
+import { gapFill, HAND_REGION_DEFAULTS, handSeparation, predictHandRegions, refineHands, toFrameHand, type HandRegion } from '../src/motion/handRegions';
+import { Reconstructor } from '../src/motion/reconstruct';
+import { detection } from './fixtures';
 import { detectWithRegions } from '../src/motion/visionResult';
 import { assignHands } from '../src/motion/tracking';
 import type { HandDetection, Landmark } from '../src/motion/types';
@@ -84,59 +86,92 @@ describe('crop to frame coordinates', () => {
   });
 });
 
-describe('confidence fusion', () => {
-  it('keeps the higher-scoring estimate of the same hand and prefers the full frame on a tie', () => {
-    const frame = hand(.5, .5, { score: .8 }), region = { ...hand(.501, .501, { score: .93 }), origin: 'region' as const };
-    expect(fuseHands([frame], [region], W, H)).toEqual([region]);
-    const tie = fuseHands([frame], [{ ...region, score: .8 }], W, H);
-    expect(tie).toHaveLength(1); expect(tie[0].origin).toBe('frame'); expect(tie[0].image).toEqual(frame.image);
+/** A fake crop detector that sees `inFrame` hands through the given region, in crop coordinates. */
+const seeing = (inFrame: HandDetection[]) => (region: HandRegion) => inFrame
+  .filter(h => h.image[0].x * W > region.x0 && h.image[0].x * W < region.x0 + region.size && h.image[0].y * H > region.y0 && h.image[0].y * H < region.y0 + region.size)
+  .map(h => ({ ...h, image: h.image.map(p => ({ ...p, x: (p.x * W - region.x0) / region.size, y: (p.y * H - region.y0) / region.size, z: p.z * W / region.size })) }));
+const withoutOrigin = (hands: HandDetection[]) => hands.map(({ origin: _origin, ...h }) => h);
+const assigned = (pose: Landmark[], hands: HandDetection[]) => assignHands({ timestamp: 0, body: pose, bodyWorld: pose, hands }).assignment;
+// Two nearby hands, 0.08 image widths apart: the overlapping-crop situation that broke 0.3.0.
+const close = body({ 15: point(.52, .55), 13: point(.54, .75), 16: point(.44, .55), 14: point(.42, .75) });
+const leftHand = hand(.52, .545, { label: 'Left', score: .97 }), rightHand = hand(.44, .545, { label: 'Right', score: .91, direction: -Math.PI / 2 - .3 });
+
+describe('0.3.1 gap-fill', () => {
+  it('leaves a frame whose full-frame pass found both hands exactly as 0.2.0 stored it, without running any crop', async () => {
+    const detectRegion = vi.fn(seeing([{ ...leftHand, score: .98 }, { ...rightHand, label: 'Left', score: .98 }]));
+    const result = await refineHands({ body: close, frameHands: [leftHand, rightHand], width: W, height: H, detectRegion });
+    expect(detectRegion).not.toHaveBeenCalled();
+    expect(withoutOrigin(result.hands)).toEqual([leftHand, rightHand]);
+    expect(result.trace).toMatchObject({ gaps: [], skipped: 'no-gap', candidates: { frame: 2, region: 0 }, regions: { left: null, right: null }, dropped: [] });
+    // Two full-frame hands with one unassigned: still no room for a fill, still 0.2.0.
+    const stray = hand(.95, .1, { label: 'Right', score: .9 });
+    const partial = await refineHands({ body: close, frameHands: [leftHand, stray], width: W, height: H, detectRegion });
+    expect(detectRegion).not.toHaveBeenCalled();
+    expect(withoutOrigin(partial.hands)).toEqual([leftHand, stray]);
+    expect(partial.trace).toMatchObject({ gaps: ['right'], skipped: 'no-room' });
   });
-  it('keeps two touching hands whose boxes overlap but whose landmarks do not correspond', () => {
-    const left = hand(.5, .5, { label: 'Left' }), right = hand(.53, .47, { label: 'Right', direction: Math.PI, score: .7 });
-    expect(handSeparation(left, right, W, H)).toBeGreaterThan(HAND_REGION_DEFAULTS.fusion.sameHand);
-    expect(fuseHands([left], [right], W, H).map(h => h.label)).toEqual(['Left', 'Right']);
+  it('reconstructs the same pose as 0.2.0 when the full frame found two hands', async () => {
+    const d = detection(), { hands } = await refineHands({ body: d.body, frameHands: d.hands, width: 640, height: 480, detectRegion: () => { throw new Error('no crop expected'); } });
+    const a = new Reconstructor().reconstruct(d), b = new Reconstructor().reconstruct({ ...d, hands });
+    expect(b.assignment).toEqual(a.assignment);
+    expect(b.pose).toEqual(a.pose);
   });
-  it('requires closer agreement before merging estimates with opposite handedness labels', () => {
-    const a = hand(.5, .5, { label: 'Left', score: .9 }), b = hand(.5 + .005 * H / W, .505, { label: 'Right', score: .6 });
-    const separation = handSeparation(a, b, W, H);
-    expect(separation).toBeGreaterThan(HAND_REGION_DEFAULTS.fusion.sameHandOppositeLabel);
-    expect(separation).toBeLessThan(HAND_REGION_DEFAULTS.fusion.sameHand);
-    expect(fuseHands([a], [b], W, H)).toHaveLength(2);
-    expect(fuseHands([a], [{ ...b, label: 'Left' }], W, H)).toHaveLength(1);
+  it('keeps both hands when an overlapping crop returns two "Left" hands for the empty side', async () => {
+    // Full frame found only the left hand; the right crop also sees the left hand and labels the right hand "Left".
+    const detectRegion = vi.fn((region: HandRegion) => region.side === 'right' ? seeing([{ ...leftHand, score: .98 }, { ...rightHand, label: 'Left', score: .98 }])(region) : []);
+    const { hands, trace } = await refineHands({ body: close, frameHands: [leftHand], width: W, height: H, detectRegion });
+    expect(detectRegion).toHaveBeenCalledTimes(1);
+    expect(hands.map(h => [h.origin, h.label])).toEqual([['frame', 'Left'], ['region', 'Left']]);
+    expect(assigned(close, hands)).toEqual({ left: 0, right: 1 });
+    expect(trace.gaps).toEqual(['right']);
+    expect(trace.kept).toEqual([{ origin: 'frame', label: 'Left', score: .97 }, { origin: 'region', label: 'Left', score: .98, side: 'right' }]);
+    expect(trace.dropped).toEqual([{ side: 'right', label: 'Left', score: .98, reason: 'duplicate' }]);
+    // Neither hand found by the full frame: each side takes the candidate nearest its own wrist, labels ignored.
+    const both = await refineHands({ body: close, frameHands: [], width: W, height: H, detectRegion: seeing([{ ...rightHand, label: 'Left', score: .98 }, { ...leftHand, score: .97 }]) });
+    expect(both.hands.map(h => h.image[0].x)).toEqual([.52, .44].map(x => expect.closeTo(x, 9)));
+    expect(assigned(close, both.hands)).toEqual({ left: 0, right: 1 });
   });
-  it('merges both regions seeing the same hand, keeps at most two hands by score and drops malformed ones', () => {
-    const seen = [hand(.5, .5, { score: .7 }), hand(.5005, .5, { score: .75 })];
-    expect(fuseHands([], seen, W, H)).toHaveLength(1);
-    const three = [hand(.2, .5, { score: .6 }), hand(.5, .5, { score: .9 }), hand(.8, .5, { score: .7 })];
-    expect(fuseHands(three, [], W, H).map(h => h.score)).toEqual([.9, .7]);
-    const broken = { ...hand(.3, .3, { score: .99 }), image: hand(.3, .3).image.slice(0, 20) };
-    const nan = { ...hand(.6, .3, { score: .98 }), world: hand(.6, .3).world.map((p, i) => i ? p : { ...p, x: NaN }) };
-    expect(fuseHands([broken], [nan], W, H)).toEqual([]);
+  it('never displaces a full-frame hand: a fill that changes an existing assignment is rejected', () => {
+    const pose = body({ 15: point(.50, .55), 13: point(.50, .75), 16: point(.58, .55), 14: point(.58, .75) });
+    const a = hand(.53, .55, { label: 'Left', score: .95 }), b = hand(.51, .55, { label: 'Right', score: .95 });
+    expect(assigned(pose, [a])).toEqual({ left: 0 });
+    expect(assigned(pose, [a, b]).left).not.toBe(0); // 0.3.0 would have stored both and lost the left hand
+    const result = gapFill({ body: pose, frameHands: [a], regionHands: { right: [{ ...b, origin: 'region' }] }, width: W, height: H });
+    expect(withoutOrigin(result.hands)).toEqual([a]);
+    expect(result.fills).toEqual({});
+    expect(result.dropped).toEqual([{ side: 'right', label: 'Right', score: .95, reason: 'rejected-by-tracking' }]);
+  });
+  it('chooses one candidate per side by wrist distance, not by label or score, and says why the others were dropped', () => {
+    const near = hand(.62, .545, { label: 'Right', score: .6 }), farther = hand(.64, .56, { label: 'Left', score: .99 });
+    const weak = hand(.61, .55, { score: .3 }), outside = hand(.95, .2, { score: .99 }), broken = { ...hand(.6, .5), image: hand(.6, .5).image.slice(0, 20) };
+    const result = gapFill({ body: body(), frameHands: [], regionHands: { left: [farther, weak, outside, broken, near] }, width: W, height: H });
+    expect(result.fills).toEqual({ left: 0 });
+    expect(result.hands[0].image[0]).toEqual(near.image[0]);
+    expect(result.dropped.map(d => d.reason).sort()).toEqual(['far-from-wrist', 'invalid', 'low-score', 'not-best']);
+    // Both crops saw one hand near two close wrists: the nearer wrist keeps it.
+    const pose = body({ 15: point(.50, .55), 13: point(.50, .75), 16: point(.54, .55), 14: point(.54, .75) });
+    const shared = hand(.51, .55, { label: 'Left', score: .9 });
+    const split = gapFill({ body: pose, frameHands: [], regionHands: { left: [shared], right: [shared] }, width: W, height: H });
+    expect(split.fills).toEqual({ left: 0 });
+    expect(split.dropped).toEqual([{ side: 'right', label: 'Left', score: .9, reason: 'duplicate' }]);
   });
 });
 
 describe('re-detection orchestration', () => {
-  /** A fake crop detector that sees `inFrame` hands through the given region, in crop coordinates. */
-  const seeing = (inFrame: HandDetection[]) => (region: HandRegion) => inFrame
-    .filter(h => h.image[0].x * W > region.x0 && h.image[0].x * W < region.x0 + region.size && h.image[0].y * H > region.y0 && h.image[0].y * H < region.y0 + region.size)
-    .map(h => ({ ...h, image: h.image.map(p => ({ ...p, x: (p.x * W - region.x0) / region.size, y: (p.y * H - region.y0) / region.size, z: p.z * W / region.size })) }));
   it('adds a hand only the crop found; the unchanged wrist rule assigns it to its anatomical side', async () => {
     const pose = body(), small = hand(.62, .545, { label: 'Left', score: .88 });
     const { hands, regions } = await refineHands({ body: pose, frameHands: [], width: W, height: H, detectRegion: seeing([small]) });
     expect(regions.left).not.toBeNull();
     expect(hands).toHaveLength(1); expect(hands[0].origin).toBe('region');
     expect(hands[0].image[0].x).toBeCloseTo(.62, 9);
-    const { assignment } = assignHands({ timestamp: 0, body: pose, bodyWorld: pose, hands });
-    expect(assignment).toEqual({ left: 0 });
+    expect(assigned(pose, hands)).toEqual({ left: 0 });
   });
-  it('still withholds a hand between crossing wrists', async () => {
+  it('does not add a hand the wrist rule would withhold between crossing wrists', async () => {
     const pose = body({ 15: point(.5, .55), 16: point(.52, .55), 13: point(.6, .75), 14: point(.42, .75) });
     const between = hand(.51, .55, { label: 'Left', score: .9 });
-    const { hands } = await refineHands({ body: pose, frameHands: [], width: W, height: H, detectRegion: seeing([between]) });
-    expect(hands).toHaveLength(1); // both crops saw it: one hand after fusion
-    const result = assignHands({ timestamp: 0, body: pose, bodyWorld: pose, hands });
-    expect(result.assignment).toEqual({});
-    expect(result.warnings.some(w => w.startsWith('Ambiguous hand identity'))).toBe(true);
+    const { hands, trace } = await refineHands({ body: pose, frameHands: [], width: W, height: H, detectRegion: seeing([between]) });
+    expect(hands).toEqual([]);
+    expect(trace.dropped.map(d => d.reason)).toEqual(['duplicate', 'rejected-by-tracking']);
   });
   it('cuts each square from the detail frame and upscales it to the crop size', async () => {
     const drawImage = vi.fn(), context = { clearRect: vi.fn(), drawImage, imageSmoothingEnabled: false, imageSmoothingQuality: 'low' };

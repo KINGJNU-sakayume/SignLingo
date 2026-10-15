@@ -1,8 +1,9 @@
-// Frame-by-frame 0.2.0 / 0.3.0 diagnostics for `motion:compare --trace <clip>`. Pure.
+// Frame-by-frame 0.2.0 / 0.3.x diagnostics for `motion:compare --trace <clip>`. Pure.
 // Records numbers and coordinates only: candidate counts, crop boxes, labels, scores, tracking decisions and
 // hand states. No pixels, images, thumbnails or landmarks are written.
 import type { FusionDrop, FusionTrace } from '../motion/handRegions';
 import { HAND_REGION_DEFAULTS, handSeparation } from '../motion/handRegions';
+import { EXPERIMENTAL_PIPELINE } from '../motion/pipeline';
 import { wristInImage } from '../motion/tracking';
 import { SIDES, type MotionClip, type Side, type TrackingState } from '../motion/types';
 import { handFates, missingReason, type DiscardReason, type MissingReason } from './report';
@@ -12,7 +13,9 @@ export type TraceHand = { origin: 'frame' | 'region'; label: string; score: numb
 export type TraceFrame = {
   index: number; timestamp: number;
   candidates: { frame: number; region: number };
-  /** Predicted crop boxes in crop-source pixels (0.3.0 only). */
+  /** Sides without a full-frame hand, and why no region ran (0.3.1 only). */
+  gaps?: Side[]; skipped?: FusionTrace['skipped'];
+  /** Predicted crop boxes in crop-source pixels (region pipelines only). */
   regions: FusionTrace['regions'] | null;
   /** Hands kept after fusion, as stored, with what tracking.ts did with each. */
   hands: TraceHand[];
@@ -36,6 +39,7 @@ export function traceRun(clip: MotionClip, fusion: readonly FusionRecord[] = [])
     return {
       index, timestamp: frame.timestamp,
       candidates: record?.candidates ?? { frame: frame.hands.length, region: 0 },
+      ...(record ? { gaps: record.gaps, ...(record.skipped ? { skipped: record.skipped } : {}) } : {}),
       regions: record?.regions ?? null,
       hands: frame.hands.map((h, i) => ({ origin: h.origin ?? 'frame', label: h.label, score: h.score, ...fates[i] })),
       fusionDropped: record?.dropped ?? [], duplicatePairs,
@@ -58,15 +62,15 @@ type Change = { side: Side; kind: 'worse' | 'better' | 'other'; a: TraceFrame; b
 /** Reason labels counted in one version's frame for one side: tracking discards, fusion drops, the side's missing reason, duplicates. */
 function reasons(frame: TraceFrame, side: Side): string[] {
   const out = frame.hands.flatMap(h => h.discarded ? [`tracking 버림: ${h.discarded}`] : []);
-  out.push(...frame.fusionDropped.map(d => `융합 제외: ${d.reason} (${d.origin})`));
+  out.push(...frame.fusionDropped.map(d => `영역 후보 제외: ${d.reason} (${d.side === 'left' ? '왼쪽' : '오른쪽'} 영역)`));
   const s = frame.sides[side];
   if (s.reason) out.push(`${side === 'left' ? '왼손' : '오른손'} 상태 원인: ${s.reason}`);
   for (let i = 0; i < frame.duplicatePairs; i++) out.push('저장: 같은 손 중복');
   return out;
 }
 
-/** Human summary: where 0.3.0 changed a hand's state relative to 0.2.0, and which reasons grew in the worsened frames. */
-export function traceMarkdown(report: TraceReport, base = '0.2.0', other = '0.3.0'): string {
+/** Human summary: where the region pipeline changed a hand's state relative to 0.2.0, and which reasons grew in the worsened frames. */
+export function traceMarkdown(report: TraceReport, base = '0.2.0', other: string = EXPERIMENTAL_PIPELINE): string {
   const a = report.runs[base], b = report.runs[other];
   const lines = [`# 프레임 추적: ${report.clip}`, '', `- SHA-256 \`${report.sha256}\`, ${report.sampleHz} Hz`, `- 비교: ${base} → ${other}`, `- ${report.notice}`, ''];
   if (!a || !b) return [...lines, `두 버전의 결과가 모두 있어야 비교할 수 있습니다 (있는 버전: ${Object.keys(report.runs).join(', ') || '없음'}).`, ''].join('\n');
@@ -113,6 +117,6 @@ export function traceMarkdown(report: TraceReport, base = '0.2.0', other = '0.3.
   lines.push(`## 악화 프레임(${worse.length}개 손·프레임)에서 늘어난 사유`, '');
   if (!ranked.length) lines.push('- 늘어난 사유 없음');
   else lines.push('| 순위 | 사유 | ' + base + ' | ' + other + ' | 증가 |', '| --- | --- | --- | --- | --- |', ...ranked.map((r, i) => `| ${i + 1} | ${r.reason} | ${r.x} | ${r.y} | +${r.delta} |`));
-  lines.push('', '사유는 해당 손·프레임에서 셉니다. 한 프레임의 버림·융합 제외는 양손 각각의 악화 프레임에 함께 셀 수 있습니다. 상세 값은 같은 이름의 JSON에 있습니다.', '');
+  lines.push('', '사유는 해당 손·프레임에서 셉니다. 한 프레임의 버림·영역 후보 제외는 양손 각각의 악화 프레임에 함께 셀 수 있습니다. 상세 값은 같은 이름의 JSON에 있습니다.', '');
   return lines.join('\n');
 }

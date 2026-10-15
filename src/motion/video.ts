@@ -47,7 +47,7 @@ export async function processVideo(file: File,detector: LandmarkDetector,options
     const scale=Math.min(1,(options.maxDimension??960)/Math.max(video.videoWidth,video.videoHeight));
     canvas.width=Math.round(video.videoWidth*scale);canvas.height=Math.round(video.videoHeight*scale);
     const ctx=canvas.getContext('2d');if (!ctx) throw new Error('Canvas 2D is unavailable.');
-    // 0.3.0 hand-region crops are cut from a sharper copy of the same decoded frame when the source is larger
+    // 0.3.1 hand-region crops are cut from a sharper copy of the same decoded frame when the source is larger
     // than the analysis canvas. The full-frame pose/hand pass keeps the analysis canvas exactly as in 0.2.0.
     const regions=detector.handRegions,detailScale=regions?Math.min(1,regions.cropSourceMaxDimension/Math.max(video.videoWidth,video.videoHeight)):0;
     const detailCanvas=regions&&detailScale>scale+1e-9?document.createElement('canvas'):undefined;

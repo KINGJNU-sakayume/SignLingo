@@ -1,35 +1,37 @@
-import type { HandDetection, HandRegionSettings, Landmark, Side } from './types';
+import { assignHandsDetailed, MIN_HAND_SCORE, WRIST_GATE } from './association';
+import { confidence, valid } from './landmark';
+import { SIDES, type Detection, type HandDetection, type HandRegionSettings, type Landmark, type Side } from './types';
 
 /**
- * Pipeline 0.3.0 hand re-detection. Small hands (≈50 px in a 700 px frame) shrink to ≈15 px in the palm
- * detector's 192 px input and are missed. Each pose wrist predicts a square around its hand; the square is cut
- * from the decoded frame, upscaled and given to an IMAGE-mode HandLandmarker, and its landmarks are mapped back
- * to full-frame image coordinates. Pure: no MediaPipe or canvas code, so the geometry and fusion rules are
- * unit-tested; detectors inject the actual crop + inference.
+ * Pipeline 0.3.1 hand re-detection, gap-fill only. Small hands (≈50 px in a 700 px frame) shrink to ≈15 px in
+ * the palm detector's 192 px input and are missed. The full-frame detection is kept exactly as it is; only a
+ * side the wrist rule (association.ts) leaves without a hand gets a square predicted from its pose wrist, cut
+ * from the decoded frame, upscaled and given to an IMAGE-mode HandLandmarker. At most one region hand per side
+ * is added, chosen by distance to that side's wrist, never by handedness label, and only if the same wrist rule
+ * then keeps every full-frame assignment and places the new hand on its own side. Pure: detectors inject the
+ * crop + inference, so the geometry and selection rules are unit-tested.
  *
- * Left/right is NOT decided here. Fused hands go through the unchanged wrist association in tracking.ts.
+ * 0.3.0 let region hands compete with full-frame hands by score (top 2 kept). With two nearby hands, a crop could
+ * relabel one of them so that two "Left" estimates displaced the right hand and both sides were withheld.
  */
 export const HAND_REGION_DEFAULTS: HandRegionSettings = {
-  method: 'pose-forearm-roi-v1',
+  method: 'pose-forearm-roi-v2-gapfill',
   cropSize: 320,
   sizeToForearm: 1.6,
   centerAlongHand: 0.35,
   minShoulderFraction: 0.55,
-  minWristConfidence: 0.3,
+  // A fill can only be assigned to a wrist the association trusts.
+  minWristConfidence: 0.45,
   minGuideConfidence: 0.3,
   minRegionPixels: 32,
   cropSourceMaxDimension: 1920,
-  fusion: { rule: 'max-score-landmark-nms', sameHand: 0.35, sameHandOppositeLabel: 0.15, maxHands: 2 },
+  fusion: { rule: 'gap-fill-per-side', sameHand: 0.35, maxWristDistance: WRIST_GATE, minScore: MIN_HAND_SCORE, perSide: 1 },
   landmarker: { runningMode: 'IMAGE', numHands: 2, minHandDetectionConfidence: 0.5, minHandPresenceConfidence: 0.5 },
 };
 
 /** Axis-aligned square in source pixels. x0/y0 can lie outside the image only when `padded`. */
 export type HandRegion = { side: Side; x0: number; y0: number; size: number; padded: boolean };
 type Point = { x: number; y: number };
-
-// Local copies of math.ts helpers keep three.js out of the inference worker bundle.
-const finite = (p: Landmark | undefined): p is Landmark => !!p && [p.x, p.y, p.z].every(Number.isFinite);
-const confidence = (p: Landmark | undefined) => finite(p) ? Math.min(p.visibility ?? 1, p.presence ?? 1) : 0;
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 const POSE = { left: { wrist: 15, elbow: 13, pinky: 17, index: 19 }, right: { wrist: 16, elbow: 14, pinky: 18, index: 20 } } as const;
 
@@ -79,7 +81,7 @@ export function toFrameHand(hand: HandDetection, region: HandRegion, width: numb
   return { ...hand, image, origin: 'region' };
 }
 
-const usable = (h: HandDetection) => h.image.length === 21 && h.world.length === 21 && h.image.every(finite) && h.world.every(finite) && Number.isFinite(h.score);
+const usable = (h: HandDetection) => h.image.length === 21 && h.world.length === 21 && h.image.every(valid) && h.world.every(valid) && Number.isFinite(h.score);
 /** Mean landmark distance between two estimates, in units of their mean palm length (wrist → middle MCP). */
 export function handSeparation(a: HandDetection, b: HandDetection, width: number, height: number): number {
   const px = (p: Landmark): Point => ({ x: p.x * width, y: p.y * height });
@@ -88,70 +90,113 @@ export function handSeparation(a: HandDetection, b: HandDetection, width: number
   const mean = a.image.reduce((sum, p, i) => sum + distance(px(p), px(b.image[i])), 0) / a.image.length;
   return scale > 1e-9 ? mean / scale : mean > 1e-9 ? Infinity : 0;
 }
+
+export type FusionDrop = {
+  /** The side whose region produced the candidate. */
+  side: Side; label: string; score: number;
+  reason: 'invalid' | 'low-score' | 'duplicate' | 'far-from-wrist' | 'not-best' | 'no-room' | 'rejected-by-tracking';
+};
+type Candidate = { side: Side; hand: HandDetection; distance: number };
+const asDetection = (body: Landmark[], hands: HandDetection[]): Detection => ({ timestamp: 0, body, bodyWorld: [], hands });
+
 /**
- * Confidence fusion: candidates are ordered by handedness score (the only per-hand confidence Tasks Vision
- * returns; a classification proxy, not localization accuracy), ties prefer the full-frame estimate, and a
- * candidate is suppressed when it is the same physical hand as one already kept. Same hand means corresponding
- * landmarks nearly coincide, not overlapping boxes, so two touching hands both survive. The winner is kept
- * whole: averaging two estimates would produce a hand neither model saw.
+ * Gap-fill selection. Full-frame hands are returned unchanged (tagged `origin: 'frame'`). For each side with
+ * region candidates, the nearest usable candidate to that side's pose wrist wins; a candidate that repeats a
+ * full-frame hand is dropped; if both sides picked the same hand, the nearer wrist keeps it. Fills never push the
+ * total past two hands and are kept only if the wrist rule still assigns every full-frame hand as before and
+ * puts each fill on its own side (otherwise the farthest fill is dropped and the rest re-checked).
  */
-export type FusionDrop = { origin: 'frame' | 'region'; label: string; score: number; reason: 'invalid' | 'duplicate' | 'cap' };
-/** `fuseHands` plus every candidate it left out and why: malformed, the same hand as a kept one, or over `maxHands`. */
-export function fuseHandsDetailed(frameHands: HandDetection[], regionHands: HandDetection[], width: number, height: number, fusion: HandRegionSettings['fusion'] = HAND_REGION_DEFAULTS.fusion): { hands: HandDetection[]; dropped: FusionDrop[] } {
-  const all = [...frameHands.map(h => ({ ...h, origin: 'frame' as const })), ...regionHands.map(h => ({ ...h, origin: 'region' as const }))].map((hand, order) => ({ hand, order }));
-  const drop = (hand: HandDetection, reason: FusionDrop['reason']): FusionDrop => ({ origin: hand.origin ?? 'frame', label: hand.label, score: hand.score, reason });
-  const dropped = all.filter(c => !usable(c.hand)).map(c => drop(c.hand, 'invalid'));
-  const candidates = all.filter(c => usable(c.hand));
-  candidates.sort((a, b) => b.hand.score - a.hand.score || (a.hand.origin === b.hand.origin ? 0 : a.hand.origin === 'frame' ? -1 : 1) || a.order - b.order);
-  const kept: HandDetection[] = [];
-  for (const { hand } of candidates) {
-    const duplicate = kept.some(k => {
-      const separation = handSeparation(k, hand, width, height);
-      return separation < (k.label === hand.label ? fusion.sameHand : fusion.sameHandOppositeLabel);
-    });
-    if (duplicate) dropped.push(drop(hand, 'duplicate'));
-    else if (kept.length >= fusion.maxHands) dropped.push(drop(hand, 'cap'));
-    else kept.push(hand);
+export function gapFill(input: {
+  body: Landmark[]; frameHands: HandDetection[]; regionHands: Partial<Record<Side, HandDetection[]>>;
+  width: number; height: number; fusion?: HandRegionSettings['fusion'];
+}): { hands: HandDetection[]; fills: Partial<Record<Side, number>>; dropped: FusionDrop[] } {
+  const fusion = input.fusion ?? HAND_REGION_DEFAULTS.fusion, { width, height } = input;
+  const frame = input.frameHands.map(h => ({ ...h, origin: 'frame' as const }));
+  const base = assignHandsDetailed(asDetection(input.body, frame)).assignment;
+  const dropped: FusionDrop[] = [];
+  const drop = (side: Side, hand: HandDetection, reason: FusionDrop['reason']) => dropped.push({ side, label: hand.label, score: hand.score, reason });
+  const eligible: Record<Side, Candidate[]> = { left: [], right: [] };
+  for (const side of SIDES) {
+    const wrist = input.body[side === 'left' ? 15 : 16];
+    for (const hand of input.regionHands[side] ?? []) {
+      if (!usable(hand)) { drop(side, hand, 'invalid'); continue; }
+      if (hand.score < fusion.minScore) { drop(side, hand, 'low-score'); continue; }
+      if (frame.some(f => usable(f) && handSeparation(f, hand, width, height) < fusion.sameHand)) { drop(side, hand, 'duplicate'); continue; }
+      const d = confidence(wrist) >= .45 ? Math.hypot(wrist.x - hand.image[0].x, wrist.y - hand.image[0].y) : Infinity;
+      if (!(d <= fusion.maxWristDistance)) { drop(side, hand, 'far-from-wrist'); continue; }
+      eligible[side].push({ side, hand, distance: d });
+    }
+    eligible[side].sort((a, b) => a.distance - b.distance || b.hand.score - a.hand.score);
   }
-  return { hands: kept, dropped };
-}
-/**
- * Confidence fusion: candidates are ordered by handedness score (the only per-hand confidence Tasks Vision
- * returns; a classification proxy, not localization accuracy), ties prefer the full-frame estimate, and a
- * candidate is suppressed when it is the same physical hand as one already kept. Same hand means corresponding
- * landmarks nearly coincide, not overlapping boxes, so two touching hands both survive. The winner is kept
- * whole: averaging two estimates would produce a hand neither model saw.
- */
-export function fuseHands(frameHands: HandDetection[], regionHands: HandDetection[], width: number, height: number, fusion: HandRegionSettings['fusion'] = HAND_REGION_DEFAULTS.fusion): HandDetection[] {
-  return fuseHandsDetailed(frameHands, regionHands, width, height, fusion).hands;
+  // One per side. Overlapping crops can return the same hand to both sides: the nearer wrist keeps it.
+  const next: Record<Side, number> = { left: 0, right: 0 };
+  for (;;) {
+    const l = eligible.left[next.left], r = eligible.right[next.right];
+    if (!l || !r || handSeparation(l.hand, r.hand, width, height) >= fusion.sameHand) break;
+    if (l.distance <= r.distance) { drop('right', r.hand, 'duplicate'); next.right++; } else { drop('left', l.hand, 'duplicate'); next.left++; }
+  }
+  const picks: Candidate[] = [];
+  for (const side of SIDES) {
+    const chosen = eligible[side][next[side]];
+    if (!chosen) continue;
+    picks.push(chosen);
+    for (const other of eligible[side].slice(next[side] + 1)) drop(side, other.hand, 'not-best');
+  }
+  picks.sort((a, b) => a.distance - b.distance);
+  const room = Math.max(0, 2 - frame.length);
+  for (const c of picks.slice(room)) drop(c.side, c.hand, 'no-room');
+  const fills = picks.slice(0, room);
+  while (fills.length) {
+    const hands = [...frame, ...fills.map(c => c.hand)];
+    const after = assignHandsDetailed(asDetection(input.body, hands)).assignment;
+    const kept = SIDES.every(side => base[side] === undefined || after[side] === base[side]);
+    const placed = fills.every((c, k) => after[c.side] === frame.length + k);
+    if (kept && placed) return { hands, fills: Object.fromEntries(fills.map((c, k) => [c.side, frame.length + k])), dropped };
+    const farthest = fills.pop()!;
+    drop(farthest.side, farthest.hand, 'rejected-by-tracking');
+  }
+  return { hands: frame, fills: {}, dropped };
 }
 
 /**
- * Numbers and coordinates only, for `motion:compare --trace`: candidate counts, predicted boxes (crop-source
- * pixels), what fusion kept and what it dropped. Never stored in a MotionClip; no pixels.
+ * Numbers and coordinates only, for `motion:compare --trace`: candidate counts, the sides that needed a fill,
+ * predicted boxes (crop-source pixels), what was kept and what was dropped. Never stored in a MotionClip; no pixels.
  */
 export type FusionTrace = {
   source: { width: number; height: number };
   candidates: { frame: number; region: number };
+  /** Sides the wrist rule left without a full-frame hand. */
+  gaps: Side[];
+  /** No region ran: every side already had a hand, or the full frame already holds two hands. */
+  skipped?: 'no-gap' | 'no-room';
   regions: Record<Side, { x0: number; y0: number; size: number } | null>;
-  kept: { origin: 'frame' | 'region'; label: string; score: number }[];
+  kept: { origin: 'frame' | 'region'; label: string; score: number; side?: Side }[];
   dropped: FusionDrop[];
 };
 
-/** Runs one frame's re-detection. `detectRegion` crops `region` from the source, upscales it and returns crop-normalized hands. */
+/** Runs one frame's gap-fill. `detectRegion` crops `region` from the source, upscales it and returns crop-normalized hands. */
 export async function refineHands(input: {
   body: Landmark[]; frameHands: HandDetection[]; width: number; height: number; settings?: HandRegionSettings;
   detectRegion: (region: HandRegion) => HandDetection[] | Promise<HandDetection[]>;
 }): Promise<{ hands: HandDetection[]; regions: Record<Side, HandRegion | null>; trace: FusionTrace }> {
-  const settings = input.settings ?? HAND_REGION_DEFAULTS;
-  const regions = predictHandRegions(input.body, input.width, input.height, settings);
-  const regional: HandDetection[] = [];
-  for (const region of [regions.left, regions.right]) {
-    if (!region) continue;
-    for (const hand of await input.detectRegion(region)) regional.push(toFrameHand(hand, region, input.width, input.height));
+  const settings = input.settings ?? HAND_REGION_DEFAULTS, { width, height } = input;
+  const base = assignHandsDetailed(asDetection(input.body, input.frameHands)).assignment;
+  const gaps = SIDES.filter(side => base[side] === undefined);
+  // A frame that already holds two hands is left as the full-frame pass produced it (no region inference).
+  const skipped = !gaps.length ? 'no-gap' as const : input.frameHands.length >= 2 ? 'no-room' as const : undefined;
+  const predicted = skipped ? { left: null, right: null } : predictHandRegions(input.body, width, height, settings);
+  const regions: Record<Side, HandRegion | null> = { left: gaps.includes('left') ? predicted.left : null, right: gaps.includes('right') ? predicted.right : null };
+  const regionHands: Record<Side, HandDetection[]> = { left: [], right: [] };
+  for (const side of SIDES) {
+    const region = regions[side];
+    if (region) for (const hand of await input.detectRegion(region)) regionHands[side].push(toFrameHand(hand, region, width, height));
   }
-  const { hands, dropped } = fuseHandsDetailed(input.frameHands, regional, input.width, input.height, settings.fusion);
+  const { hands, fills, dropped } = gapFill({ body: input.body, frameHands: input.frameHands, regionHands, width, height, fusion: settings.fusion });
   const box = (r: HandRegion | null) => r && { x0: r.x0, y0: r.y0, size: r.size };
-  return { hands, regions, trace: { source: { width: input.width, height: input.height }, candidates: { frame: input.frameHands.length, region: regional.length },
-    regions: { left: box(regions.left), right: box(regions.right) }, kept: hands.map(h => ({ origin: h.origin ?? 'frame', label: h.label, score: h.score })), dropped } };
+  const fillSide = (i: number) => SIDES.find(side => fills[side] === i);
+  return { hands, regions, trace: {
+    source: { width, height }, candidates: { frame: input.frameHands.length, region: regionHands.left.length + regionHands.right.length },
+    gaps, ...(skipped ? { skipped } : {}), regions: { left: box(regions.left), right: box(regions.right) },
+    kept: hands.map((h, i) => { const side = fillSide(i); return { origin: h.origin ?? 'frame', label: h.label, score: h.score, ...(side ? { side } : {}) }; }),
+    dropped } };
 }

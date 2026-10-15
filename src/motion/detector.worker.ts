@@ -4,7 +4,7 @@ import { MODELS } from './types';
 import type { HandRegionSettings } from './types';
 import { cleanLandmarks as clean, detectWithRegions, handsFrom, regionLandmarkerOptions } from './visionResult';
 let pose: PoseLandmarker, hands: HandLandmarker;
-// Optional pipeline 0.3.0 crop re-detection: a separate IMAGE-mode task, so full-frame VIDEO tracking is untouched.
+// Optional pipeline 0.3.1 gap-fill crops: a separate IMAGE-mode task, so full-frame VIDEO tracking is untouched.
 let regionHands: HandLandmarker | undefined, regions: HandRegionSettings | undefined, surface: OffscreenCanvas | undefined;
 self.onmessage=async (event: MessageEvent)=>{
   const {type,frame,detail,timestampMs,handRegions}=event.data;

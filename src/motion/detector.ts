@@ -9,7 +9,7 @@ export function releaseFrame(frame: VisionFrame) { if ('close' in frame) frame.c
 // A mesh-only model must convert its joint convention before implementing this interface.
 export interface LandmarkDetector {
   readonly id: string;
-  /** Present when hands are also re-detected in pose-predicted crops (pipeline 0.3.0). */
+  /** Present when hands missing from the full-frame pass are re-detected in pose-predicted crops (pipeline 0.3.1). */
   readonly handRegions?: HandRegionSettings;
   /** Diagnostics of the latest detect() with hand regions; not part of the Detection or any MotionClip. */
   readonly lastFusion?: FusionTrace;

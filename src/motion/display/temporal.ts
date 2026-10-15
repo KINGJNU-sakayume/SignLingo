@@ -28,7 +28,7 @@ const count = (display: DisplayClip, side: Side) => {
 
 /**
  * Display-only temporal reconstruction (`conservative-bidirectional-v1`) as the first learner stage. Clips record
- * the policy from pipeline 0.3.0 on, so published 0.2.0 clips keep exactly the hands they were reviewed with.
+ * the policy from pipeline 0.3.x on, so published 0.2.0 clips keep exactly the hands they were reviewed with.
  * Short gaps between reliable observations become `interpolated` hands; what remains is left to later stages.
  * The stored clip, its evidence and Practice comparisons never see this result.
  */

@@ -15,9 +15,9 @@ import { Reconstructor } from '../src/motion/reconstruct';
 import { MODELS, SIDES, type MotionClip } from '../src/motion/types';
 
 describe('arguments', () => {
-  it('defaults to 0.2.0 at 30 Hz and the documented report path; 0.3.0 only when asked', () => {
+  it('defaults to 0.2.0 at 30 Hz and the documented report path; 0.3.1 only when asked', () => {
     expect(parseArgs(['batch', 'a.webm', 'videos', '--out', 'private-data/exports'])).toEqual({ command: 'batch', inputs: ['a.webm', 'videos'], out: 'private-data/exports', report: 'work/batch-report.json', hz: 30, pipeline: '0.2.0', mirrored: false, trace: [] });
-    expect(parseArgs(['batch', 'a.mp4', '--out', 'o', '--hz', '15', '--pipeline', '0.3.0', '--mirrored', '--channel', 'chrome'])).toMatchObject({ hz: 15, pipeline: '0.3.0', mirrored: true, channel: 'chrome' });
+    expect(parseArgs(['batch', 'a.mp4', '--out', 'o', '--hz', '15', '--pipeline', '0.3.1', '--mirrored', '--channel', 'chrome'])).toMatchObject({ hz: 15, pipeline: '0.3.1', mirrored: true, channel: 'chrome' });
     expect(parseArgs(['compare', 'private-data/videos'])).toMatchObject({ out: 'work/compare', report: 'work/compare-report.json', trace: [] });
     expect(parseArgs(['compare', 'private-data/videos', '--trace', 'ksl-no.webm', '--trace', 'ksl-ask.mp4']).trace).toEqual(['ksl-no.webm', 'ksl-ask.mp4']);
   });
@@ -25,7 +25,7 @@ describe('arguments', () => {
     [['batch', 'a.webm'], '--out'],
     [['batch', 'a.webm', '--out', 'o', '--hz', '25'], '15 또는 30'],
     [['batch', 'a.webm', '--out', 'o', '--pipeline', '0.1.0'], '--pipeline'],
-    [['compare', 'videos', '--pipeline', '0.3.0'], '모두 실행'],
+    [['compare', 'videos', '--pipeline', '0.3.1'], '모두 실행'],
     [['batch', 'a.webm', '--out', 'o', '--report', 'report.md'], '.json'],
     [['batch', 'a.webm', '--out'], '값이 필요'],
     [['batch', 'a.webm', '--fast'], '알 수 없는 옵션'],
@@ -80,14 +80,14 @@ describe('model cache', () => {
 });
 
 /** 30 frames at 30 Hz; both hands hidden at `hidden`, left hand from a region crop at `region`. */
-function clip(version: '0.2.0' | '0.3.0', hidden: number[], region: number[] = []): MotionClip {
+function clip(version: '0.2.0' | '0.3.1', hidden: number[], region: number[] = []): MotionClip {
   const result = fixtureClip(), solver = new Reconstructor();
-  result.pipeline = version === '0.3.0' ? pipelineInfo('synthetic-test-fixture-not-sign-language', HAND_REGION_DEFAULTS) : pipelineInfo('synthetic-test-fixture-not-sign-language');
+  result.pipeline = version === '0.3.1' ? pipelineInfo('synthetic-test-fixture-not-sign-language', HAND_REGION_DEFAULTS) : pipelineInfo('synthetic-test-fixture-not-sign-language');
   result.source = { ...result.source, sampleHz: 30, duration: 1 };
   result.frames = Array.from({ length: 30 }, (_, i) => {
     const d = articulatedDetection({ timestamp: i * 1000 / 30, flex: [.2 + i / 100, .3, .2], spread: .1, palm: new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), Math.PI) });
     for (const [wrist, index] of [[15, 0], [16, 1]]) d.hands[index].image[0] = { ...d.body[wrist] };
-    if (version === '0.3.0') d.hands = d.hands.map((h, k) => ({ ...h, origin: k === 0 && region.includes(i) ? 'region' : 'frame' }));
+    if (version === '0.3.1') d.hands = d.hands.map((h, k) => ({ ...h, origin: k === 0 && region.includes(i) ? 'region' : 'frame' }));
     if (hidden.includes(i)) d.hands = [];
     return solver.reconstruct(d);
   });
@@ -96,7 +96,7 @@ function clip(version: '0.2.0' | '0.3.0', hidden: number[], region: number[] = [
 
 describe('clip metrics', () => {
   it('counts missing rate, held frames, reasons, region hands, warnings and corrections from the stored clip', () => {
-    const metrics = clipMetrics(clip('0.3.0', [10, 11, 12, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29], [3, 4, 5]));
+    const metrics = clipMetrics(clip('0.3.1', [10, 11, 12, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29], [3, 4, 5]));
     for (const side of SIDES) {
       const m = metrics.hands[side];
       expect(m.tracked + m.held + m.missing).toBe(30);
@@ -109,11 +109,11 @@ describe('clip metrics', () => {
     expect(metrics.warnings['no-associated-hand']).toBe(26);
     expect(metrics.warnings['hand-held']).toBe(metrics.hands.left.held + metrics.hands.right.held);
     expect(metrics.corrections.total).toBe(Object.values(metrics.corrections.byKind).reduce((a, b) => a + b, 0));
-    expect(metrics.pipeline).toEqual({ version: '0.3.0', detector: 'synthetic-test-fixture-not-sign-language', handRegions: true });
+    expect(metrics.pipeline).toEqual({ version: '0.3.1', detector: 'synthetic-test-fixture-not-sign-language', handRegions: true });
   });
   it('separates learner frames bridged by temporal reconstruction from frames filled by estimate', () => {
     const hidden = [10, 11, 12, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29];
-    const current = clipMetrics(clip('0.3.0', hidden)), previous = clipMetrics(clip('0.2.0', hidden));
+    const current = clipMetrics(clip('0.3.1', hidden)), previous = clipMetrics(clip('0.2.0', hidden));
     expect(current.learner.temporal).toEqual({ applied: true });
     expect(previous.learner.temporal).toEqual({ applied: false, reason: 'not-recorded' });
     for (const side of SIDES) {
@@ -135,18 +135,18 @@ describe('clip metrics', () => {
   it('writes the requested comparison columns and lists failures outside the totals', () => {
     const entry = (pipeline: string, c?: MotionClip, error?: string): ClipEntry => ({ file: 'clip-01.webm', bytes: 1, sha256: 'a'.repeat(64), pipeline, sampleHz: 30, mirrored: false, ...(c ? { metrics: clipMetrics(c) } : {}), ...(error ? { error } : {}) });
     const hidden = [10, 11, 12];
-    const markdown = compareMarkdown({ format: 'signlingo.motion-compare', version: 1, environment: { generatedAt: '2026-10-14T00:00:00Z' }, sampleHz: 30, mirrored: false, versions: ['0.2.0', '0.3.0'], notice: NOTICE,
-      clips: [{ file: 'clip-01.webm', bytes: 1, sha256: 'a'.repeat(64), runs: { '0.2.0': entry('0.2.0', clip('0.2.0', hidden)), '0.3.0': entry('0.3.0', clip('0.3.0', hidden)) } },
-        { file: 'clip-02.mp4', bytes: 1, sha256: 'b'.repeat(64), runs: { '0.2.0': entry('0.2.0', undefined, 'Video decode failure'), '0.3.0': entry('0.3.0', undefined, 'Video decode failure') } }] });
+    const markdown = compareMarkdown({ format: 'signlingo.motion-compare', version: 1, environment: { generatedAt: '2026-10-14T00:00:00Z' }, sampleHz: 30, mirrored: false, versions: ['0.2.0', '0.3.1'], notice: NOTICE,
+      clips: [{ file: 'clip-01.webm', bytes: 1, sha256: 'a'.repeat(64), runs: { '0.2.0': entry('0.2.0', clip('0.2.0', hidden)), '0.3.1': entry('0.3.1', clip('0.3.1', hidden)) } },
+        { file: 'clip-02.mp4', bytes: 1, sha256: 'b'.repeat(64), runs: { '0.2.0': entry('0.2.0', undefined, 'Video decode failure'), '0.3.1': entry('0.3.1', undefined, 'Video decode failure') } }] });
     expect(markdown).toContain('| 클립 | 버전 | 프레임 | 왼손 누락률 | 오른손 누락률 | held 왼/오 | 보간 왼/오 | 채움 왼손 앞·중간·뒤 | 채움 오른손 앞·중간·뒤 | 채움 대신 숨김 왼/오 |');
     expect(markdown).toMatch(/\| clip-01\.webm \| 0\.2\.0 \| 30 \| [\d.]+% \| [\d.]+% \| \d+ \/ \d+ \| 0 \/ 0 \| 0·3·0 \| 0·3·0 \| 0 \/ 0 \|/);
-    expect(markdown).toMatch(/\| clip-01\.webm \| 0\.3\.0 \| 30 \| [\d.]+% \| [\d.]+% \| \d+ \/ \d+ \| 3 \/ 3 \| 0·0·0 \| 0·0·0 \| 0 \/ 0 \|/);
+    expect(markdown).toMatch(/\| clip-01\.webm \| 0\.3\.1 \| 30 \| [\d.]+% \| [\d.]+% \| \d+ \/ \d+ \| 3 \/ 3 \| 0·0·0 \| 0·0·0 \| 0 \/ 0 \|/);
     expect(markdown).toContain('| 클립 | 버전 | 구간 | 프레임 | 왼손 누락률 | 오른손 누락률 | 화면 밖 왼/오 | 화면 안 실패 왼/오 |');
     expect(markdown).toContain('| 클립 | 버전 | 저장 frame/region | 배정 frame/region | 버림 (frame/region) | 주요 버림 사유 | 중복 쌍 |');
-    expect(markdown).toMatch(/\| clip-01\.webm \| 0\.3\.0 \| [\d.]+–[\d.]+ s \| \d+ \| [\d.]+% \| [\d.]+% \| \d+ \/ \d+ \| \d+ \/ \d+ \|/);
+    expect(markdown).toMatch(/\| clip-01\.webm \| 0\.3\.1 \| [\d.]+–[\d.]+ s \| \d+ \| [\d.]+% \| [\d.]+% \| \d+ \/ \d+ \| \d+ \/ \d+ \|/);
     expect(markdown).toContain('## 실패 (합계에서 제외)\n- clip-02.mp4 (0.2.0): Video decode failure');
-    expect(markdown).toContain('| 0.3.0 | 30 |');
-    const batch = batchMarkdown({ format: 'signlingo.motion-batch', version: 1, environment: { generatedAt: 'now' }, notice: NOTICE, clips: [entry('0.3.0', clip('0.3.0', hidden))] });
+    expect(markdown).toContain('| 0.3.1 | 30 |');
+    const batch = batchMarkdown({ format: 'signlingo.motion-batch', version: 1, environment: { generatedAt: 'now' }, notice: NOTICE, clips: [entry('0.3.1', clip('0.3.1', hidden))] });
     expect(batch).toContain('### clip-01.webm');
     expect(batch).toContain('경고 종류별 개수');
   });

@@ -8,7 +8,6 @@ import { detection, fixtureClip } from './fixtures';
 import { clipMetrics, unionInterval } from '../src/batch/report';
 import { buildTrace, traceMarkdown, type FusionRecord } from '../src/batch/trace';
 import { fillHands, FILL_GUARD_REPORT, runDisplayPipeline, stabilizeTorso, temporalReconstruct, type FillGuardReport, type FillReport } from '../src/motion/display';
-import { fuseHandsDetailed } from '../src/motion/handRegions';
 import { pipelineInfo } from '../src/motion/pipeline';
 import { Reconstructor } from '../src/motion/reconstruct';
 import { importMotion } from '../src/motion/serialization';
@@ -134,28 +133,21 @@ describe('hand-fill safeguard', () => {
   });
 });
 
-describe('fusion details', () => {
-  it('names why each candidate was left out', () => {
-    const d = detection(), [left, right] = d.hands;
-    const { hands, dropped } = fuseHandsDetailed([left, { ...right, world: right.world.slice(0, 3) }], [shifted(left, .001), shifted(right, .2)], 640, 480);
-    expect(hands).toHaveLength(2);
-    expect(dropped.map(x => [x.origin, x.reason])).toEqual([['frame', 'invalid'], ['region', 'duplicate']]);
-    const capped = fuseHandsDetailed([left, right], [shifted(right, -.2)], 640, 480);
-    expect(capped.dropped).toEqual([{ origin: 'region', label: 'Right', score: right.score, reason: 'cap' }]);
-  });
-});
-
 describe('frame trace', () => {
-  // 0.3.0 frames 10–14: a second, opposite-label estimate of the left hand displaces the right hand.
+  // Tool test, not a pipeline claim: in the second run, frames 10–14 store a second, opposite-label estimate of
+  // the left hand instead of the right hand (the 0.3.0 failure pattern), so both sides are lost there.
   const base = clip();
   const experiment = clip((d, i) => { if (i >= 10 && i < 15) d.hands = [{ ...d.hands[0], origin: 'frame' }, { ...shifted(d.hands[0], .004, 'Right'), origin: 'region' }]; }, '0.3.0');
-  const fusion: FusionRecord[] = experiment.frames.map(f => ({ timestamp: f.timestamp, source: { width: 640, height: 480 }, candidates: { frame: 2, region: f.timestamp >= 333 && f.timestamp < 500 ? 1 : 0 },
-    regions: { left: { x0: 400, y0: 200, size: 120 }, right: { x0: 100, y0: 200, size: 120 } }, kept: [], dropped: f.timestamp >= 333 && f.timestamp < 500 ? [{ origin: 'frame', label: 'Right', score: .96, reason: 'cap' }] : [] }));
-  const report = buildTrace('synthetic.webm', 'a'.repeat(64), { '0.2.0': base, '0.3.0': experiment }, { '0.3.0': fusion });
+  const lost = (t: number) => t >= 333 && t < 500;
+  const fusion: FusionRecord[] = experiment.frames.map(f => ({ timestamp: f.timestamp, source: { width: 640, height: 480 }, candidates: { frame: 2, region: lost(f.timestamp) ? 1 : 0 },
+    gaps: lost(f.timestamp) ? ['right'] : [], regions: { left: null, right: lost(f.timestamp) ? { x0: 100, y0: 200, size: 120 } : null }, kept: [],
+    dropped: lost(f.timestamp) ? [{ side: 'right', label: 'Right', score: .96, reason: 'no-room' }] : [] }));
+  const report = buildTrace('synthetic.webm', 'a'.repeat(64), { '0.2.0': base, '0.3.1': experiment }, { '0.3.1': fusion });
   it('records per-frame candidates, boxes, hand fates and states without image data', () => {
-    const frame = report.runs['0.3.0'].frames[12];
+    const frame = report.runs['0.3.1'].frames[12];
     expect(frame.candidates).toEqual({ frame: 2, region: 1 });
-    expect(frame.regions?.left).toEqual({ x0: 400, y0: 200, size: 120 });
+    expect(frame.gaps).toEqual(['right']);
+    expect(frame.regions?.right).toEqual({ x0: 100, y0: 200, size: 120 });
     expect(frame.hands.map(h => h.discarded)).toEqual(['ambiguous-crossing', 'outcompeted']);
     expect(frame.duplicatePairs).toBe(1);
     expect(frame.sides.left.state).not.toBe('tracked');
@@ -165,8 +157,8 @@ describe('frame trace', () => {
   it('lists the changed frame ranges and ranks the reasons that grew there', () => {
     const md = traceMarkdown(report);
     expect(md).toMatch(/### 왼손\n\n\| 프레임 \| 시간 \| 구분 \| 바뀐 상태 \|\n\| --- \| --- \| --- \| --- \|\n\| 10–14 \| 0\.33–0\.47 s \| 악화 5 \|/);
-    expect(md).toMatch(/\| 1 \| (tracking 버림: ambiguous-crossing|저장: 같은 손 중복|융합 제외: cap \(frame\)|오른손 상태 원인: unassociated|왼손 상태 원인: ambiguous) \|/);
-    for (const reason of ['tracking 버림: ambiguous-crossing', '융합 제외: cap (frame)', '저장: 같은 손 중복', '왼손 상태 원인: ambiguous']) expect(md).toContain(`| ${reason} | 0 |`);
+    expect(md).toMatch(/\| 1 \| (tracking 버림: ambiguous-crossing|저장: 같은 손 중복|영역 후보 제외: no-room \(오른쪽 영역\)|오른손 상태 원인: unassociated|왼손 상태 원인: ambiguous) \|/);
+    for (const reason of ['tracking 버림: ambiguous-crossing', '영역 후보 제외: no-room (오른쪽 영역)', '저장: 같은 손 중복', '왼손 상태 원인: ambiguous']) expect(md).toContain(`| ${reason} | 0 |`);
     expect(traceMarkdown(buildTrace('only.webm', 'b'.repeat(64), { '0.2.0': base }))).toContain('두 버전의 결과가 모두 있어야');
   });
 });
