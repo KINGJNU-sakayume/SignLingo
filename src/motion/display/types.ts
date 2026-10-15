@@ -13,7 +13,11 @@ export type DisplayHandState = 'observed' | 'interpolated' | 'held' | 'filled' |
  * `evidence`: for a constrained hand, whether the constraint adjusted an observed hand (`observed`) or produced the
  * values of a hand with no observation (`constrained`). Only the former counts as observed evidence.
  */
-export type HandAnnotation = { state: DisplayHandState; fill?: 'lead' | 'trail' | 'gap'; anchors?: [number, number]; hidden?: 'insufficient-evidence' | 'offscreen'; constraints?: string[]; evidence?: ConstraintEvidence };
+/**
+ * `restWeight`: how far the rest stage blended this hand toward the relaxed rest hand (0–1); the avatar fades its color
+ * by it. `under`: for a `rest` hand still morphing, the state of the handshape it morphs from (its color fades out).
+ */
+export type HandAnnotation = { state: DisplayHandState; fill?: 'lead' | 'trail' | 'gap'; anchors?: [number, number]; hidden?: 'insufficient-evidence' | 'offscreen'; constraints?: string[]; evidence?: ConstraintEvidence; restWeight?: number; under?: DisplayHandState };
 export type TorsoAnnotation = {
   mode: 'fixed' | 'smoothed';
   /** Angle between the reconstructed and the displayed torso. */
@@ -37,5 +41,9 @@ export type DisplayClip = { frames: DisplayFrame[]; stages: string[]; reports: R
  */
 export type DisplayStage = { id: string; run(display: DisplayClip, input: DisplayInput): DisplayClip };
 /** A sampled pose plus the display state of each hand, as the avatar consumes it. */
-export type AvatarPose = DisplayPose & { hands?: Partial<Record<Side, DisplayHandState>>; arms?: Partial<Record<Side, 'rest'>> };
+export type AvatarPose = DisplayPose & {
+  hands?: Partial<Record<Side, DisplayHandState>>; arms?: Partial<Record<Side, 'rest'>>;
+  /** Rest blend per hand (color fade) and, for a morphing rest hand, the state it morphs from. */
+  rest?: Partial<Record<Side, { weight: number; under?: DisplayHandState }>>;
+};
 export type HandFocus = { center: [number, number, number]; radius: number };

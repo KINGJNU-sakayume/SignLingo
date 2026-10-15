@@ -121,9 +121,9 @@ describe('clip metrics', () => {
       expect(now.observed + now.interpolated + now.held + now.filled + now.missing).toBe(30);
       expect(now.fill.lead + now.fill.gap + now.fill.trail).toBe(now.filled);
       expect(now.interpolated).toBe(3); // the 100 ms gap
-      expect(now.fill).toEqual({ lead: 0, gap: 0, trail: 10 }); // after the last observation: still estimated
+      expect(now.fill).toMatchObject({ lead: 0, gap: 0, trail: 10 }); // after the last observation: still estimated
       expect(before.interpolated).toBe(0);
-      expect(before.fill).toEqual({ lead: 0, gap: 3, trail: 10 });
+      expect(before.fill).toMatchObject({ lead: 0, gap: 3, trail: 10 });
     }
   });
   it('maps every reconstruction warning template to a stable kind', () => {

@@ -11,7 +11,7 @@ import { forwardArm, forwardHand } from '../src/motion/rig';
 import { q } from '../src/motion/math';
 import { importMotion } from '../src/motion/serialization';
 import { seededRng } from '../src/learn/rng';
-import { armVisible, displayFor, fillHands, handFocus, hasFilled, PRESETS, runDisplayPipeline, sampleDisplay, stabilizeTorso, type DisplayClip, type DisplayStage, type FillReport, type TorsoReport } from '../src/motion/display';
+import { armVisible, displayFor, fillHands, handFocus, hasFilled, learnerStages, PRESETS, runDisplayPipeline, sampleDisplay, stabilizeTorso, type DisplayClip, type DisplayStage, type FillReport, type TorsoReport } from '../src/motion/display';
 import { handShape } from '../src/motion/display/fillHands';
 import { geodesicMedian } from '../src/motion/display/quaternion';
 import { FINGERS, SIDES, type DisplayPose, type MotionClip, type Pose, type Side } from '../src/motion/types';
@@ -57,7 +57,7 @@ function expectHandsPreserved(clip: MotionClip, display: DisplayClip, skipFilled
     for (const side of SIDES) {
       const original = clip.frames[i].pose;
       // Filled and rest hands are display estimates, and hands the contact stage moved apart are checked by its own test.
-      if (!armVisible(original, side) || frame.annotation.contact || (skipFilled && ['filled', 'rest'].includes(frame.annotation.hands[side].state))) continue;
+      if (!armVisible(original, side) || frame.annotation.contact || (skipFilled && (['filled', 'rest'].includes(frame.annotation.hands[side].state) || frame.annotation.hands[side].restWeight !== undefined))) continue;
       const before = forwardHand(original, side), after = forwardHand(frame.pose, side), residual = frame.annotation.torso?.wristResidual[side] ?? 0;
       for (const [k, point] of before.points.entries()) expect(point.distanceTo(after.points[k])).toBeLessThanOrEqual(residual + 1e-6);
       expect(before.palm.angleTo(after.palm)).toBeLessThan(1e-6);
@@ -137,7 +137,7 @@ describe('hand filling', () => {
   });
   it('holds the last observed handshape after the last appearance and reports every fill', () => {
     for (let i = 50; i < 60; i++) { expect(display.frames[i].annotation.hands.left.fill).toBe('trail'); same(fingers(display.frames[i].pose), fingers(input.frames[49].pose)); }
-    expect(display.reports['hand-fill']).toEqual({ left: { lead: 5, gap: 8, trail: 10 }, right: { lead: 0, gap: 0, trail: 0 } } satisfies FillReport);
+    expect(display.reports['hand-fill']).toEqual({ left: { lead: 5, gap: 8, trail: 10, palm: 0 }, right: { lead: 0, gap: 0, trail: 0, palm: 0 } } satisfies FillReport);
     expect(hasFilled(display)).toBe(true); expect(hasFilled(input)).toBe(false);
   });
   it('plays filled frames smoothly instead of stepping between them', () => {
@@ -199,11 +199,12 @@ describe('published course 1 (read-only)', () => {
       expect(torsoShake(after)).toBeLessThan(torsoShake(before) * .1);
       // Fingertip-to-fingertip distance (contact in ksl-meet) wherever both hands are observed.
       display.frames.forEach((frame, i) => {
-        if (!SIDES.every(side => frame.annotation.hands[side].state === 'observed') || frame.annotation.contact) return;
+        if (!SIDES.every(side => frame.annotation.hands[side].state === 'observed' && frame.annotation.hands[side].restWeight === undefined) || frame.annotation.contact) return;
         const gap = (pose: Pose) => forwardHand(pose, 'left').points[8].distanceTo(forwardHand(pose, 'right').points[8]);
         expect(Math.abs(gap(frame.pose) - gap(clip.frames[i].pose))).toBeLessThan(.002);
       });
-      expect(hasFilled(display)).toBe(true);
+      // Hand filling still fills these clips; the rest stage then shows the fills around the sign as rest hands.
+      expect(hasFilled(runDisplayPipeline({ clip }, learnerStages(undefined, { presentation: false })))).toBe(true);
     }
     expect(modes).toEqual({ 'ksl-thanks': 'fixed', 'ksl-sorry': 'smoothed', 'ksl-meet': 'fixed' });
   });

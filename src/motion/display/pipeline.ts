@@ -87,8 +87,11 @@ const displayRules = (frame: DisplayFrame): BlendRules<DisplayPose> => ({
   hand: (_pose, side) => ['observed', 'interpolated', 'filled', 'constrained', 'rest'].includes(frame.annotation.hands[side].state),
   fingers: (_pose, side) => fingersShown(frame, side),
 });
-const avatarPose = (frame: DisplayFrame, pose: DisplayPose): AvatarPose =>
-  ({ ...pose, hands: { left: frame.annotation.hands.left.state, right: frame.annotation.hands.right.state }, ...(frame.annotation.arms ? { arms: frame.annotation.arms } : {}) });
+function avatarPose(frame: DisplayFrame, pose: DisplayPose): AvatarPose {
+  const { hands, arms } = frame.annotation;
+  const rest = Object.fromEntries(SIDES.flatMap(side => hands[side].restWeight === undefined ? [] : [[side, { weight: hands[side].restWeight!, ...(hands[side].under ? { under: hands[side].under } : {}) }]]));
+  return { ...pose, hands: { left: hands.left.state, right: hands.right.state }, ...(arms ? { arms } : {}), ...(Object.keys(rest).length ? { rest } : {}) };
+}
 
 export function displayPose(display: DisplayClip, index: number): AvatarPose | null {
   const frame = display.frames[Math.max(0, Math.min(index, display.frames.length - 1))];

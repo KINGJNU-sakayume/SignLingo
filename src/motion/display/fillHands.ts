@@ -9,7 +9,8 @@ import type { DisplayClip, DisplayFrame, DisplayInput, DisplayStage, HandAnnotat
 
 export const FILL_STAGE = 'hand-fill';
 export const FILL_GUARD_REPORT = 'hand-fill-guard';
-export type FillReport = Record<Side, { lead: number; gap: number; trail: number }>;
+/** `palm`: unobserved constrained hands whose palm (not fingers) was bridged between observations. */
+export type FillReport = Record<Side, { lead: number; gap: number; trail: number; palm: number }>;
 export type FillOptions = {
   /** A side is filled only when at least this fraction of its arm-shown frames in the signing interval are anchors. */
   minObservedFraction: number;
@@ -17,6 +18,10 @@ export type FillOptions = {
   hideOffscreen: boolean;
 };
 export const FILL_DEFAULTS: FillOptions = { minObservedFraction: 0.15, hideOffscreen: true };
+/** Constraint kinds that set a hand's orientation: a palm they set is deliberate and never re-estimated. */
+const ORIENTING = new Set(['palmFacing', 'wristOffset', 'symmetry', 'hold']);
+/** Longest unobserved run whose palm is bridged between the observations around it. */
+const PALM_BRIDGE_MS = 300;
 export type FillGuardSide = {
   interval: { start: number; end: number; method: string };
   armFrames: number; anchors: number; fraction: number; sufficient: boolean;
@@ -74,8 +79,15 @@ export function fillHands(options: Partial<FillOptions> = {}): DisplayStage {
   const settings: FillOptions = { ...FILL_DEFAULTS, ...options };
   return { id: FILL_STAGE, run(display: DisplayClip, input: DisplayInput): DisplayClip {
     const frames = display.frames.slice();
-    const report: FillReport = { left: { lead: 0, gap: 0, trail: 0 }, right: { lead: 0, gap: 0, trail: 0 } };
+    const report: FillReport = { left: { lead: 0, gap: 0, trail: 0, palm: 0 }, right: { lead: 0, gap: 0, trail: 0, palm: 0 } };
     const sides = evidence(display, input, settings.minObservedFraction);
+    // Kinds of the stored constraints (a corrected clip); unknown ids (a preview) are treated as orienting.
+    const kinds = new Map((input.clip.constraints?.document.constraints ?? []).map(c => [c.id, c.kind]));
+    const palmFree = (frame: DisplayFrame, side: Side) => {
+      const hand = frame.annotation.hands[side];
+      return hand.state === 'constrained' && hand.evidence === 'constrained' && !!hand.constraints?.length
+        && hand.constraints.every(id => kinds.has(id) && !ORIENTING.has(kinds.get(id)!));
+    };
     const guard: FillGuardReport = { options: settings, sides: Object.fromEntries(SIDES.map(side => [side, { ...sides[side], hidden: { 'insufficient-evidence': 0, offscreen: 0 } }])) as Record<Side, FillGuardSide> };
     for (const side of SIDES) {
       const segments = new Map<number, number[]>();
@@ -87,6 +99,21 @@ export function fillHands(options: Partial<FillOptions> = {}): DisplayStage {
         for (const i of indices) {
           while (k < anchors.length && anchors[k] < i) k++;
           const source = display.frames[i];
+          if (palmFree(source, side) && armVisible(source.pose, side)) {
+            // A constraint gave this unobserved hand its fingers but not its palm, which still holds a stale
+            // estimate (e.g. the reconstruction's 200 ms hold). Between close observations the palm is bridged.
+            const before = indices.filter(j => j < i && isObserved(display.frames[j], side)).at(-1), after = indices.find(j => j > i && isObserved(display.frames[j], side));
+            if (before === undefined || after === undefined || display.frames[after].timestamp - display.frames[before].timestamp > PALM_BRIDGE_MS) continue;
+            const a = handShape(display.frames[before].pose, side), b = handShape(display.frames[after].pose, side);
+            const t = (source.timestamp - display.frames[before].timestamp) / (display.frames[after].timestamp - display.frames[before].timestamp);
+            const pose = { ...frames[i].pose, rotations: { ...frames[i].pose.rotations } }, { arm, frame } = bareForearm(pose, side);
+            const { forearm, wrist } = distributeForearmRoll(frame, frame.clone().multiply(a.relative.clone().slerp(b.relative, t)).normalize());
+            pose.rotations[`${side}.lower`] = qa(arm.upper.clone().invert().multiply(forearm));
+            pose.rotations[`${side}.wrist`] = qa(wrist);
+            frames[i] = withPose(frames[i], pose, FILL_STAGE, { hands: { ...frames[i].annotation.hands, [side]: { ...source.annotation.hands[side], fill: 'gap', anchors: [before, after] } } });
+            report[side].palm++;
+            continue;
+          }
           if (isAnchor(source, side) || !armVisible(source.pose, side)) continue;
           const state = source.annotation.hands[side].state;
           const hide = !sides[side].sufficient ? 'insufficient-evidence' : settings.hideOffscreen && !wristInImage(input.clip.frames[i], side) ? 'offscreen' : undefined;

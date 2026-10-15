@@ -1,0 +1,5 @@
+{
+  "rule": "docs/content-reviews/review-process.md",
+  "reconstruction": { "reviewer": "저장소 소유자", "qualification": "SignLingo 복원 파이프라인 운영자 (실명 비공개)" },
+  "linguistic": { "reviewer": "검수자 B", "qualification": "수어 경력 5년 (실명 비공개)" }
+}

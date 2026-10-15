@@ -70,18 +70,37 @@ describe('rest pose on learner screens', () => {
       expect(wrist(i).distanceTo(wrist(i - 1)), `frame ${i}`).toBeLessThan(.04);
     }
   });
-  it('never changes an observed hand inside the sign', () => {
+  it('never changes an observed hand inside the sign, only around the moments it rises and comes down', () => {
     for (const id of IDS) {
       const clip = v1[id], before = runDisplayPipeline({ clip }, learnerStages(undefined, { presentation: false })), after = displayFor(clip, 'learner');
       for (const side of SIDES) {
-        const [first, last] = raisedRange(clip, side);
+        const [first, last] = raisedRange(clip, side), t = (i: number) => clip.frames[i].timestamp;
         const keys = Object.keys(before.frames[0].pose.rotations).filter(key => key.startsWith(`${side}.`));
         before.frames.forEach((frame, i) => {
           if (i < first || i > last || frame.annotation.hands[side].state !== 'observed' || after.frames[i].annotation.contact) return;
           if (keys.every(key => after.frames[i].pose.rotations[key].every((x, k) => Math.abs(x - frame.pose.rotations[key][k]) < 1e-12))) return;
-          // A rest edit inside the sign only happens to a sub-100 ms detection blip while the hand rests.
-          expect(after.frames[i].annotation.hands[side].state, `${id} frame ${i} ${side}`).toBe('rest');
+          // The handshape morph: within a second of the hand leaving or reaching its rest.
+          expect(after.frames[i].annotation.hands[side].restWeight, `${id} frame ${i} ${side}`).toBeDefined();
+          expect(Math.min(Math.abs(t(i) - t(first)), Math.abs(t(i) - t(last))), `${id} frame ${i} ${side}`).toBeLessThan(1000);
         });
+      }
+    }
+  });
+  it('morphs between the rest hand and the sign smoothly', () => {
+    // Before the morph, up to ~150° of finger rotation switched in one frame as the hand rose or came down.
+    for (const id of IDS) {
+      const display = displayFor(v2[id], 'learner');
+      for (const side of SIDES) {
+        const [first, last] = raisedRange(v2[id], side);
+        for (const edge of [first, last]) for (let i = Math.max(1, edge - 8); i <= Math.min(display.frames.length - 1, edge + 8); i++) {
+          const a = display.frames[i - 1].pose, b = display.frames[i].pose;
+          // The morph's own frames (estimation noise inside the sign is not this stage's to smooth).
+          if (![a, b].every(pose => armVisible(pose, side)) || display.frames[i].annotation.hands[side].restWeight === undefined) continue;
+          const keys = Object.keys(b.rotations).filter(key => key.startsWith(`${side}.`) && key.split('.').length === 3);
+          const step = Math.max(...keys.map(key => new Quaternion(...a.rotations[key]).angleTo(new Quaternion(...b.rotations[key])))) * 180 / Math.PI;
+          // ≤ 400°/s of following the frame's own hand (13° per frame at 30 Hz) plus the morph toward the relaxed hand.
+          expect(step, `${id} ${side} frame ${i}`).toBeLessThan(25);
+        }
       }
     }
   });
