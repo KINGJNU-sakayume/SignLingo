@@ -31,7 +31,8 @@ export async function validatePackage(catalog: Catalog, root: string, includeDra
       if (kind === 'motion') {
         const clip = parseLessonMotion(entry, bytes);
         await verifyConstraintRecord(clip);
-        const problems = practiceReadiness(clip);
+        // Publish gate: candidates may be prepared and reviewed; a published reference must pass.
+        const problems = entry.status === 'published' ? practiceReadiness(clip) : [];
         if (problems.length) throw new Error(`${entry.id} v${entry.revision} cannot be a practice reference: ${problems.join('; ')}`);
       }
     }

@@ -44,6 +44,7 @@ npm run motion:compare -- private-data/videos
 
 - Node 22.12 이상(CI는 Node 24)이 필요합니다. 셸 스크립트를 쓰지 않으므로 Windows PowerShell, macOS 터미널, Linux에서 같은 명령으로 실행됩니다.
 - **H.264 MP4**: Playwright의 Chromium은 특허 코덱을 디코딩하지 못합니다. MP4가 "could not decode"로 실패하면 설치된 Chrome이나 Edge를 씁니다: `--channel chrome`(또는 `--channel msedge`). WebM(VP8/VP9)은 기본 Chromium으로 됩니다.
+- **iPhone 화면 녹화·촬영(HEVC `.mov`)**도 Chromium이 디코딩하지 못합니다. 화질을 유지한 VP9 WebM으로 옮겨 씁니다: `ffmpeg -i in.mov -an -c:v libvpx-vp9 -crf 18 -b:v 0 -row-mt 1 -pix_fmt yuv420p out.webm`. 콘텐츠의 원본 해시는 동작을 추출한 WebM이며, 제공 원본의 해시도 이용 허락 기록에 함께 남깁니다(예: `docs/content-reviews/own-recording-rights-2026-10-16.md`).
 - 다른 Chromium을 쓰려면 `CHROMIUM_PATH=<실행 파일 경로>`를 지정합니다.
 - 프록시 뒤에서는 Node 내장 fetch가 프록시 변수를 읽도록 `NODE_USE_ENV_PROXY=1`을 함께 설정합니다(모델을 처음 받을 때만 필요).
 

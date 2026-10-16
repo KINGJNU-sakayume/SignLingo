@@ -7,6 +7,8 @@ Records in this folder:
 - `course1-v2-reconstruction-review-2026-10-15.md`, `course1-v2-linguistic-review-2026-10-15.md`: approvals for the same three expressions at revision 2 (constraint-corrected motion).
 - `course1-v2-feedback-2026-10-15.md`: review findings on revision 2 (change request, not an approval) and the prepared revision 3, which needs both reviews before publishing.
 - `course1-v4-candidates-2026-10-16.md`: v4 candidates built with constraint solver v3 (ksl-thanks revision 4 with two taps, ksl-sorry revision 3 rebuilt to keep the revision-2 arm angle). Not an approval; both reviews are needed before publishing.
+- `own-recording-rights-2026-10-16.md`: rights record for the 2026-10-16 high-quality re-recordings of the three course-1 expressions (same scope as 2026-10-14).
+- `course1-hq-candidates-2026-10-16.md`: candidates re-extracted from those recordings (ksl-thanks r5, ksl-sorry r4, ksl-meet r4) with updated thanks/sorry descriptions. Not an approval.
 
 The other seven candidates have no review approval yet.
 

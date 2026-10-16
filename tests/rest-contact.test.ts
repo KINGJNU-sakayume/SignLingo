@@ -72,7 +72,7 @@ describe('rest pose on learner screens', () => {
   });
   it('never changes an observed hand inside the sign, only around the moments it rises and comes down', () => {
     for (const id of IDS) {
-      const clip = v1[id], before = runDisplayPipeline({ clip }, learnerStages(undefined, { presentation: false })), after = displayFor(clip, 'learner');
+      const clip = v1[id], before = runDisplayPipeline({ clip }, learnerStages().slice(0, -2)), after = displayFor(clip, 'learner');
       for (const side of SIDES) {
         const [first, last] = raisedRange(clip, side), t = (i: number) => clip.frames[i].timestamp;
         const keys = Object.keys(before.frames[0].pose.rotations).filter(key => key.startsWith(`${side}.`));

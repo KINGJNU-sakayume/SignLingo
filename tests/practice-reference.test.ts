@@ -66,3 +66,18 @@ describe('hand size guidance', () => {
     expect(handSize(far)!).toBeLessThan(MIN_HAND_SIZE);
   });
 });
+
+describe('practice interval', () => {
+  it('starts where the sign\'s hands have a measured position (hands entering from below a tight frame)', async () => {
+    const { practiceInterval } = await import('../src/practice/interval');
+    const { signingInterval } = await import('../src/motion/signing');
+    const meet = structuredClone(clip('ksl-meet')), s = signingInterval(meet);
+    // The first 150 ms of the sign lose their hands, as when resting hands are still below the frame.
+    const hidden = meet.frames.filter(f => f.timestamp / 1000 >= s.start - 1e-6 && f.timestamp / 1000 < s.start + .15);
+    for (const frame of hidden) { frame.hands = []; for (const i of [15, 16, 17, 18, 19, 20, 21, 22]) frame.body[i] = { ...frame.body[i], visibility: .2 }; }
+    const interval = practiceInterval(meet);
+    expect(interval.start).toBeGreaterThanOrEqual(s.start + .15 - 1e-6);
+    expect(interval.end).toBeLessThanOrEqual(s.end + 1e-6);
+    expect(practiceReadiness(meet)).toEqual([]);
+  });
+});

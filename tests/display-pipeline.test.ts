@@ -189,10 +189,14 @@ describe('published course 1 (read-only)', () => {
   it('steadies each torso while keeping hands, palms and two-hand contact as reconstructed', () => {
     const modes: Record<string, string> = {};
     for (const [id, clip] of Object.entries(clips)) {
-      const display = displayFor(clip, 'learner'), report = display.reports['torso-stabilize'] as TorsoReport;
+      // The torso stage on its own (jitter smoothing, rest pose and hand contact are tested separately).
+      const display = runDisplayPipeline({ clip }, learnerStages(undefined, { presentation: false })), report = display.reports['torso-stabilize'] as TorsoReport;
       modes[id] = report.mode;
-      // Fixed arm reach clamps a few wrists by at most ~1.5 mm; nothing else moves a hand.
-      expect(report.maxWristResidual).toBeLessThan(.002);
+      // Fixed arm reach clamps a few wrists; nothing else moves a hand. Holding a torso that varied 18° (ksl-sorry) leaves
+      // at most ~5 mm on a shown hand (one frame) and ~9 mm on hands the learner screen shows at rest.
+      const shown = displayFor(clip, 'learner');
+      shown.frames.forEach(frame => { for (const side of SIDES) if (frame.annotation.torso && frame.annotation.hands[side].restWeight === undefined) expect(frame.annotation.torso.wristResidual[side]).toBeLessThan(.006); });
+      expect(report.maxWristResidual).toBeLessThan(.01);
       expectHandsPreserved(clip, display);
       const before = clip.frames.map(f => f.pose), after = display.frames.map(f => f.pose);
       if (report.mode === 'fixed') expect(torsoVariance(after)).toBeLessThan(1e-6);
@@ -201,11 +205,12 @@ describe('published course 1 (read-only)', () => {
       display.frames.forEach((frame, i) => {
         if (!SIDES.every(side => frame.annotation.hands[side].state === 'observed' && frame.annotation.hands[side].restWeight === undefined) || frame.annotation.contact) return;
         const gap = (pose: Pose) => forwardHand(pose, 'left').points[8].distanceTo(forwardHand(pose, 'right').points[8]);
-        expect(Math.abs(gap(frame.pose) - gap(clip.frames[i].pose))).toBeLessThan(.002);
+        expect(Math.abs(gap(frame.pose) - gap(clip.frames[i].pose))).toBeLessThan(.006); // the reach clamp above
       });
       // Hand filling still fills these clips; the rest stage then shows the fills around the sign as rest hands.
       expect(hasFilled(runDisplayPipeline({ clip }, learnerStages(undefined, { presentation: false })))).toBe(true);
     }
-    expect(modes).toEqual({ 'ksl-thanks': 'fixed', 'ksl-sorry': 'smoothed', 'ksl-meet': 'fixed' });
+    // Learner screens hold every torso still (a bow or lean included); ksl-sorry varied 18.4° and was low-passed before.
+    expect(modes).toEqual({ 'ksl-thanks': 'fixed', 'ksl-sorry': 'fixed', 'ksl-meet': 'fixed' });
   });
 });

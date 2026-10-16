@@ -9,7 +9,7 @@ import { constraintsName, parseArgs } from '../src/batch/args';
 import { batchMarkdown, type BatchReport } from '../src/batch/report';
 import { batchConstraintEntry, constraintMarkdown, constraintReport } from '../src/batch/constraintReport';
 import { importMotion } from '../src/motion/serialization';
-import { applyConstraints, constraintHash, HANDSHAPES, parseConstraints, PRESET_IDS } from '../src/motion/constraints';
+import { applyConstraints, constraintHash, HANDSHAPES, parseConstraints, PRESET_IDS, sourceClip } from '../src/motion/constraints';
 import { FINGERS, SIDES } from '../src/motion/types';
 import { deepestPenetration, handsOf, leftward } from '../src/motion/handContact';
 
@@ -44,11 +44,11 @@ describe('docs/CONSTRAINTS.md', () => {
 
 describe('published course 1: the documented meet example (read only)', () => {
   it('brings the hands together until they touch, centered, without touching the asset', async () => {
-    const file = 'public/content/assets/ksl-meet/v1/reference.motion.json';
-    // Revision 1 is archived in the release record; the current revision is this example applied to it.
-    const asset = releases.find(e => e.id === 'ksl-meet' && e.revision === 1)!.assets.motion!;
+    const file = `public/${catalog.expressions.find(e => e.id === 'ksl-meet')!.assets.motion!.uri}`;
+    // The published revision is this example applied to its own source (the stored observation inside the corrected clip).
+    const asset = catalog.expressions.find(e => e.id === 'ksl-meet')!.assets.motion!;
     expect(sha(file)).toBe(asset.sha256);
-    const clip = importMotion(readFileSync(file, 'utf8')), set = parseConstraints(readFileSync('docs/constraints/ksl-meet.constraints.json', 'utf8'));
+    const clip = sourceClip(importMotion(readFileSync(file, 'utf8'))), set = parseConstraints(readFileSync('docs/constraints/ksl-meet.constraints.json', 'utf8'));
     const { clip: corrected, source, solution } = await applyConstraints(clip, set);
     const report = constraintReport({ set, source, corrected, solution, constraintFile: 'docs/constraints/ksl-meet.constraints.json', constraintSha256: await constraintHash(set),
       motion: { file, bytes: 1, sha256: asset.sha256, version: 1, pipeline: '0.2.0', frames: clip.frames.length, sampleHz: 30, duration: clip.source.duration }, generatedAt: 'test' });
@@ -65,7 +65,8 @@ describe('published course 1: the documented meet example (read only)', () => {
     }
     expect(result('meet-index-shape').after.max).toBe(0);
     expect(report.changes.outsideSpans).toBe(0);
-    expect(report.changes.hands.left.constrained + report.changes.hands.right.constrained).toBeGreaterThan(0);
+    // The re-recording tracks both hands throughout the spans: every change adjusts an observed hand.
+    expect(report.changes.hands.left.observed + report.changes.hands.right.observed).toBeGreaterThan(0);
     expect(report.integrity).toMatchObject({ landmarksUnchanged: true, qualityUnchanged: true, roundTrip: true });
     expect(report.integrity.maxArmLengthErrorMeters).toBeLessThan(1e-9);
     const markdown = constraintMarkdown(report);
@@ -93,8 +94,9 @@ describe('command-line arguments and batch report', () => {
     expect(constraintsName('c', 'clips/ksl-thanks.MP4')).toBe(path.join('c', 'ksl-thanks.constraints.json'));
   });
   it('lists the constraints applied right after recognition', async () => {
+    // Revision 1 with the document of revision 3 (recorded inside that published motion).
     const clip = importMotion(readFileSync('public/content/assets/ksl-meet/v1/reference.motion.json', 'utf8'));
-    const set = parseConstraints(readFileSync('docs/constraints/ksl-meet.constraints.json', 'utf8'));
+    const set = importMotion(readFileSync('public/content/assets/ksl-meet/v3/reference.motion.json', 'utf8')).constraints!.document;
     const applied = await applyConstraints(clip, set);
     const entry = batchConstraintEntry('docs/constraints/ksl-meet.constraints.json', await constraintHash(set), applied.clip, applied.solution);
     expect(entry).toMatchObject({ count: 4, changedFrames: 60 });

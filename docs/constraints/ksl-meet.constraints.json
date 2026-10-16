@@ -2,12 +2,14 @@
   "format": "signlingo.constraints",
   "version": 1,
   "expression": "ksl-meet",
-  "request": "두 주먹의 1지를 펴서 마주 세웠다가 중앙으로 모아 마주 댄다.",
+  "request": "두 주먹의 1지를 펴서 마주 세웠다가 중앙으로 모아 마주 댄다. (2026-10-16 재촬영 영상 기준. 프레임은 새 영상의 저장 동작에서 잰 값이며 검수자가 원본과 맞는지 확인한다.)",
   "constraints": [
     {
       "id": "meet-index-shape",
       "kind": "handshape",
-      "span": { "phase": "whole" },
+      "span": {
+        "phase": "whole"
+      },
       "hand": "both",
       "preset": "index",
       "note": "두 손 모두 주먹에서 검지만 편다."
@@ -15,30 +17,42 @@
     {
       "id": "meet-index-upright",
       "kind": "palmFacing",
-      "span": { "fraction": [0, 0.8] },
+      "span": {
+        "phase": "whole"
+      },
       "hand": "both",
       "facing": "inward",
       "pointing": "up",
       "toleranceDeg": 20,
-      "note": "검지를 위로 세우고 두 손바닥이 서로 마주 보게 한다."
+      "note": "검지를 위로 세우고 두 손바닥이 서로 마주 보게 한다. 새 영상은 마주 댄 채로 끝나므로 끝까지 유지한다."
     },
     {
       "id": "meet-center",
       "kind": "symmetry",
-      "span": { "fraction": [0.5, 0.8] },
+      "span": {
+        "frames": [
+          28,
+          64
+        ]
+      },
       "axis": "lateral",
       "toleranceCm": 2,
-      "note": "두 손을 몸 가운데로 모아 좌우 대칭이 되게 한다."
+      "note": "두 손을 몸 가운데로 모아 좌우 대칭이 되게 한다(약 0.93초부터 끝까지)."
     },
     {
       "id": "meet-touch",
       "kind": "contact",
-      "span": { "fraction": [0.5, 0.8] },
+      "span": {
+        "frames": [
+          28,
+          64
+        ]
+      },
       "a": "left.index.mid",
       "b": "right.index.mid",
       "gapCm": 1.5,
       "toleranceCm": 0.5,
-      "note": "가운데에서 두 검지가 마주 닿는다."
+      "note": "가운데에서 두 검지가 마주 닿는다(약 0.93초부터 끝까지)."
     }
   ]
 }
