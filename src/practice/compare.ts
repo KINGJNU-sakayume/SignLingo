@@ -1,11 +1,15 @@
 import { SIDES, type MotionClip, type Side } from '../motion/types';
-import { activeInterval, palmDistance, selectedFeatures, shapeDistance, type Feature, type HandFeature } from './features';
+import { participation } from '../motion/signing';
+import { palmDistance, selectedFeatures, shapeDistance, type Feature, type HandFeature } from './features';
+import { practiceInterval } from './interval';
+import { mirrorClip } from './mirror';
+import { constraintRubric } from './rubric';
 import type { Comparison, Component, Feedback, Interval, Metric } from './types';
 const mean = (xs: number[]) => xs.reduce((a,b)=>a+b,0)/xs.length;
 // Engineering weights emphasize handshape and palm orientation. These are NOT KSL-calibrated.
-function cost(a: Feature,b: Feature) {
+function cost(a: Feature,b: Feature,sides: readonly Side[]=SIDES) {
   let sum=0, weight=0;
-  for (const side of SIDES) {
+  for (const side of sides) {
     const x=a.hands[side],y=b.hands[side];
     if (!x || !y) {sum+=.75;weight++;continue;}
     const shape=shapeDistance(x,y);if(shape!==undefined){sum+=3*shape/90;weight+=3;}
@@ -16,12 +20,16 @@ function cost(a: Feature,b: Feature) {
   }
   return weight?sum/weight:.75;
 }
-export function align(a: Feature[],b: Feature[]): [number,number][] {
+export function align(a: Feature[],b: Feature[],sides: readonly Side[]=SIDES): [number,number][] {
+  return alignment(a,b,sides).path;
+}
+/** DTW path and its mean cost per step (lower = more alike), over the given hands only. */
+export function alignment(a: Feature[],b: Feature[],sides: readonly Side[]=SIDES): {path:[number,number][];cost:number} {
   const n=a.length,m=b.length, dp = new Float64Array(n*m).fill(Infinity), parent = new Uint8Array(n*m);
   for (let i=0;i<n;i++) for (let j=0;j<m;j++) {
     // Irregular capture/analysis spacing must not change the temporal band.
     if (Math.abs((a[i].time-a[0].time)/(a.at(-1)!.time-a[0].time)-(b[j].time-b[0].time)/(b.at(-1)!.time-b[0].time))>.45) continue;
-    const k=i*m+j, c=cost(a[i],b[j]);
+    const k=i*m+j, c=cost(a[i],b[j],sides);
     if (!i && !j) {dp[k]=c;continue;}
     // A small repeat penalty prevents gratuitous stretching of an incomplete gesture.
     const options=[i&&j?dp[(i-1)*m+j-1]:Infinity,i?dp[(i-1)*m+j]+.025:Infinity,j?dp[k-1]+.025:Infinity];
@@ -30,7 +38,7 @@ export function align(a: Feature[],b: Feature[]): [number,number][] {
   if (!Number.isFinite(dp[n*m-1])) throw new Error('The selected intervals could not be aligned.');
   const path: [number,number][]=[];let i=n-1,j=m-1;
   while(true) {path.push([i,j]);if(!i&&!j)break;const p=parent[i*m+j];if(p!==2)i--;if(p!==1)j--;}
-  return path.reverse();
+  return {path:path.reverse(),cost:dp[n*m-1]/path.length};
 }
 function priorMotion(fs:Feature[],i:number,side:Side,key:'position'|'position2D') {
   for(let j=i-1;j>=0;j--){
@@ -40,8 +48,20 @@ function priorMotion(fs:Feature[],i:number,side:Side,key:'position'|'position2D'
   }
   return undefined;
 }
-export function compareMotion(reference: MotionClip,learner: MotionClip,referenceInterval: Interval=activeInterval(reference),learnerInterval: Interval=activeInterval(learner)): Comparison {
-  const a=selectedFeatures(reference,referenceInterval),b=selectedFeatures(learner,learnerInterval),path=align(a,b);
+export type CompareOptions = {
+  /** Hands compared. Default: those taking part in the reference sign (`participation`). */
+  sides?: readonly Side[];
+  /** Also align a left-right mirrored learner and report a likely opposite-hand attempt. Default true. */
+  mirror?: boolean;
+};
+/** A mirrored learner aligning this much better (relative and absolute) is reported as an opposite-hand attempt. */
+// MIRROR_MIN_COST: below it the attempt already matches (e.g. a symmetric two-handed sign looks the same mirrored).
+export const MIRROR_RATIO=.8, MIRROR_MARGIN=.04, MIRROR_MIN_COST=.25;
+/** A hand the reference keeps down counts as raised by the learner from this fraction of the learner's signing interval. */
+export const UNUSED_RAISED=.3;
+export function compareMotion(reference: MotionClip,learner: MotionClip,referenceInterval: Interval=practiceInterval(reference),learnerInterval: Interval=practiceInterval(learner),options: CompareOptions={}): Comparison {
+  const taking=participation(reference),sides=options.sides??SIDES.filter(side=>taking[side].participates);
+  const a=selectedFeatures(reference,referenceInterval),b=selectedFeatures(learner,learnerInterval),aligned=alignment(a,b,sides),path=aligned.path;
   const pairs=path.map(([i,j])=>({reference:a[i].index,learner:b[j].index,referenceTime:a[i].time,learnerTime:b[j].time}));
   const metrics: Metric[]=[], feedback: Feedback[]=[];
   const support=(fs:Feature[],i:number)=>((i?Math.min(.3,fs[i].time-fs[i-1].time):0)+(i<fs.length-1?Math.min(.3,fs[i+1].time-fs[i].time):0))/2;
@@ -64,7 +84,7 @@ export function compareMotion(reference: MotionClip,learner: MotionClip,referenc
       reason:measured.value===null?requirements[component]+' At least 3 distinct samples and 65% frame/time coverage per clip are needed.':undefined};
     metrics.push(result);return result;
   }
-  for (const side of SIDES) {
+  for (const side of sides) {
     const paired = (measure:(x:HandFeature,y:HandFeature)=>number|undefined) => (x:Feature,y:Feature) => x.hands[side]&&y.hands[side]?measure(x.hands[side]!,y.hands[side]!):undefined;
     const shape=metric('handshape',side,'degrees',paired(shapeDistance));
     metric('palm',side,'degrees',paired(palmDistance));
@@ -78,7 +98,8 @@ export function compareMotion(reference: MotionClip,learner: MotionClip,referenc
     const imageDirections=(fs:Feature[])=>new Map(fs.map((f,i)=>{const prior=priorMotion(fs,i,side,'position2D'),p=f.hands[side]?.position2D,old=prior?.hands[side]?.position2D,v=p&&old&&prior&&f.time-prior.time<=.3?p.clone().sub(old):undefined;return [f.index,v&&v.length()>.015?v.normalize():undefined] as const;}));
     const aid=imageDirections(a),bid=imageDirections(b);
     metric('direction',side,'degrees',(x,y)=>{const u=ad.get(x.index),v=bd.get(y.index);return u&&v?u.angleTo(v)*180/Math.PI:undefined;},(x,y)=>{const u=aid.get(x.index),v=bid.get(y.index);return u&&v?Math.acos(Math.max(-1,Math.min(1,u.dot(v))))*180/Math.PI:undefined;});
-    if (shape.value===null || shape.coverage<.9) feedback.push({kind:'tracking',key:'missing',side,pair:Math.max(0,path.findIndex(([i,j])=>!a[i].hands[side]?.shape||!b[j].hands[side]?.shape))});
+    // The same evidence gate as the metric (65% coverage, 3 samples), so a usable comparison carries no notice.
+    if (shape.value===null) feedback.push({kind:'tracking',key:'missing',side,pair:Math.max(0,path.findIndex(([i,j])=>!a[i].hands[side]?.shape||!b[j].hands[side]?.shape))});
     // Specific claims require three distinct, consecutive frames on BOTH sides of the alignment.
     // This rejects isolated spikes and repeated DTW matches as evidence of a sustained difference.
     const claims: {key:Feedback['key']; value:(x:HandFeature,y:HandFeature)=>number|undefined; threshold:number}[]=[
@@ -100,7 +121,25 @@ export function compareMotion(reference: MotionClip,learner: MotionClip,referenc
       }
     }
   }
-  metric('coordination',undefined,'body',(x,y)=>x.hands.left?.position&&x.hands.right?.position&&y.hands.left?.position&&y.hands.right?.position?x.hands.left.position.clone().sub(x.hands.right.position).distanceTo(y.hands.left.position.clone().sub(y.hands.right.position)):undefined,(x,y)=>x.hands.left?.position2D&&x.hands.right?.position2D&&y.hands.left?.position2D&&y.hands.right?.position2D?x.hands.left.position2D.clone().sub(x.hands.right.position2D).distanceTo(y.hands.left.position2D.clone().sub(y.hands.right.position2D)):undefined);
+  if (sides.length===2) metric('coordination',undefined,'body',(x,y)=>x.hands.left?.position&&x.hands.right?.position&&y.hands.left?.position&&y.hands.right?.position?x.hands.left.position.clone().sub(x.hands.right.position).distanceTo(y.hands.left.position.clone().sub(y.hands.right.position)):undefined,(x,y)=>x.hands.left?.position2D&&x.hands.right?.position2D&&y.hands.left?.position2D&&y.hands.right?.position2D?x.hands.left.position2D.clone().sub(x.hands.right.position2D).distanceTo(y.hands.left.position2D.clone().sub(y.hands.right.position2D)):undefined);
+  // A hand the reference keeps down must stay down: one notice if the learner raised it in the sign.
+  // Conservative (30% of the learner's signing interval): webcam framing can leave a resting hand partly in view.
+  const learnerTaking=participation(learner),learnerRaised=SIDES.filter(side=>!sides.includes(side)&&learnerTaking[side].raisedFraction>=UNUSED_RAISED);
+  for (const side of learnerRaised) feedback.push({kind:'observed',key:'unused',side,pair:0});
+  // Reviewed intent: the reference's handshape/palm constraints on the learner's tracked frames. A sign whose
+  // constraint is unmet is reported once per constraint (its note names the intended form).
+  const rubric=constraintRubric(reference,learner,pairs,sides);
+  for (const item of rubric) if (item.passes===false) feedback.push({kind:'observed',key:item.kind==='handshape'?'shape':'facing',side:item.side,pair:item.pair,value:item.learner??undefined,note:item.note});
+  // Opposite hand: the mirrored attempt aligns clearly better. One notice replaces the scattered differences it causes.
+  let mirror: Comparison['mirror'];
+  if (options.mirror!==false) {
+    try {
+      const mirrored=alignment(a,selectedFeatures(mirrorClip(learner),learnerInterval),sides);
+      const detected=aligned.cost>=MIRROR_MIN_COST&&mirrored.cost<aligned.cost*MIRROR_RATIO&&aligned.cost-mirrored.cost>MIRROR_MARGIN;
+      mirror={cost:aligned.cost,mirroredCost:mirrored.cost,detected};
+      if (detected) { const keep=feedback.filter(f=>f.kind==='tracking'); feedback.length=0; feedback.push({kind:'observed',key:'mirror',side:sides[0]??'right',pair:0},...keep); }
+    } catch { /* the mirrored attempt could not be aligned: no claim */ }
+  }
   const da=a.at(-1)!.time-a[0].time,db=b.at(-1)!.time-b[0].time;
-  return {referenceInterval,learnerInterval,pairs,metrics,feedback,durationRatio:db/da,maxWarp:Math.max(...path.map(([i,j])=>Math.abs((a[i].time-a[0].time)/da-(b[j].time-b[0].time)/db))),evidence:metrics.filter(m=>m.component!=='direction').every(m=>m.value!==null)?'sufficient':'limited'};
+  return {referenceInterval,learnerInterval,sides:[...sides],alignmentCost:aligned.cost,...(mirror?{mirror}:{}),pairs,metrics,feedback,rubric,durationRatio:db/da,maxWarp:Math.max(...path.map(([i,j])=>Math.abs((a[i].time-a[0].time)/da-(b[j].time-b[0].time)/db))),evidence:metrics.filter(m=>m.component!=='direction').every(m=>m.value!==null)?'sufficient':'limited'};
 }

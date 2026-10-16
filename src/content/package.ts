@@ -5,6 +5,7 @@ import { parseLessonMotion, verifyAsset } from './assets';
 import type { Catalog, Expression } from './schema';
 import { expressionSchema } from './schema';
 import { verifyConstraintRecord } from '../motion/constraints/bake';
+import { practiceReadiness } from '../practice/gate';
 
 export async function readContained(root: string, relative: string) {
   const base = await realpath(root), target = await realpath(path.resolve(root, relative));
@@ -27,7 +28,12 @@ export async function validatePackage(catalog: Catalog, root: string, includeDra
       }
       const bytes = await readContained(root, asset.uri);
       await verifyAsset(asset, bytes);
-      if (kind === 'motion') await verifyConstraintRecord(parseLessonMotion(entry, bytes));
+      if (kind === 'motion') {
+        const clip = parseLessonMotion(entry, bytes);
+        await verifyConstraintRecord(clip);
+        const problems = practiceReadiness(clip);
+        if (problems.length) throw new Error(`${entry.id} v${entry.revision} cannot be a practice reference: ${problems.join('; ')}`);
+      }
     }
   }
 }

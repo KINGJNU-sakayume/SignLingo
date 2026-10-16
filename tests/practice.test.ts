@@ -6,7 +6,8 @@ import { practiceClip } from './practice-fixtures';
 import type { Component, Interval } from '../src/practice/types';
 import type { MotionClip, Side } from '../src/motion/types';
 const full=(c:MotionClip):Interval=>({start:0,end:c.frames.at(-1)!.timestamp/1000,method:'manual'});
-const compare=(a:MotionClip,b:MotionClip)=>compareMotion(a,b,full(a),full(b));
+// Synthetic geometry: compare both hands (participation detection is for real recordings).
+const compare=(a:MotionClip,b:MotionClip)=>compareMotion(a,b,full(a),full(b),{sides:['left','right']});
 const value=(r:ReturnType<typeof compare>,component:Component,side:Side='left')=>r.metrics.find(m=>m.component===component&&m.side===side)!.value!;
 describe('technical motion comparison (synthetic geometry, not KSL validity)',()=>{
   it('identical sequences have zero residuals and a diagonal alignment',()=>{

@@ -159,6 +159,20 @@ function measure(c: Constraint, f: Frame, context: { hold?: Partial<Record<Side,
     }
   }
 }
+/**
+ * Residual of a handshape or palmFacing constraint on one pose, exactly as the solver measures it (null when a needed
+ * hand is not shown or has no observation). Other kinds need clip context (holds, offsets) or depend on the fixed rig's
+ * arm geometry and monocular depth, so they are not measured here. Used by Practice to grade a learner's tracked frames.
+ */
+export function orientationResidual(c: Constraint, pose: DisplayPose, shown: Record<Side, boolean>, source: Record<Side, HandSource>): number | null {
+  if (c.kind !== 'handshape' && c.kind !== 'palmFacing') return null;
+  if (pose.quality.body <= 0) return null;
+  const f: Frame = { pose, torso: q(pose.rotations.torso).normalize(), root: v(pose.root), shown, source,
+    hands: { left: handState(pose, 'left'), right: handState(pose, 'right') },
+    fingersSet: { left: false, right: false }, orientationSet: { left: false, right: false } };
+  if (c.kind === 'palmFacing' && !sidesOf(c.hand).every(side => handPresent(f, side))) return null;
+  return measure(c, f, {});
+}
 const offsetQuaternion = (c: Extract<Constraint, { kind: 'wristOffset' }>) => eulerQuat(...c.degrees.map(rad) as [number, number, number]);
 
 function facingTarget(c: Extract<Constraint, { kind: 'palmFacing' }>, f: Frame, side: Side) {

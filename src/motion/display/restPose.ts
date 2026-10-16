@@ -2,7 +2,7 @@ import { Matrix4, Quaternion, Vector3 } from 'three';
 import { boneQuaternion, eulerQuat, q, qa, rad, solveArm, v } from '../math';
 import { distributeForearmRoll } from '../hand';
 import { forwardArm } from '../rig';
-import { localWrist, NEAR_REST_METERS, RAISED_METERS, restDistance, signingInterval } from '../signing';
+import { localWrist, NEAR_REST_METERS, participation, RAISED_METERS, restDistance, signingInterval } from '../signing';
 import { FINGERS, SIDES, type DisplayPose, type Side } from '../types';
 import { armVisible, withPose } from './pipeline';
 import type { DisplayClip, DisplayFrame, DisplayStage, HandAnnotation } from './types';
@@ -13,8 +13,6 @@ export const REST_BLEND_MS = 300;
 /** Shorter tracked runs of an arm (tracking blips while it rests) do not anchor anything. */
 const SUSTAINED_MS = 150;
 export type RestReport = Record<Side, { restArms: number; restHands: number; blended: number; passive: boolean }>;
-/** A side raised in fewer than this fraction of the signing interval's frames does not take part in the sign. */
-export const PASSIVE_FRACTION = .15;
 
 // A relaxed hand: fingers slightly curled, thumb resting alongside. Left hand, [flexion, spread] degrees per joint
 // (the constraint presets' parameterization); the right hand mirrors the spread.
@@ -78,14 +76,14 @@ const restness = (distance: number) => 1 - smooth((distance - NEAR_REST_METERS) 
 export function restPose(): DisplayStage {
   return { id: REST_STAGE, run(display: DisplayClip, input): DisplayClip {
     const interval = signingInterval(input.clip), activity = interval.sides;
-    const inside = input.clip.frames.filter(f => f.timestamp / 1000 >= interval.start - 1e-6 && f.timestamp / 1000 <= interval.end + 1e-6).length;
+    const taking = participation(input.clip);
     const frames = display.frames.slice();
     const report: RestReport = { left: { restArms: 0, restHands: 0, blended: 0, passive: false }, right: { restArms: 0, restHands: 0, blended: 0, passive: false } };
     for (const side of SIDES) {
       const rest = activity[side].rest;
       // A hand that stays down through the sign (e.g. the non-dominant hand of a one-handed sign) takes no part in
       // it: all its frames show the rest hand, observed or not, so it does not flicker between estimates.
-      const passive = interval.method === 'raised-hands' && activity[side].raised.filter(Boolean).length < PASSIVE_FRACTION * inside;
+      const passive = !taking[side].participates;
       report[side].passive = passive;
       const distance = (pose: DisplayPose) => { const p = localWrist(pose, side); return Math.min(restDistance(p, rest.start), restDistance(p, rest.end)); };
       // Shown arms. The sign's handshape forms while the hand travels from rest to where the sign starts, and
