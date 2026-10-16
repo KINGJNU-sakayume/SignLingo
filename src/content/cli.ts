@@ -52,6 +52,30 @@ async function writePrepared(directory: string, prepared: Expression, clip: Moti
   return entry;
 }
 
+/**
+ * The entry at a revision a new motion may be written to. The catalog, not the private entry, says what is
+ * published: a new motion (a correction or a new source video) never reuses a published revision, and an unpublished
+ * higher revision (e.g. an earlier constrain) is rebuilt in place. Other local assets are copied to the new revision.
+ */
+async function unpublishedRevision(directory: string, entry: Expression): Promise<Expression> {
+  const catalog = parseCatalog(await json('src/content/catalog.json'));
+  const published = catalog.expressions.find(e => e.id === entry.id && e.status === 'published');
+  const revision = published && entry.revision <= published.revision ? published.revision + 1 : entry.revision;
+  if (revision === entry.revision) return entry;
+  const assets: Expression['assets'] = {};
+  for (const [kind, item] of Object.entries(entry.assets) as [keyof Expression['assets'], NonNullable<Expression['assets']['motion']>][]) {
+    if (kind === 'motion') continue;
+    if (item.uri.startsWith('https://')) { assets[kind] = { ...item, version: revision }; continue; }
+    const uri = item.uri.replace(`/v${entry.revision}/`, `/v${revision}/`);
+    const bytes = await readContained(directory, item.uri).catch(() => readContained('public', item.uri));
+    await verifyAsset(item, bytes);
+    await mkdir(path.dirname(path.join(directory, uri)), { recursive: true });
+    await writeFile(path.join(directory, uri), bytes);
+    assets[kind] = { ...item, uri, version: revision };
+  }
+  return { ...entry, revision, assets };
+}
+
 /** Validates a ready-to-publish package and copies its approved assets into the static release (never a video). */
 async function publishPackage(directory: string | undefined) {
   if (!directory || !/^private-data\/[a-z0-9-]+$/.test(directory)) throw new Error('publish private-data/<package>');
@@ -172,8 +196,8 @@ try {
     if (await sha256(video) !== entry.source.videoSha256) throw new Error('Video differs from rights approval');
     const clip = importMotion(motion.toString());
     if (clip.source.size !== video.length || clip.source.name !== path.basename(videoPath)) throw new Error('Motion Lab export does not match the source video');
-    await writePrepared(directory, entry, clip, motion);
-    console.log('검수 패키지를 준비했습니다. 원본은 공개 폴더에 복사하지 않았습니다.');
+    const written = await writePrepared(directory, await unpublishedRevision(directory, entry), clip, motion);
+    console.log(`검수 패키지를 준비했습니다(revision ${written.revision}). 원본은 공개 폴더에 복사하지 않았습니다.`);
   } else if (command === 'constrain') {
     const [directory, constraintsPath] = args;
     if (!directory || !PACKAGE.test(directory) || !constraintsPath) throw new Error('constrain private-data/<package> <constraints.json>');
@@ -190,26 +214,7 @@ try {
     catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; motion = await readContained('public', asset.uri); }
     await verifyAsset(asset, motion);
     const { clip } = await applyConstraints(importMotion(new TextDecoder().decode(motion)), set);
-    // The catalog, not the private entry, says what is published. A correction never reuses a published revision;
-    // an unpublished higher revision (e.g. an earlier constrain) is rebuilt in place.
-    const catalog = parseCatalog(await json('src/content/catalog.json'));
-    const published = catalog.expressions.find(e => e.id === entry.id && e.status === 'published');
-    const revision = published && entry.revision <= published.revision ? published.revision + 1 : entry.revision;
-    let next: Expression = { ...entry, revision };
-    if (revision !== entry.revision) {
-      const assets: Expression['assets'] = {};
-      for (const [kind, item] of Object.entries(entry.assets) as [keyof Expression['assets'], NonNullable<Expression['assets']['motion']>][]) {
-        if (kind === 'motion') continue;
-        if (item.uri.startsWith('https://')) { assets[kind] = { ...item, version: revision }; continue; }
-        const uri = item.uri.replace(`/v${entry.revision}/`, `/v${revision}/`);
-        const bytes = await readContained(directory, item.uri).catch(() => readContained('public', item.uri));
-        await verifyAsset(item, bytes);
-        await mkdir(path.dirname(path.join(directory, uri)), { recursive: true });
-        await writeFile(path.join(directory, uri), bytes);
-        assets[kind] = { ...item, uri, version: revision };
-      }
-      next = { ...next, assets };
-    }
+    const next = await unpublishedRevision(directory, entry);
     const written = await writePrepared(directory, next, clip, new TextEncoder().encode(exportMotion(clip)));
     await writeFile(path.join(directory, 'constraints.json'), exportConstraints(set));
     const changed = clip.frames.filter(f => f.constraint).length;
@@ -220,7 +225,10 @@ try {
     console.log(await reviewSubject(entry));
   } else if (command === 'transition') {
     const [file, next] = args;
-    const entry = transition(expressionSchema.parse(await json(file)), next as ContentState);
+    const current = expressionSchema.parse(await json(file));
+    // Back to the rights review (e.g. a new source video): the review starts over, so earlier approvals no longer apply.
+    const restart: Expression = next === 'rights-review-required' ? { ...current, reviews: { reconstruction: { status: 'pending' }, linguistic: { status: 'pending' } } } : current;
+    const entry = transition(restart, next as ContentState);
     await verifyReviews(entry);
     await save(file, entry);
   } else if (command === 'publish') {

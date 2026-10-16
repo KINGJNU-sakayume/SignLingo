@@ -157,3 +157,29 @@ it('approves both reviews from the owner feedback with a generated record, and p
   // A second session the same day gets its own record; a published package is not approvable again.
   expect(failure('approve', '--feedback', '좋아요', `private-data/${ID}`)).toContain('검수 대기 상태가 아닙니다');
 }, 30000);
+
+it('restarts a published package for a new source video at the next revision, with fresh reviews', async () => {
+  // Continues from revision 2 published above.
+  const before = await readEntry();
+  expect(before.revision).toBe(2);
+  const privateMotion = path.join(root, `private-data/${ID}`, before.assets.motion!.uri);
+  const publishedMotion = await readFile(privateMotion);
+  // Changing the source invalidates the approvals: going back to the rights review starts both reviews over.
+  const video = new TextEncoder().encode('CONTRACT TEST ONLY — new source recording');
+  const entry = structuredClone(before);
+  entry.source.videoSha256 = await sha256(video); entry.license.approval!.sourceSha256 = entry.source.videoSha256;
+  await saveEntry(entry);
+  command('transition', `private-data/${ID}/entry.json`, 'rights-review-required');
+  expect((await readEntry()).reviews).toEqual({ reconstruction: { status: 'pending' }, linguistic: { status: 'pending' } });
+  command('transition', `private-data/${ID}/entry.json`, 'source-approved');
+  command('transition', `private-data/${ID}/entry.json`, 'motion-processing-required');
+  const clip = (await approvedFixture(ID)).clip;
+  await writeFile(path.join(root, 'private-data/new-camera.mp4'), video);
+  clip.source.name = 'new-camera.mp4'; clip.source.size = video.length;
+  await writeFile(path.join(root, 'private-data/new.motion.json'), JSON.stringify(clip));
+  expect(command('prepare', `private-data/${ID}`, 'private-data/new-camera.mp4', 'private-data/new.motion.json')).toContain('revision 3');
+  const prepared = await readEntry();
+  expect(prepared).toMatchObject({ revision: 3, status: 'reconstruction-review-required', assets: { motion: { uri: `content/assets/${ID}/v3/reference.motion.json`, version: 3 } } });
+  // The published revision's private copy is not overwritten.
+  expect(await readFile(privateMotion)).toEqual(publishedMotion);
+}, 30000);
