@@ -1,5 +1,5 @@
 import { Matrix4, Quaternion, Vector3 } from 'three';
-import { boneQuaternion, boundWrist, eulerQuat, q, qa, rad, REACH, solveArm, v } from '../math';
+import { boneQuaternion, boundWrist, eulerQuat, LENGTHS, q, qa, rad, REACH, solveArm, v } from '../math';
 import { distributeForearmRoll } from '../hand';
 import { forwardArm } from '../rig';
 import { SIDES, type ConstraintEvidence, type DisplayPose, type MotionClip, type Quat, type Side } from '../types';
@@ -46,6 +46,8 @@ export type ConstraintResult = {
   /** Residual at or below this counts as satisfied (same unit). */
   tolerance: number;
   span: ResolvedSpan | null;
+  /** Contact with `approaches`: clip times (ms) of the approaches it acts around. */
+  approaches?: number[];
   rows: (ResidualRow | null)[];
   summary: ConstraintSummary;
 };
@@ -75,6 +77,32 @@ const SATISFIED: Record<ConstraintKind, (c: Constraint) => number> = {
 };
 const unitOf = (c: Constraint): ResidualUnit =>
   c.kind === 'sameHeight' || c.kind === 'contact' || c.kind === 'symmetry' || (c.kind === 'hold' && c.parts.includes('position')) ? 'm' : 'deg';
+const contactAlong = (c: Extract<Constraint, { kind: 'contact' }>) => c.along ?? 'any';
+/** Distance used by a contact: 3D, or in the front camera's image plane (x, y; the camera looks along -Z) for `along: 'image'`. */
+const contactDistance = (c: Extract<Constraint, { kind: 'contact' }>, a: Vector3, b: Vector3) => contactAlong(c) === 'image' ? Math.hypot(a.x - b.x, a.y - b.y) : a.distanceTo(b);
+/**
+ * The elbow for a moved wrist that keeps the arm looking as observed from the camera: of the elbow positions the
+ * fixed-length arm allows (a circle around the shoulder–wrist line), the one closest to the observed elbow in the
+ * image plane (x, y), depth breaking ties. The old rule (closest in 3D) swung the elbow sideways when a contact moved
+ * the hand far in depth (ksl-sorry revision-3 candidate).
+ */
+export function projectedElbow(shoulder: Vector3, wrist: Vector3, observed: Vector3, samples = 180): Vector3 {
+  const { upper: a, lower: b } = LENGTHS, direction = wrist.clone().sub(shoulder);
+  const distance = Math.min(REACH.max, Math.max(REACH.min, direction.length()));
+  if (direction.lengthSq() < 1e-12) return observed.clone();
+  direction.normalize();
+  const along = (a * a - b * b + distance * distance) / (2 * distance), radius = Math.sqrt(Math.max(0, a * a - along * along));
+  const center = shoulder.clone().addScaledVector(direction, along);
+  const u = (Math.abs(direction.x) < .8 ? new Vector3(1, 0, 0) : new Vector3(0, 0, 1)).cross(direction).normalize();
+  const w = direction.clone().cross(u).normalize();
+  let best = observed.clone(), cost = Infinity;
+  for (let k = 0; k < samples; k++) {
+    const t = 2 * Math.PI * k / samples, e = center.clone().addScaledVector(u, radius * Math.cos(t)).addScaledVector(w, radius * Math.sin(t));
+    const dx = e.x - observed.x, dy = e.y - observed.y, dz = e.z - observed.z, value = dx * dx + dy * dy + .1 * dz * dz;
+    if (value < cost) { cost = value; best = e; }
+  }
+  return best;
+}
 const sidesOf = (hand: 'left' | 'right' | 'both'): Side[] => hand === 'both' ? [...SIDES] : [hand];
 const deg = (radians: number) => radians * 180 / Math.PI;
 const mirror = (r: Quaternion) => new Quaternion(r.x, -r.y, -r.z, r.w);
@@ -121,7 +149,7 @@ function measure(c: Constraint, f: Frame, context: { hold?: Partial<Record<Side,
     }
     case 'contact': {
       if (!pointAvailable(f, c.a) || !pointAvailable(f, c.b) || !presentFor(f, [c.a, c.b])) return null;
-      return Math.max(0, pointPosition(f.pose, f.hands, c.a).distanceTo(pointPosition(f.pose, f.hands, c.b)) - c.gapCm / 100);
+      return Math.max(0, contactDistance(c, pointPosition(f.pose, f.hands, c.a), pointPosition(f.pose, f.hands, c.b)) - c.gapCm / 100);
     }
     case 'symmetry': {
       if (!handPresent(f, 'left') || !handPresent(f, 'right')) return null;
@@ -158,6 +186,20 @@ function measure(c: Constraint, f: Frame, context: { hold?: Partial<Record<Side,
       return deg(f.hands[c.hand].palm.angleTo(target));
     }
   }
+}
+/**
+ * Residual of a handshape or palmFacing constraint on one pose, exactly as the solver measures it (null when a needed
+ * hand is not shown or has no observation). Other kinds need clip context (holds, offsets) or depend on the fixed rig's
+ * arm geometry and monocular depth, so they are not measured here. Used by Practice to grade a learner's tracked frames.
+ */
+export function orientationResidual(c: Constraint, pose: DisplayPose, shown: Record<Side, boolean>, source: Record<Side, HandSource>): number | null {
+  if (c.kind !== 'handshape' && c.kind !== 'palmFacing') return null;
+  if (pose.quality.body <= 0) return null;
+  const f: Frame = { pose, torso: q(pose.rotations.torso).normalize(), root: v(pose.root), shown, source,
+    hands: { left: handState(pose, 'left'), right: handState(pose, 'right') },
+    fingersSet: { left: false, right: false }, orientationSet: { left: false, right: false } };
+  if (c.kind === 'palmFacing' && !sidesOf(c.hand).every(side => handPresent(f, side))) return null;
+  return measure(c, f, {});
 }
 const offsetQuaternion = (c: Extract<Constraint, { kind: 'wristOffset' }>) => eulerQuat(...c.degrees.map(rad) as [number, number, number]);
 
@@ -222,6 +264,43 @@ function holdReferences(c: Extract<Constraint, { kind: 'hold' }>, span: Resolved
   return refs;
 }
 
+/** Frames within this of an approach are its core (weight 1); the weight then falls off over `blendMs`. */
+const APPROACH_HOLD_MS = 35;
+/** Two approaches closer in time than this are one approach. */
+const APPROACH_SEPARATION_MS = 150;
+/**
+ * Per-frame weights of a contact with `approaches: n`: the n deepest local minima of the a–b distance inside the span
+ * (on the input poses, frames where both points are present), each with a core of APPROACH_HOLD_MS and a smoothstep
+ * fall-off over `blendMs`.
+ */
+export function approachWeights(c: Extract<Constraint, { kind: 'contact' }>, span: ResolvedSpan, input: SolveInput, shown: (i: number, side: Side) => boolean) {
+  const distance: (number | null)[] = input.poses.map((pose, i) => {
+    if (i < span.firstFrame || i > span.lastFrame || pose.quality.body <= 0) return null;
+    const sides = [pointSide(c.a), pointSide(c.b)].filter((s): s is Side => !!s);
+    if (!sides.every(side => shown(i, side) && input.hands(i, side) !== 'missing')) return null;
+    const hands = { left: handState(pose, 'left'), right: handState(pose, 'right') };
+    return contactDistance(c, pointPosition(pose, hands, c.a), pointPosition(pose, hands, c.b));
+  });
+  const minima = distance.flatMap((d, i) => d !== null && (distance[i - 1] ?? Infinity) > d && (distance[i + 1] ?? Infinity) >= d ? [i] : [])
+    .sort((x, y) => distance[x]! - distance[y]!);
+  const chosen: number[] = [];
+  for (const i of minima) {
+    if (chosen.length >= (c.approaches ?? 1)) break;
+    if (chosen.every(j => Math.abs(input.timestamps[i] - input.timestamps[j]) >= APPROACH_SEPARATION_MS)) chosen.push(i);
+  }
+  const times = chosen.map(i => input.timestamps[i]).sort((x, y) => x - y);
+  const weights = input.timestamps.map((t, i) => {
+    if (i < span.firstFrame || i > span.lastFrame) return 0;
+    return Math.max(0, ...times.map(e => {
+      const away = Math.abs(t - e) - APPROACH_HOLD_MS;
+      if (away <= 0) return 1;
+      if (c.blendMs <= 0 || away >= c.blendMs) return 0;
+      const x = 1 - away / c.blendMs; return x * x * (3 - 2 * x);
+    }));
+  });
+  return { times, weights };
+}
+
 function bareForearm(pose: DisplayPose, side: Side) {
   const arm = forwardArm(pose, side);
   const upper = arm.elbow.clone().sub(arm.shoulder), lower = arm.wrist.clone().sub(arm.elbow);
@@ -242,13 +321,14 @@ export function solveConstraints(input: SolveInput): ConstraintSolution {
   const shown = input.armShown ?? ((i: number, side: Side) => armVisible(poses[i], side));
   const spans = set.constraints.map(c => resolveSpan(c.span, timestamps, interval));
   const holds = set.constraints.map((c, k) => c.kind === 'hold' && spans[k] ? holdReferences(c, spans[k]!, input, shown) : undefined);
+  const events = set.constraints.map((c, k) => c.kind === 'contact' && c.approaches && spans[k] ? approachWeights(c, spans[k]!, input, shown) : undefined);
   const rows: (ResidualRow | null)[][] = set.constraints.map(() => []);
   const changes: FrameChange[] = [];
   const out = poses.map((pose, i) => {
     const t = timestamps[i];
     const active = set.constraints.flatMap((c, k) => {
       const span = spans[k]; if (!span) return [];
-      const blend = blendWeight(t, span, c.blendMs);
+      const blend = events[k] ? events[k]!.weights[i] : blendWeight(t, span, c.blendMs);
       return blend > 0 ? [{ c, k, blend, w: blend * c.strength }] : [];
     });
     set.constraints.forEach((_, k) => { rows[k][i] = null; });
@@ -353,7 +433,7 @@ export function solveConstraints(input: SolveInput): ConstraintSolution {
         const { arm, bare } = bareForearm(pose, side);
         let upper = arm.upper, lower = bare;
         if (moved) {
-          const solved = solveArm(arm.shoulder, hand.wrist, arm.elbow);
+          const solved = solveArm(arm.shoulder, hand.wrist, projectedElbow(arm.shoulder, hand.wrist, arm.elbow));
           upper = solved.upperQ; lower = solved.lowerQ;
           if (solved.wrist.distanceTo(hand.wrist) > .002) flags[side].add('unreachable');
           rotations[`${side}.upper`] = qa(torso.clone().invert().multiply(upper));
@@ -395,7 +475,7 @@ export function solveConstraints(input: SolveInput): ConstraintSolution {
   });
   const constraints = set.constraints.map((c, k): ConstraintResult => {
     const tolerance = SATISFIED[c.kind](c);
-    return { id: c.id, kind: c.kind, note: c.note, unit: unitOf(c), tolerance, span: spans[k], rows: rows[k], summary: summarize(rows[k], tolerance) };
+    return { id: c.id, kind: c.kind, note: c.note, unit: unitOf(c), tolerance, span: spans[k], ...(events[k] ? { approaches: events[k]!.times } : {}), rows: rows[k], summary: summarize(rows[k], tolerance) };
   });
   return { poses: out, changes, constraints, interval };
 }
@@ -429,10 +509,11 @@ function positionCorrection(c: Constraint, f: Frame, hold?: Partial<Record<Side,
   } else if (c.kind === 'contact') {
     if (!pointAvailable(f, c.a) || !pointAvailable(f, c.b) || !presentFor(f, [c.a, c.b])) return out;
     const a = pointPosition(f.pose, f.hands, c.a), b = pointPosition(f.pose, f.hands, c.b), diff = b.clone().sub(a);
+    if (contactAlong(c) === 'image') diff.z = 0;
     const distance = diff.length(), excess = Math.max(0, distance - c.gapCm / 100 - c.toleranceCm / 100);
     if (excess <= 0 || distance < 1e-9) return out;
-    diff.normalize();
     const sa = pointSide(c.a), sb = pointSide(c.b), ma = moves(sa, c.move), mb = moves(sb, c.move);
+    diff.normalize();
     const share = ma && mb ? .5 : 1;
     if (ma) out[sa!] = diff.clone().multiplyScalar(excess * share);
     if (mb) out[sb!] = diff.clone().multiplyScalar(-excess * share);

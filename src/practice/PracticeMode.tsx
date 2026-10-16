@@ -1,6 +1,6 @@
 import { MediaPipeDetector } from '../motion/detector';
 import { Reconstructor } from '../motion/reconstruct';
-import { attemptTracking, inspectTracking } from './diagnostics';
+import { attemptTracking, handSize, inspectTracking, MIN_HAND_SIZE } from './diagnostics';
 import type { CaptureMeasurements, ExtractionMeasurements } from '../motion/timing';
 import { CaptureQuality } from './CaptureQuality';
 import { Overlay } from '../components/Overlay';
@@ -13,7 +13,8 @@ import { importMotion } from '../motion/serialization';
 import { frameIndex } from '../motion/player';
 import { displayFor, displayPose, hasConstrained, hasFilled, hasRest } from '../motion/display';
 import type { MotionClip, Side } from '../motion/types';
-import { activeInterval, features } from './features';
+import { features } from './features';
+import { practiceInterval } from './interval';
 import { compareMotion } from './compare';
 import { WebcamCapture, cameraError } from './capture';
 import { koMessage } from '../i18n/ko';
@@ -24,7 +25,7 @@ type Phase = 'idle'|'opening'|'ready'|'countdown'|'recording'|'finishing'|'proce
 const seconds=(n:number)=>n.toFixed(2)+' s';
 function Trim({clip,value,onChange,label,locale}:{clip:MotionClip;value:Interval;onChange:(v:Interval)=>void;label:string;locale:Locale}) {
   const t=copy[locale];
-  return <fieldset className="practice-trim"><legend>{label} · {value.method}</legend>{(['start','end'] as const).map(key=><label key={key}>{key==='start'?t.startTime:t.endTime}<input aria-label={`${label} ${key==='start'?t.startTime:t.endTime}`} type="number" min={0} max={clip.frames.at(-1)!.timestamp/1000} step={.01} value={Number(value[key].toFixed(3))} onChange={e=>onChange({...value,[key]:Number(e.target.value),method:'manual'})}/></label>)}<button className="button secondary" onClick={()=>onChange(activeInterval(clip))}>{t.auto}</button></fieldset>;
+  return <fieldset className="practice-trim"><legend>{label} · {value.method}</legend>{(['start','end'] as const).map(key=><label key={key}>{key==='start'?t.startTime:t.endTime}<input aria-label={`${label} ${key==='start'?t.startTime:t.endTime}`} type="number" min={0} max={clip.frames.at(-1)!.timestamp/1000} step={.01} value={Number(value[key].toFixed(3))} onChange={e=>onChange({...value,[key]:Number(e.target.value),method:'manual'})}/></label>)}<button className="button secondary" onClick={()=>onChange(practiceInterval(clip))}>{t.auto}</button></fieldset>;
 }
 function Alignment({result,index,locale}:{result:Comparison;index:number;locale:Locale}) {
   const t=copy[locale],r=result.referenceInterval,l=result.learnerInterval;
@@ -53,7 +54,7 @@ function WristPaths({reference,learner,result,side,index,locale}:{reference:Moti
 export function PracticeMode({initialReference=null,avatarMirror=false,onResultReviewed,onReturnToLesson}:{initialReference?:MotionClip|null;avatarMirror?:boolean;onResultReviewed?:(evidence:'sufficient'|'limited',feedback?:string[])=>void;onReturnToLesson?:()=>void}={}) {
   const [locale,setLocale]=useState<Locale>('ko'),t=copy[locale];
   const [reference,setReference]=useState<MotionClip|null>(initialReference),[learner,setLearner]=useState<MotionClip|null>(null);
-  const [ri,setRi]=useState<Interval|null>(()=>initialReference?activeInterval(initialReference):null),[li,setLi]=useState<Interval|null>(null);
+  const [ri,setRi]=useState<Interval|null>(()=>initialReference?practiceInterval(initialReference):null),[li,setLi]=useState<Interval|null>(null);
   const [referenceUrl,setReferenceUrl]=useState(''),[learnerUrl,setLearnerUrl]=useState('');
   const [phase,setPhase]=useState<Phase>('idle'),[countdown,setCountdown]=useState(3),[error,setError]=useState('');
   const [mirror,setMirror]=useState(true),[unmirror,setUnmirror]=useState(false),[frames,setFrames]=useState(0),[elapsed,setElapsed]=useState(0),[attempt,setAttempt]=useState(0);
@@ -80,6 +81,8 @@ export function PracticeMode({initialReference=null,avatarMirror=false,onResultR
   // Display only: the reference gets the learner view; the attempt keeps its tracking gaps visible.
   const referenceDisplay=useMemo(()=>reference?displayFor(reference,'learner'):null,[reference]);
   const learnerDisplay=useMemo(()=>learner?displayFor(learner,'attempt'):null,[learner]);
+  // Measured after recording (the signing interval of the whole attempt), not from a single framing snapshot.
+  const learnerHand=useMemo(()=>learner?handSize(learner):null,[learner]);
   const rPose=useMemo(()=>referenceDisplay?displayPose(referenceDisplay,rIndex):null,[referenceDisplay,rIndex]);
   const lPose=useMemo(()=>learnerDisplay?displayPose(learnerDisplay,lIndex):null,[learnerDisplay,lIndex]);
   useEffect(()=>()=>{epoch.current++;clearTimeout(timer.current);capture.current?.cancel();framing.current?.close();offline.current?.abort();},[]);
@@ -108,8 +111,8 @@ export function PracticeMode({initialReference=null,avatarMirror=false,onResultR
       const clip=importMotion(await file.text());if(current!==epoch.current)return;
       if(clip.frames.length<3)throw new Error('Practice requires at least three motion frames.');
       setPlaying(false);setError('');setIndex(0);setTime(0);
-      if(target==='reference'){resetAttempt();setReference(clip);setRi(activeInterval(clip));setReferenceUrl('');}
-      else {resetAttempt();setLearner(clip);setLi(activeInterval(clip));setAttempt(n=>n+1);}
+      if(target==='reference'){resetAttempt();setReference(clip);setRi(practiceInterval(clip));setReferenceUrl('');}
+      else {resetAttempt();setLearner(clip);setLi(practiceInterval(clip));setAttempt(n=>n+1);}
     } catch(e){if(current===epoch.current)setError(koMessage(cameraError(e)));}
   }
   async function openCamera() {
@@ -128,7 +131,7 @@ export function PracticeMode({initialReference=null,avatarMirror=false,onResultR
         onFrame:(f,m)=>{if(current===epoch.current)setDiagnostics({model:'ready',backend:m.backend,fps:m.inferenceFps??0,...inspectTracking(f),frame:f,width:0,height:0});}
       });
       if(current!==epoch.current)return;
-      setLearner(clip);setLi(activeInterval(clip));setDiagnostics(d=>d?{...d,attempt:attemptTracking(clip)}:d);
+      setLearner(clip);setLi(practiceInterval(clip));setDiagnostics(d=>d?{...d,attempt:attemptTracking(clip)}:d);
     }catch(e){if(current===epoch.current&&!(e instanceof Error&&e.name==='AbortError'))setError(cameraError(e));}
     finally{if(current===epoch.current){setPhase('idle');offline.current=null;}}
   }
@@ -189,10 +192,12 @@ export function PracticeMode({initialReference=null,avatarMirror=false,onResultR
       <section className="practice-card"><h2>{t.intervals}</h2><p>{t.intervalNote}</p>{ri&&<Trim clip={reference} value={ri} onChange={setRi} label={t.reference} locale={locale}/ >}{learner&&li&&<Trim clip={learner} value={li} onChange={setLi} label={t.learner} locale={locale}/ >}{comparison.error&&<p role="alert">{comparison.error}</p>}</section>
     </>}
     {session&&result&&learner&&reference&&<div className="practice-results" data-attempt={session.attempt}>
+      {learnerHand!==null&&learnerHand<MIN_HAND_SIZE&&<p className="practice-notice" role="status">{locale==='ko'?`손이 화면에서 작게 찍혔습니다(화면 높이의 ${Math.round(learnerHand*100)}%). 손가락이 잘 보이도록 카메라에 더 가까이 와서 다시 녹화해 보세요. 상체와 손이 화면 안에 들어오면 됩니다.`:`Your hands were small in the frame (${Math.round(learnerHand*100)}% of the frame height). Move closer to the camera and record again so the fingers are clearly visible, keeping your upper body and hands in view.`}</p>}
       <section className="practice-card"><h2>{t.alignment}</h2><p>{t.alignmentNote}</p><Alignment result={result} index={index} locale={locale}/><h3>{t.timing}</h3><p>{t.speedRatio}: <strong>{result.durationRatio.toFixed(2)}×</strong> · {t.warp}: <strong>{(result.maxWarp*100).toFixed(1)}%</strong></p><p>{t.timingNote}</p></section>
-      <section className="practice-card"><h2>{t.metrics}</h2>{result.evidence==='limited'&&<p className="practice-notice">{locale==='ko'?'일부 항목은 근거가 부족합니다. 관측된 항목은 개별적으로 표시하며 측정 불가능한 항목은 점수를 표시하지 않습니다.':'Some components have insufficient evidence. Supported components remain available; unavailable components are not scored.'}</p>}<p>{t.metricNote}</p><div className="practice-metrics">{result.metrics.map(m=><article key={`${m.side}-${m.component}`}><h3>{t[m.component]}</h3><span>{m.side?t[m.side]:t.both}</span><strong>{m.value===null?(m.component==='direction'?t.noDirection:t.missingValue):`${m.value.toFixed(m.unit==='degrees'?1:3)} ${m.unit==='degrees'?t.degrees:t.body}`}</strong><small>{m.space==='image2d'?(locale==='ko'?'2D 영상 평면 · 깊이 미측정':'2D image plane · no depth'):m.space==='estimated3d'?(locale==='ko'?'추정 3D · 깊이 불확실':'Estimated 3D · depth uncertain'):(locale==='ko'?'손 기준 각도':'Hand-local angles')}</small><small>{Math.round(m.coverage*100)}% {t.coverage} · n={m.samples}</small>{m.image&&m.space!=='image2d'&&<small>{locale==='ko'?'2D 영상 평면':'2D image plane'}: {m.image.value===null?'—':m.image.value.toFixed(3)} · {Math.round(m.image.coverage*100)}%</small>}{m.reason&&<small>{metricRequirement(locale,m.component,m.space==='image2d')}</small>}</article>)}</div></section>
-      {onResultReviewed&&result&&<section className="practice-card" aria-label="레슨 연습 기록"><h2>레슨 연습 기록</h2><p>동작 비교가 완료되었습니다. 결과는 정답 점수가 아니라 관측 가능한 움직임의 차이입니다. 저장하면 이 브라우저에 연습 횟수와 추적 근거 수준, 동작 피드백만 기록됩니다.</p><button type="button" className="button primary" onClick={()=>onResultReviewed(result.evidence,result.feedback.slice(0,8).map(item=>feedbackText('ko',item.key,item.side)))}>연습 결과 검토 완료 · 학습으로 돌아가기</button></section>}
-       <section className="practice-card"><h2>{t.observed}</h2>{!result.feedback.some(f=>f.kind==='observed')&&<p>{t.noClaims}</p>}{(['observed','tracking'] as const).map(kind=><div key={kind}>{kind==='tracking'&&<h3>{t.tracking}</h3>}{result.feedback.filter(f=>f.kind===kind).map((f,i)=><button className={`practice-feedback ${kind}`} key={i} onClick={()=>{setPlaying(false);setIndex(f.pair);setHighlight(f.side);setSide(f.side);}}>{feedbackText(locale,f.key,f.side)} <span>{t.reference} {seconds(result.pairs[f.pair].referenceTime)} ↔ {t.learner} {seconds(result.pairs[f.pair].learnerTime)}</span></button>)}</div>)}<h3>{t.meaning}</h3><p>{t.meaningNote}</p></section>
+      <section className="practice-card"><h2>{t.metrics}</h2>{result.evidence==='limited'&&<p className="practice-notice">{locale==='ko'?'일부 항목은 근거가 부족합니다. 관측된 항목은 개별적으로 표시하며 측정 불가능한 항목은 점수를 표시하지 않습니다.':'Some components have insufficient evidence. Supported components remain available; unavailable components are not scored.'}</p>}<p>{t.metricNote}</p>{result.sides.length===1&&<p className="practice-sides">{locale==='ko'?`기준 수어에서 쓰는 ${t[result.sides[0]]}만 비교합니다.`:`Only the ${t[result.sides[0]].toLowerCase()} used by the reference sign is compared.`}</p>}<div className="practice-metrics">{result.metrics.map(m=><article key={`${m.side}-${m.component}`}><h3>{t[m.component]}</h3><span>{m.side?t[m.side]:t.both}</span><strong>{m.value===null?(m.component==='direction'?t.noDirection:t.missingValue):`${m.value.toFixed(m.unit==='degrees'?1:3)} ${m.unit==='degrees'?t.degrees:t.body}`}</strong><small>{m.space==='image2d'?(locale==='ko'?'2D 영상 평면 · 깊이 미측정':'2D image plane · no depth'):m.space==='estimated3d'?(locale==='ko'?'추정 3D · 깊이 불확실':'Estimated 3D · depth uncertain'):(locale==='ko'?'손 기준 각도':'Hand-local angles')}</small><small>{Math.round(m.coverage*100)}% {t.coverage} · n={m.samples}</small>{m.image&&m.space!=='image2d'&&<small>{locale==='ko'?'2D 영상 평면':'2D image plane'}: {m.image.value===null?'—':m.image.value.toFixed(3)} · {Math.round(m.image.coverage*100)}%</small>}{m.reason&&<small>{metricRequirement(locale,m.component,m.space==='image2d')}</small>}</article>)}</div></section>
+      {result.rubric.length>0&&<section className="practice-card" aria-label={t.rubric}><h2>{t.rubric}</h2><p>{t.rubricNote}</p><div className="practice-metrics">{result.rubric.map(item=><article key={`${item.id}-${item.side}`}><h3>{item.note}</h3><span>{t[item.side]} · {item.kind==='handshape'?t.handshape:t.palm}</span><strong>{item.passes===null?t.missingValue:item.passes?t.rubricMet:t.rubricMissed}</strong><small>{item.learner===null?'—':`${item.learner.toFixed(0)}°`} / {t.rubricLimit} {item.limit.toFixed(0)}° · {Math.round(item.satisfied*100)}% · n={item.frames}</small></article>)}</div></section>}
+      {onResultReviewed&&result&&<section className="practice-card" aria-label="레슨 연습 기록"><h2>레슨 연습 기록</h2><p>동작 비교가 완료되었습니다. 결과는 정답 점수가 아니라 관측 가능한 움직임의 차이입니다. 저장하면 이 브라우저에 연습 횟수와 추적 근거 수준, 동작 피드백만 기록됩니다.</p><button type="button" className="button primary" onClick={()=>onResultReviewed(result.evidence,result.feedback.slice(0,8).map(item=>feedbackText('ko',item.key,item.side,item.note)))}>연습 결과 검토 완료 · 학습으로 돌아가기</button></section>}
+       <section className="practice-card"><h2>{t.observed}</h2>{!result.feedback.some(f=>f.kind==='observed')&&<p>{t.noClaims}</p>}{(['observed','tracking'] as const).map(kind=><div key={kind}>{kind==='tracking'&&<h3>{t.tracking}</h3>}{result.feedback.filter(f=>f.kind===kind).map((f,i)=><button className={`practice-feedback ${kind}`} key={i} onClick={()=>{setPlaying(false);setIndex(f.pair);setHighlight(f.side);setSide(f.side);}}>{feedbackText(locale,f.key,f.side,f.note)} <span>{t.reference} {seconds(result.pairs[f.pair].referenceTime)} ↔ {t.learner} {seconds(result.pairs[f.pair].learnerTime)}</span></button>)}</div>)}<h3>{t.meaning}</h3><p>{t.meaningNote}</p></section>
       <section className="practice-card"><h2>{t.path}</h2><p>{t.pathNote}</p><select aria-label={locale==='ko'?'경로 표시할 손':'Path hand'} value={side} onChange={e=>setSide(e.target.value as Side)}><option value="left">{t.left}</option><option value="right">{t.right}</option></select><WristPaths reference={reference} learner={learner} result={result} side={side} index={index} locale={locale}/></section>
     </div>}
     <footer><p>{t.safari} </p></footer>

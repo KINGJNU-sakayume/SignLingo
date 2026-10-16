@@ -6,6 +6,7 @@ Records in this folder:
 - `course1-reconstruction-review-2026-10-14.md`, `course1-linguistic-review-2026-10-14.md`: approvals for `ksl-thanks`, `ksl-sorry`, `ksl-meet` (course `courtesy`), revision 1.
 - `course1-v2-reconstruction-review-2026-10-15.md`, `course1-v2-linguistic-review-2026-10-15.md`: approvals for the same three expressions at revision 2 (constraint-corrected motion).
 - `course1-v2-feedback-2026-10-15.md`: review findings on revision 2 (change request, not an approval) and the prepared revision 3, which needs both reviews before publishing.
+- `course1-v4-candidates-2026-10-16.md`: v4 candidates built with constraint solver v3 (ksl-thanks revision 4 with two taps, ksl-sorry revision 3 rebuilt to keep the revision-2 arm angle). Not an approval; both reviews are needed before publishing.
 
 The other seven candidates have no review approval yet.
 

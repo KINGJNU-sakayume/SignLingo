@@ -86,3 +86,19 @@ export function signingInterval(clip: MotionClip): RaisedInterval {
   cache.set(clip, interval);
   return interval;
 }
+
+/** A side raised in fewer than this fraction of the signing interval's frames does not take part in the sign. */
+export const PASSIVE_FRACTION = .15;
+export type Participation = Record<Side, { raisedFraction: number; participates: boolean }>;
+/**
+ * Which hands take part in the sign: a hand raised in at least 15% of the signing interval's frames. When no hand is
+ * ever raised (the fallback interval), both count as taking part — nothing is known to be unused.
+ */
+export function participation(clip: MotionClip): Participation {
+  const interval = signingInterval(clip);
+  const inside = clip.frames.filter(f => f.timestamp / 1000 >= interval.start - 1e-6 && f.timestamp / 1000 <= interval.end + 1e-6).length;
+  return Object.fromEntries(SIDES.map(side => {
+    const raisedFraction = inside ? interval.sides[side].raised.filter(Boolean).length / inside : 0;
+    return [side, { raisedFraction, participates: interval.method !== 'raised-hands' || raisedFraction >= PASSIVE_FRACTION }];
+  })) as Participation;
+}
