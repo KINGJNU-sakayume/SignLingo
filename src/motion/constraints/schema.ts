@@ -32,7 +32,14 @@ const offset = num.min(-45).max(45);
 
 export const constraintSchema = z.discriminatedUnion('kind', [
   z.object({ ...common, kind: z.literal('sameHeight'), points: z.array(point).min(2).max(4), toleranceCm: centimeters(1), move, maxShiftCm: maxShift }).strict(),
-  z.object({ ...common, kind: z.literal('contact'), a: point, b: point, gapCm: centimeters(0), toleranceCm: centimeters(1), move, maxShiftCm: maxShift }).strict(),
+  // along: 'image' brings the points together as seen from the front camera (x, y) and keeps the reconstructed depth,
+  // so the arm keeps its observed angle; the residual is then the image-plane distance. Default 'any': straight in 3D.
+  // No schema default: the canonical hash of documents written before the field existed must not change.
+  z.object({ ...common, kind: z.literal('contact'), a: point, b: point, gapCm: centimeters(0), toleranceCm: centimeters(1), move, maxShiftCm: maxShift,
+    along: z.enum(['any', 'image']).optional(),
+    // Repeated contact (e.g. two taps): the constraint acts only around the n closest approaches of a and b inside the
+    // span, so the hand still lifts between them as observed. Without it the whole span is one held contact.
+    approaches: z.number().int().min(1).max(8).optional() }).strict(),
   z.object({ ...common, kind: z.literal('symmetry'), axis: z.enum(['lateral', 'vertical', 'depth']).default('lateral'),
     lead: z.enum(['both', 'left', 'right']).default('both'), orientation: z.boolean().optional(), toleranceCm: centimeters(1), maxShiftCm: maxShift }).strict(),
   z.object({ ...common, kind: z.literal('handshape'), hand, preset: z.enum(PRESET_IDS as [PresetId, ...PresetId[]]),

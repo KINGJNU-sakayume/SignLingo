@@ -2,12 +2,14 @@
   "format": "signlingo.constraints",
   "version": 1,
   "expression": "ksl-thanks",
-  "request": "손끝이 밖으로 향하게 펴서 모로 세운 오른손의 4지 옆면을 손바닥이 아래로 향하게 편 왼 손등에 두 번 댄다.",
+  "request": "손끝이 밖으로 향하게 펴서 모로 세운 오른손의 4지 옆면을 손바닥이 아래로 향하게 편 왼 손등에 두 번 댄다. (개정판 3 이후 측정: 복원에서 오른손 손날과 왼 손등이 가장 가까울 때도 약 12 cm 떨어져 닿지 않는다. 두 번 대는 순간에 닿게 한다.)",
   "constraints": [
     {
       "id": "thanks-right-flat",
       "kind": "handshape",
-      "span": { "phase": "whole" },
+      "span": {
+        "phase": "whole"
+      },
       "hand": "right",
       "preset": "flat",
       "note": "오른손은 다섯 손가락을 붙여 편다."
@@ -15,7 +17,9 @@
     {
       "id": "thanks-right-edge-up",
       "kind": "palmFacing",
-      "span": { "phase": "whole" },
+      "span": {
+        "phase": "whole"
+      },
       "hand": "right",
       "facing": "inward",
       "pointing": "forward",
@@ -25,7 +29,9 @@
     {
       "id": "thanks-left-flat",
       "kind": "handshape",
-      "span": { "phase": "whole" },
+      "span": {
+        "phase": "whole"
+      },
       "hand": "left",
       "preset": "flat",
       "note": "왼손은 다섯 손가락을 붙여 편다."
@@ -33,11 +39,29 @@
     {
       "id": "thanks-left-palm-down",
       "kind": "palmFacing",
-      "span": { "phase": "whole" },
+      "span": {
+        "phase": "whole"
+      },
       "hand": "left",
       "facing": "down",
       "toleranceDeg": 25,
       "note": "왼손은 손바닥이 아래를 보게 하여 손등이 위로 오게 한다."
+    },
+    {
+      "id": "thanks-tap",
+      "kind": "contact",
+      "span": {
+        "phase": "whole"
+      },
+      "approaches": 2,
+      "blendMs": 120,
+      "a": "right.pinkyEdge",
+      "b": "left.back",
+      "move": "right",
+      "gapCm": 0,
+      "toleranceCm": 1.5,
+      "maxShiftCm": 20,
+      "note": "오른손 4지(새끼) 쪽 손날을 왼 손등에 두 번 댄다. 원본에서 두 손이 가장 가까워지는 두 순간(복원에서는 약 12 cm 떨어짐)에만 닿게 하고, 그 사이에는 관측대로 손을 든다."
     }
   ]
 }

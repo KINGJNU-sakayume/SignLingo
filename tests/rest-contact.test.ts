@@ -7,7 +7,7 @@ import { importMotion } from '../src/motion/serialization';
 import { armVisible, CONTACT_STAGE, displayFor, FILL_GUARD_REPORT, learnerStages, REST_STAGE, runDisplayPipeline, sampleDisplay, type FillGuardReport, type RestReport } from '../src/motion/display';
 import { deepestPenetration, handsOf, leftward, separateHands, TOUCH_METERS } from '../src/motion/handContact';
 import { signingInterval } from '../src/motion/signing';
-import { applyConstraints, parseConstraints, sourceClip } from '../src/motion/constraints';
+import { applyConstraints, CONSTRAINT_SOLVER, parseConstraints, sourceClip } from '../src/motion/constraints';
 import { handState, type HandState } from '../src/motion/constraints/points';
 import { presetRotations } from '../src/motion/constraints/presets';
 import { SIDES, type MotionClip, type Side } from '../src/motion/types';
@@ -25,10 +25,10 @@ describe('signing interval (hands raised from rest)', () => {
     // The same clips are solved from their source: revision 2 measures the same interval.
     for (const id of IDS) expect(signingInterval(sourceClip(v2[id])).start).toBe(signingInterval(v1[id]).start);
   });
-  it('keeps whole-sign constraints off the resting hands (solver v2)', async () => {
+  it('keeps whole-sign constraints off the resting hands (solver v2+)', async () => {
     const set = parseConstraints(readFileSync('docs/constraints/ksl-thanks.constraints.json', 'utf8'));
     const { clip: corrected } = await applyConstraints(v1['ksl-thanks'], set);
-    expect(corrected.constraints!.solver).toBe('signlingo-constraint-solver-v2');
+    expect(corrected.constraints!.solver).toBe(CONSTRAINT_SOLVER);
     const changed = corrected.frames.flatMap((f, i) => f.constraint ? [i] : []);
     expect([changed[0], changed.at(-1)]).toEqual([39, 89]); // span 38–90, blended in and out inside it
     // Revision 2 (solver v1) changed 118 of 120 frames, the rest included.

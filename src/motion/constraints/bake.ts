@@ -6,9 +6,11 @@ import { solveConstraints, type ConstraintSolution, type HandSource } from './so
 
 /**
  * v2: phase/fraction spans follow `signingInterval` (hands raised from rest) instead of Practice's motion heuristic,
- * and the two hands never pass into each other. Clips baked by v1 keep their record.
+ * and the two hands never pass into each other.
+ * v3: a moved arm keeps its observed image-plane elbow (`projectedElbow`); contacts may act in the camera's image
+ * plane (`along: 'image'`) or only around repeated approaches (`approaches`). Clips baked by earlier solvers keep their record.
  */
-export const CONSTRAINT_SOLVER = 'signlingo-constraint-solver-v2';
+export const CONSTRAINT_SOLVER = 'signlingo-constraint-solver-v3';
 export const storedHand = (frame: MotionFrame, side: Side): HandSource => {
   const state = frame.pose.quality[`${side}State`];
   return state === 'tracked' ? 'observed' : state;

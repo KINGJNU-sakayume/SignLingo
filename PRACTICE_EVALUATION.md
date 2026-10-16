@@ -37,7 +37,9 @@ Image/world reference confidence remains ≥0.6 and image points must lie in the
 
 ## Segmentation, decoded timestamps and alignment
 
-Active intervals use adjacent reliable observations ≤300 ms apart: either wrist speed >0.16 body units/s, mean articulation change >22°/s, or palm change >35°/s. At least two transitions are needed and 250 ms padding is added. Static/uncertain sequences fall back to full-interval selection. These are movement heuristics, not sign boundaries; manual trim must retain meaningful holds and the complete sign.
+**Default interval (v4, 2026-10-16):** the signing interval (`practiceInterval` → `signingInterval`): the span in which a hand is raised more than 10 cm above its rest position, the same basis the constraint solver uses for `phase`/`fraction` spans. The motion heuristic below took the whole clip for ksl-thanks and ksl-sorry, so their handshape, palm and trajectory were unmeasurable even when a reference was compared with itself (7 of 13 metrics). It remains the fallback when no hand is ever raised (method `activity`). Manual trim is unchanged.
+
+Fallback heuristic: active intervals use adjacent reliable observations ≤300 ms apart: either wrist speed >0.16 body units/s, mean articulation change >22°/s, or palm change >35°/s. At least two transitions are needed and 250 ms padding is added. Static/uncertain sequences fall back to full-interval selection. These are movement heuristics, not sign boundaries; manual trim must retain meaningful holds and the complete sign.
 
 Practice samples saved video by decoded presentation timestamps from `requestVideoFrameCallback`. Duplicate presentation times and unconfirmed callbacks do not become new evidence. Variable intervals remain in the clip. Without callbacks, timestamps are explicitly unverified seek targets and exact duplicate pixel snapshots are withheld; this fallback may remove legitimate static holds and is not equivalent timing evidence. No intermediate handshapes are synthesized.
 
@@ -48,6 +50,18 @@ At most 180 existing observations are selected near uniform **time** bins. DTW u
 Unavailable terms/weights are omitted; usable image position may substitute for unavailable world position with its space clearly distinguished in the result. A missing hand contributes cost 0.75 with weight 1. These are **engineering alignment weights**, not clinical or linguistic calibration, and no aggregate score is shown.
 
 Residual means weight observed time support and divide repeated matches by per-frame repeat count. Coverage is the minimum of distinct-frame and supported-time coverage in either clip. Half-neighbor support is capped at 150 ms each side: a long gap cannot count as a reliable held pose. At least three distinct samples and 65% coverage per clip remain required. Global speed changes incur no duration penalty. Endpoint/residual inspection can expose incomplete gestures, but DTW is not an automatic completeness or meaning classifier.
+
+**Compared hands:** only the hands taking part in the reference sign (raised in at least 15% of its signing interval). A one-handed sign (ksl-sorry) no longer reports the resting left hand; if the learner raises the unused hand for at least 30% of their signing interval, one `unused` notice says so. Coordination is measured only when both hands take part.
+
+**Opposite hand:** the learner is also aligned left-right mirrored (pose landmark pairs and hand labels swapped, image x → 1 − x). When the mirrored alignment costs less than 80% of the direct one, by more than 0.04, and the direct cost is at least 0.25, a single `mirror` notice replaces the scattered differences it would cause. A mirror-symmetric two-handed sign (ksl-meet) looks the same mirrored and is not flagged. Whether KSL accepts a left-handed form of a sign is not assessed.
+
+**Reviewed forms (constraint rubric):** for a corrected reference, each reviewed `handshape`/`palmFacing` constraint is measured on the learner's **tracked** frames that the alignment pairs with the constraint's core frames. The limit is relative: the 90th percentile of the reference signer's own observed (pre-correction) residuals plus 10° (handshape) or 15° (palm). A constraint is met when 60% of at least three measured frames are within the limit; unmet constraints give one `shape`/`facing` notice quoting the constraint note. Position constraints are excluded (fixed avatar arm lengths, monocular depth).
+
+**Tracking notice:** a hand's `missing` notice appears exactly when its handshape metric fails the 65% evidence gate (it used to appear below 90%).
+
+**Publish gate:** `npm run content -- validate` (and so `npm run build`) rejects a published reference that, compared with itself, has an unmeasurable metric for a participating hand (direction excepted) or any feedback.
+
+**Hand size:** after recording, the median longest side of the detected hands' image boxes inside the signing interval is compared with 10% of the frame height (course-1 references: 13–19%); below it, the learner is asked to come closer and record again.
 
 ## Explainable feedback
 
