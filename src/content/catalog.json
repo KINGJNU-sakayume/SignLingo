@@ -1,7 +1,7 @@
 {
   "schema": "signlingo.content",
   "version": 1,
-  "updatedAt": "2026-10-15",
+  "updatedAt": "2026-10-16",
   "lessons": [
     {
       "id": "courtesy",
@@ -42,7 +42,7 @@
   "expressions": [
     {
       "id": "ksl-thanks",
-      "revision": 3,
+      "revision": 4,
       "displayName": "고맙다, 감사",
       "gloss": null,
       "category": "인사와 예의",
@@ -102,17 +102,17 @@
       },
       "assets": {
         "motion": {
-          "uri": "content/assets/ksl-thanks/v3/reference.motion.json",
-          "sha256": "28eb02e7b96dd114fbe00cd868597646c1550a966b3592804aedb40e6d74d579",
-          "bytes": 1912629,
+          "uri": "content/assets/ksl-thanks/v4/reference.motion.json",
+          "sha256": "73ac679dc68c1bf446981fec55d2cd5dbc25ce1ac5566f07e89aeedbf4b71e28",
+          "bytes": 1915966,
           "mediaType": "application/json",
-          "version": 3
+          "version": 4
         }
       },
       "reconstructionVersion": "0.2.0",
       "constraints": {
-        "sha256": "2365146142f2807db00cad5c96bdf371a6ebef31dd4170c17794e35d8996a05b",
-        "count": 4
+        "sha256": "b9a4ed747ba18fffcb5cd0279d1856bddd789be21681912b56f814b4950a8cf8",
+        "count": 5
       },
       "provenance": "authorized-video",
       "reviews": {
@@ -121,30 +121,30 @@
           "evidence": {
             "reviewer": "저장소 소유자",
             "qualification": "SignLingo 복원 파이프라인 운영자 (실명 비공개)",
-            "date": "2026-10-15",
-            "reference": "SL-REV-2026-10-15",
-            "notes": "만나다의 경우 개정판3이 훌륭합니다. 저정도면 충분합니다. 공통 쉬는 자세 좋습니다. (고맙다 개정판 3도 만나다와 함께 공개할지 묻는 질문에) 공개",
+            "date": "2026-10-16",
+            "reference": "SL-REV-2026-10-16",
+            "notes": "알고리즘 개선보다 중요한게 소스 영상 화질인 것 같습니다 아직 만족스럽지 않지만 일단 공개합시다",
             "document": {
-              "path": "docs/content-reviews/review-2026-10-15.md",
-              "sha256": "e5fa59e45518f491f2ca9439fddc368626da26a2a225ff5568d04b2dcb2196c1"
+              "path": "docs/content-reviews/review-2026-10-16.md",
+              "sha256": "ddc7de6d41e3f9c0975869b1bb71015838f5512a49e572811d5f41d614731fcf"
             }
           },
-          "subjectSha256": "2048403e7636246dc1db5cddd4fe7b0ff7d7220ae4e9829695e626d284abda6b"
+          "subjectSha256": "aef86ea02a949d17e883676180d2be303367f11cdeb511857253c92349f7db14"
         },
         "linguistic": {
           "status": "approved",
           "evidence": {
             "reviewer": "검수자 B",
             "qualification": "수어 경력 5년 (실명 비공개)",
-            "date": "2026-10-15",
-            "reference": "SL-REV-2026-10-15",
-            "notes": "만나다의 경우 개정판3이 훌륭합니다. 저정도면 충분합니다. 공통 쉬는 자세 좋습니다. (고맙다 개정판 3도 만나다와 함께 공개할지 묻는 질문에) 공개",
+            "date": "2026-10-16",
+            "reference": "SL-REV-2026-10-16",
+            "notes": "알고리즘 개선보다 중요한게 소스 영상 화질인 것 같습니다 아직 만족스럽지 않지만 일단 공개합시다",
             "document": {
-              "path": "docs/content-reviews/review-2026-10-15.md",
-              "sha256": "e5fa59e45518f491f2ca9439fddc368626da26a2a225ff5568d04b2dcb2196c1"
+              "path": "docs/content-reviews/review-2026-10-16.md",
+              "sha256": "ddc7de6d41e3f9c0975869b1bb71015838f5512a49e572811d5f41d614731fcf"
             }
           },
-          "subjectSha256": "2048403e7636246dc1db5cddd4fe7b0ff7d7220ae4e9829695e626d284abda6b"
+          "subjectSha256": "aef86ea02a949d17e883676180d2be303367f11cdeb511857253c92349f7db14"
         }
       },
       "status": "published",
@@ -152,7 +152,7 @@
     },
     {
       "id": "ksl-sorry",
-      "revision": 2,
+      "revision": 3,
       "displayName": "미안",
       "gloss": null,
       "category": "인사와 예의",
@@ -212,16 +212,16 @@
       },
       "assets": {
         "motion": {
-          "uri": "content/assets/ksl-sorry/v2/reference.motion.json",
-          "sha256": "a89167822adc9822d7e4b4bcc514e9b72485b03db0cfa04605879721ac458d70",
-          "bytes": 1687798,
+          "uri": "content/assets/ksl-sorry/v3/reference.motion.json",
+          "sha256": "8a2961e85e04e7c187aab6b11be8ed6c55228e1d3aa34b2a96278545669820ec",
+          "bytes": 1646591,
           "mediaType": "application/json",
-          "version": 2
+          "version": 3
         }
       },
       "reconstructionVersion": "0.2.0",
       "constraints": {
-        "sha256": "345eb1e8573c2aedf1e49e10a242220dd4612ccf189d5caefd1a147fd98db9ad",
+        "sha256": "7e9ce861638c88adf0000cdf9b662da0c78aa4b1c0bf67946c82c278e2db8cc6",
         "count": 3
       },
       "provenance": "authorized-video",
@@ -231,30 +231,30 @@
           "evidence": {
             "reviewer": "저장소 소유자",
             "qualification": "SignLingo 복원 파이프라인 운영자 (실명 비공개)",
-            "date": "2026-10-15",
-            "reference": "SL-REV-RECON-2026-10-15",
-            "notes": "제약 조건 보정본(개정판 2). 세 동작 모두 개정판 1에 비해 좋아진 것을 확인. 수정 요청 없음.",
+            "date": "2026-10-16",
+            "reference": "SL-REV-2026-10-16",
+            "notes": "알고리즘 개선보다 중요한게 소스 영상 화질인 것 같습니다 아직 만족스럽지 않지만 일단 공개합시다",
             "document": {
-              "path": "docs/content-reviews/course1-v2-reconstruction-review-2026-10-15.md",
-              "sha256": "38d82a482f788a1ac42a5923928ce1e060dc2320a4b0d0431c4dcb466cac3420"
+              "path": "docs/content-reviews/review-2026-10-16.md",
+              "sha256": "ddc7de6d41e3f9c0975869b1bb71015838f5512a49e572811d5f41d614731fcf"
             }
           },
-          "subjectSha256": "f025cfe20542868383b305ada4c15385384c74f41695e042fdfd6c3c8750e51f"
+          "subjectSha256": "f30517c56caffb88d43350704d027ec0e977b1cdc5c0e2cf22ead1f5d5d20c6b"
         },
         "linguistic": {
           "status": "approved",
           "evidence": {
             "reviewer": "검수자 B",
             "qualification": "수어 경력 5년 (실명 비공개)",
-            "date": "2026-10-15",
-            "reference": "SL-REV-KSL-2026-10-15",
-            "notes": "변이 10985 유지. 이전보다 실제와 더 같아짐. 기술적 한계를 전달받았고 설명 문구와 함께 제공하면 학습에 도움이 됨. 수정 요청 없음.",
+            "date": "2026-10-16",
+            "reference": "SL-REV-2026-10-16",
+            "notes": "알고리즘 개선보다 중요한게 소스 영상 화질인 것 같습니다 아직 만족스럽지 않지만 일단 공개합시다",
             "document": {
-              "path": "docs/content-reviews/course1-v2-linguistic-review-2026-10-15.md",
-              "sha256": "ec5f5e59c8d0b4d7a828e937eef4155e8b8f2c2afddaeab2d3f5c46061c19bc2"
+              "path": "docs/content-reviews/review-2026-10-16.md",
+              "sha256": "ddc7de6d41e3f9c0975869b1bb71015838f5512a49e572811d5f41d614731fcf"
             }
           },
-          "subjectSha256": "f025cfe20542868383b305ada4c15385384c74f41695e042fdfd6c3c8750e51f"
+          "subjectSha256": "f30517c56caffb88d43350704d027ec0e977b1cdc5c0e2cf22ead1f5d5d20c6b"
         }
       },
       "status": "published",
