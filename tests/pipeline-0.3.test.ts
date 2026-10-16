@@ -93,7 +93,7 @@ describe('learner temporal stage', () => {
   it('runs first for clips that record the 0.3.x policy, so short gaps are interpolated rather than filled', () => {
     const current = clipWith('0.3.1', hidden), previous = clipWith('0.2.0', hidden);
     const display = displayFor(current, 'learner'), report = display.reports[TEMPORAL_STAGE] as TemporalReport;
-    expect(display.stages).toEqual([TEMPORAL_STAGE, 'torso-stabilize', 'hand-fill', 'rest-pose', 'hand-contact']);
+    expect(display.stages).toEqual([TEMPORAL_STAGE, 'torso-stabilize', 'smooth-motion', 'hand-fill', 'rest-pose', 'hand-contact']);
     expect(report.applied).toBe(true);
     for (const side of SIDES) {
       expect(states(current, side).slice(15, 18)).toEqual(['interpolated', 'interpolated', 'interpolated']);
@@ -104,10 +104,10 @@ describe('learner temporal stage', () => {
     const marked = display.frames.filter(f => f.annotation.stages.includes(TEMPORAL_STAGE)).length;
     expect(marked).toBe(3);
   });
-  it('leaves 0.2.0 and published clips exactly as the previous learner preset showed them', () => {
+  it('leaves 0.2.0 and published clips exactly as the learner stages without it show them', () => {
     const files = ['ksl-thanks', 'ksl-sorry', 'ksl-meet'].map(id => importMotion(readFileSync(`public/content/assets/${id}/v1/reference.motion.json`, 'utf8')));
     for (const clip of [clipWith('0.2.0', hidden), ...files]) {
-      const display = displayFor(clip, 'learner'), before = runDisplayPipeline({ clip }, [stabilizeTorso(), fillHands(), restPose(), separate()]);
+      const display = displayFor(clip, 'learner'), before = runDisplayPipeline({ clip }, learnerStages().slice(1));
       expect(display.frames).toEqual(before.frames);
       expect((display.reports[TEMPORAL_STAGE] as TemporalReport).reason).toBe('not-recorded');
     }

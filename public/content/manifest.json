@@ -262,7 +262,7 @@
     },
     {
       "id": "ksl-meet",
-      "revision": 3,
+      "revision": 4,
       "displayName": "만나다, 직면",
       "gloss": null,
       "category": "인사와 예의",
@@ -279,20 +279,20 @@
         "손이 맞닿아야 함"
       ],
       "source": {
-        "title": "SignLingo 자체 촬영 — 만나다, 직면",
-        "url": "https://github.com/KINGJNU-sakayume/signlingo/blob/main/docs/content-reviews/own-recording-rights-2026-10-14.md",
+        "title": "SignLingo 자체 촬영 — 만나다, 직면 (2026-10-16 재촬영)",
+        "url": "https://github.com/KINGJNU-sakayume/signlingo/blob/main/docs/content-reviews/own-recording-rights-2026-10-16.md",
         "owner": "저장소 소유자 (촬영자·권리자)",
         "attribution": "수어: 출연자 A · 촬영: 저장소 소유자 (실명 비공개)",
         "locator": "ksl-meet.webm",
-        "entryId": "SL-REC-2026-10-14/ksl-meet",
-        "checkedAt": "2026-10-14",
+        "entryId": "SL-REC-2026-10-16/ksl-meet",
+        "checkedAt": "2026-10-16",
         "videoAvailability": "confirmed",
-        "videoSha256": "758df0fb788243576952d2f95a4e562b66eff6ddeed083d5d8b6b1a029311465"
+        "videoSha256": "fab417a696a366589dcc205e0c9e79550e7e3eb54fc2ee252b69e671b2c5aab6"
       },
       "license": {
         "type": "자체 촬영 — 출연자 동의 범위 내 이용",
-        "policyUrl": "https://github.com/KINGJNU-sakayume/signlingo/blob/main/docs/content-reviews/own-recording-rights-2026-10-14.md",
-        "notes": "권리자(저장소 소유자)의 2026-10-14 진술에 따른 출연자 A의 동의 범위: 3D 변환, 동작 파일 배포, 공개 저장소, 웹 공개 허락. 원본 영상 공개는 불허. 실명은 비공개.",
+        "policyUrl": "https://github.com/KINGJNU-sakayume/signlingo/blob/main/docs/content-reviews/own-recording-rights-2026-10-16.md",
+        "notes": "권리자(저장소 소유자)의 2026-10-16 진술: 2026-10-14 기록과 같은 출연자 A의 동의 범위(3D 변환, 동작 파일 배포, 공개 저장소, 웹 공개 허락. 원본 영상 공개는 불허). 실명은 비공개.",
         "permissions": {
           "importVideo": "allowed",
           "deriveMotion": "allowed",
@@ -305,14 +305,14 @@
         "approval": {
           "reviewer": "저장소 소유자",
           "qualification": "영상 촬영자 및 권리자 (실명 비공개)",
-          "date": "2026-10-14",
-          "reference": "SL-REC-2026-10-14",
+          "date": "2026-10-16",
+          "reference": "SL-REC-2026-10-16",
           "notes": "출연자 동의 범위를 권리자가 확인함. 원본 영상 비공개. 언어·복원 검수는 별도.",
           "document": {
-            "path": "docs/content-reviews/own-recording-rights-2026-10-14.md",
-            "sha256": "b923b5069b39453a03bf000a5ce201e76abe6d1eb6dc18b38476c4ddacad94e3"
+            "path": "docs/content-reviews/own-recording-rights-2026-10-16.md",
+            "sha256": "596ad658387e0632298dffe6a208d15e4387b5ebd10d3fdf836e111d475217f3"
           },
-          "sourceSha256": "758df0fb788243576952d2f95a4e562b66eff6ddeed083d5d8b6b1a029311465"
+          "sourceSha256": "fab417a696a366589dcc205e0c9e79550e7e3eb54fc2ee252b69e671b2c5aab6"
         }
       },
       "variant": {
@@ -322,16 +322,16 @@
       },
       "assets": {
         "motion": {
-          "uri": "content/assets/ksl-meet/v3/reference.motion.json",
-          "sha256": "cae5ecd66ea0bcb725a80d257799915ca26f1e191bad79bc69f6d7d643ade814",
-          "bytes": 1942908,
+          "uri": "content/assets/ksl-meet/v4/reference.motion.json",
+          "sha256": "ca8286359036ac05d20f07b71a2f1780d7e2e43e6f5ed9935be0dc4462185bd6",
+          "bytes": 1317342,
           "mediaType": "application/json",
-          "version": 3
+          "version": 4
         }
       },
       "reconstructionVersion": "0.2.0",
       "constraints": {
-        "sha256": "a727d625a3af35fbf37e12958e0c6b247d8a85135e11ae5367340781f3c29190",
+        "sha256": "ba3143514ac10990cdf5326924316a6029e1c0e64dc7238e4b918c573828b4d5",
         "count": 4
       },
       "provenance": "authorized-video",
@@ -341,34 +341,34 @@
           "evidence": {
             "reviewer": "저장소 소유자",
             "qualification": "SignLingo 복원 파이프라인 운영자 (실명 비공개)",
-            "date": "2026-10-15",
-            "reference": "SL-REV-2026-10-15",
-            "notes": "만나다의 경우 개정판3이 훌륭합니다. 저정도면 충분합니다. 공통 쉬는 자세 좋습니다. (고맙다 개정판 3도 만나다와 함께 공개할지 묻는 질문에) 공개",
+            "date": "2026-10-16",
+            "reference": "SL-REV-2026-10-16-2",
+            "notes": "미안하다 와 고맙다의 경우 고개가 움직이는 걸텐데 몸통도 움직이는 것, 그리고 부르르 떠는 것이 부자연스럽습니다. 만나다는 아주 좋습니다.",
             "document": {
-              "path": "docs/content-reviews/review-2026-10-15.md",
-              "sha256": "e5fa59e45518f491f2ca9439fddc368626da26a2a225ff5568d04b2dcb2196c1"
+              "path": "docs/content-reviews/review-2026-10-16-2.md",
+              "sha256": "e2d34baa1dc170cb3d74b39749035fba9a3ecbf7fc14eafc141f7e0925a8e401"
             }
           },
-          "subjectSha256": "653f0f4336484b1b5935118c65cc04a7f50f6131b0741103d7553df5a71b99ab"
+          "subjectSha256": "28e18c7dda6baf13da7d071f2556176754005d01209448d9f6addb233c3fbf89"
         },
         "linguistic": {
           "status": "approved",
           "evidence": {
             "reviewer": "검수자 B",
             "qualification": "수어 경력 5년 (실명 비공개)",
-            "date": "2026-10-15",
-            "reference": "SL-REV-2026-10-15",
-            "notes": "만나다의 경우 개정판3이 훌륭합니다. 저정도면 충분합니다. 공통 쉬는 자세 좋습니다. (고맙다 개정판 3도 만나다와 함께 공개할지 묻는 질문에) 공개",
+            "date": "2026-10-16",
+            "reference": "SL-REV-2026-10-16-2",
+            "notes": "미안하다 와 고맙다의 경우 고개가 움직이는 걸텐데 몸통도 움직이는 것, 그리고 부르르 떠는 것이 부자연스럽습니다. 만나다는 아주 좋습니다.",
             "document": {
-              "path": "docs/content-reviews/review-2026-10-15.md",
-              "sha256": "e5fa59e45518f491f2ca9439fddc368626da26a2a225ff5568d04b2dcb2196c1"
+              "path": "docs/content-reviews/review-2026-10-16-2.md",
+              "sha256": "e2d34baa1dc170cb3d74b39749035fba9a3ecbf7fc14eafc141f7e0925a8e401"
             }
           },
-          "subjectSha256": "653f0f4336484b1b5935118c65cc04a7f50f6131b0741103d7553df5a71b99ab"
+          "subjectSha256": "28e18c7dda6baf13da7d071f2556176754005d01209448d9f6addb233c3fbf89"
         }
       },
       "status": "published",
-      "updatedAt": "2026-10-14"
+      "updatedAt": "2026-10-16"
     }
   ]
 }

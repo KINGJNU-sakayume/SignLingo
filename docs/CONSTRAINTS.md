@@ -468,12 +468,12 @@
 }
 ```
 
-### 예시 3 · 만나다 (ksl-meet, 사전 의도)
+### 예시 3 · 만나다 (ksl-meet, 사전 의도 → 재촬영 영상, 개정판 4)
 
 > 두 주먹의 1지를 펴서 마주 세웠다가 중앙으로 모아 마주 댄다.
 
-- 두 손 모두 검지 펴기이고, 검지를 세우고(`pointing: up`) 손바닥이 마주 보게(`facing: inward`) 합니다. 손을 내리기 시작하는 마지막 부분은 빼고 `fraction [0, 0.8]`입니다.
-- "중앙으로 모아 마주 댄다"는 마지막 자세입니다. 좌우 대칭(`symmetry lateral`)으로 가운데에 모으고, 두 검지 가운데 마디가 닿게 합니다(`contact`, 손가락 면이 닿도록 `gapCm` 1.5). 구간은 `fraction [0.5, 0.8]`입니다.
+- 두 손 모두 검지 펴기이고, 검지를 세우고(`pointing: up`) 손바닥이 마주 보게(`facing: inward`) 합니다. 처음 문서(개정판 2·3)는 손을 내리기 시작하는 마지막 부분을 빼고 `fraction [0, 0.8]`이었습니다. 2026-10-16 재촬영 영상은 마주 댄 채로 끝나므로 `whole`입니다.
+- "중앙으로 모아 마주 댄다"는 마지막 자세입니다. 좌우 대칭(`symmetry lateral`)으로 가운데에 모으고, 두 검지 가운데 마디가 닿게 합니다(`contact`, 손가락 면이 닿도록 `gapCm` 1.5). 처음 문서는 `fraction [0.5, 0.8]`, 재촬영 영상은 저장 동작에서 잰 프레임 28(약 0.93초)부터 끝까지입니다(`frames [28, 64]`).
 - 해결기 v2에서 두 손은 서로 파고들지 않습니다. 손바닥이 마주 보는 두 `index` 손은 접은 손가락 마디가 먼저 닿으므로, 그 자리에서 멈추고 `meet-touch`는 "다른 곳이 먼저 닿음"으로 남습니다(검지 가운데 마디 사이 약 11 cm). 개정판 2(v1)는 이 접촉을 맞추느라 두 손목이 겹쳐 손이 서로 파고들었습니다. 검지끼리 닿아야 한다면 손 방향을 바꿔야 하므로 검수자가 정합니다.
 
 ```json
@@ -481,12 +481,14 @@
   "format": "signlingo.constraints",
   "version": 1,
   "expression": "ksl-meet",
-  "request": "두 주먹의 1지를 펴서 마주 세웠다가 중앙으로 모아 마주 댄다.",
+  "request": "두 주먹의 1지를 펴서 마주 세웠다가 중앙으로 모아 마주 댄다. (2026-10-16 재촬영 영상 기준. 프레임은 새 영상의 저장 동작에서 잰 값이며 검수자가 원본과 맞는지 확인한다.)",
   "constraints": [
     {
       "id": "meet-index-shape",
       "kind": "handshape",
-      "span": { "phase": "whole" },
+      "span": {
+        "phase": "whole"
+      },
       "hand": "both",
       "preset": "index",
       "note": "두 손 모두 주먹에서 검지만 편다."
@@ -494,30 +496,42 @@
     {
       "id": "meet-index-upright",
       "kind": "palmFacing",
-      "span": { "fraction": [0, 0.8] },
+      "span": {
+        "phase": "whole"
+      },
       "hand": "both",
       "facing": "inward",
       "pointing": "up",
       "toleranceDeg": 20,
-      "note": "검지를 위로 세우고 두 손바닥이 서로 마주 보게 한다."
+      "note": "검지를 위로 세우고 두 손바닥이 서로 마주 보게 한다. 새 영상은 마주 댄 채로 끝나므로 끝까지 유지한다."
     },
     {
       "id": "meet-center",
       "kind": "symmetry",
-      "span": { "fraction": [0.5, 0.8] },
+      "span": {
+        "frames": [
+          28,
+          64
+        ]
+      },
       "axis": "lateral",
       "toleranceCm": 2,
-      "note": "두 손을 몸 가운데로 모아 좌우 대칭이 되게 한다."
+      "note": "두 손을 몸 가운데로 모아 좌우 대칭이 되게 한다(약 0.93초부터 끝까지)."
     },
     {
       "id": "meet-touch",
       "kind": "contact",
-      "span": { "fraction": [0.5, 0.8] },
+      "span": {
+        "frames": [
+          28,
+          64
+        ]
+      },
       "a": "left.index.mid",
       "b": "right.index.mid",
       "gapCm": 1.5,
       "toleranceCm": 0.5,
-      "note": "가운데에서 두 검지가 마주 닿는다."
+      "note": "가운데에서 두 검지가 마주 닿는다(약 0.93초부터 끝까지)."
     }
   ]
 }

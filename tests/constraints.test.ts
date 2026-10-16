@@ -287,9 +287,9 @@ describe('display stage and learner screens', () => {
   };
   it('runs after torso stabilization and before hand filling, never after it', () => {
     expect(() => runDisplayPipeline({ clip: clip() }, [fillHands(), constrain(shape)])).toThrow('before hand-fill');
-    expect(learnerStages(shape).map(s => s.id)).toEqual(['temporal-reconstruct', 'torso-stabilize', 'constraints', 'hand-fill', 'rest-pose', 'hand-contact']);
+    expect(learnerStages(shape).map(s => s.id)).toEqual(['temporal-reconstruct', 'torso-stabilize', 'constraints', 'smooth-motion', 'hand-fill', 'rest-pose', 'hand-contact']);
     expect(learnerStages(shape, { presentation: false }).map(s => s.id)).toEqual(['temporal-reconstruct', 'torso-stabilize', 'constraints', 'hand-fill']);
-    expect(PRESETS.learner().map(s => s.id)).toEqual(['temporal-reconstruct', 'torso-stabilize', 'hand-fill', 'rest-pose', 'hand-contact']);
+    expect(PRESETS.learner().map(s => s.id)).toEqual(['temporal-reconstruct', 'torso-stabilize', 'smooth-motion', 'hand-fill', 'rest-pose', 'hand-contact']);
   });
   it('shows constrained hands, which hand filling neither overwrites nor hides', () => {
     const source = lateLeft();
