@@ -10,6 +10,7 @@
 | `npm run motion:compare -- <영상 폴더 또는 영상...> [--hz 30\|15] [--mirrored] [--trace <영상 파일 이름>]...` | 영상마다 0.2.0과 0.3.1을 모두 실행하고 비교표를 만듭니다. `--trace`로 지정한 클립은 프레임별 진단도 씁니다 | `work/compare/0.2.0/`, `work/compare/0.3.0/`, `work/compare-report.json`, **`work/compare-report.md`**, `work/trace-<이름>.json`, **`work/trace-<이름>.md`** |
 | `npm run motion:report -- <motion.json 또는 폴더...>` | 이미 있는 JSON의 지표만 계산합니다(추론 없음) | `work/motion-report.json`, `work/motion-report.md` |
 | `npm run motion:constrain-report -- <motion.json> <constraints.json>` | 제약 조건 적용 전후 잔차와 바뀐 관절·프레임 수를 계산합니다(추론 없음, 입력 파일은 바꾸지 않음) | `work/constraint-report.json`, `work/constraint-report.md` |
+| `npm run motion:import -- <detections.json 또는 폴더> --out <폴더> [--videos <원본 폴더>] [--constraints <폴더>]` | 로컬 추출기(`tools/extract/`)의 `signlingo.detections`를 같은 복원기로 MotionClip으로 바꿉니다. [로컬 추출기](LOCAL_EXTRACTION.md) | `<폴더>/<영상 이름>.motion.json`, `work/import-report.json`, `work/import-report.md` |
 
 - 기본값은 30 Hz, 파이프라인 **0.2.0**, 좌우 반전 없음입니다. 0.3.1은 `--pipeline 0.3.1` 또는 Motion Lab의 "실험: 손 영역 재검출"로만 씁니다. 보고서 경로는 `--report <파일>.json`으로 바꿀 수 있으며, 같은 이름의 `.md`도 함께 만듭니다.
 - 폴더를 주면 그 안의 `.mp4`/`.webm`(report는 `.json`)을 이름순으로 처리합니다. 하위 폴더는 보지 않습니다. Windows 셸은 `*.mp4`를 펼치지 않으므로 폴더를 주는 쪽이 편합니다.
