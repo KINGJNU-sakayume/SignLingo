@@ -14,3 +14,9 @@
 ## 표시 계층
 
 학습 화면 표시는 `src/motion/display/`의 단계(시간 복원 → 몸통 고정 → 흔들림 줄이기 → 손 채우기 → 쉬는 자세 → 손 겹침 해소)가 바꿉니다. 저장된 동작과 검수 대상 해시는 바뀌지 않으므로 재검수가 필요 없습니다. `docs/DISPLAY_PIPELINE.md`.
+
+## 자동화 (`.claude/`)
+
+- 클라우드 세션이 시작되면 `.claude/hooks/session-start.sh`가 `npm ci`(잠금 파일이 바뀐 경우만), `CHROMIUM_PATH` 지정, 비어 있는 `private-data/`를 `../signlingo-private/private-data`에서 복사하고 검수 대기 패키지를 알려 줍니다. 로컬 PC에서는 아무것도 하지 않습니다.
+- 콘텐츠 작업 스킬: `intake-recording`(새 촬영 영상 → 패키지) → `review-candidate`(수정 요청 → 후보·화면) → `approve-publish`(승인 피드백 → 기록·공개).
+- 검수 화면 그림: `npm run dev` 뒤 `npm run review:shots -- <id>` → `work/screens/review-<id>-<view>.png`.

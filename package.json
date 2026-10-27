@@ -18,7 +18,8 @@
     "motion:batch": "node scripts/motion-batch.mjs batch",
     "motion:compare": "node scripts/motion-batch.mjs compare",
     "motion:report": "node scripts/motion-batch.mjs report",
-    "motion:constrain-report": "node scripts/motion-batch.mjs constrain-report"
+    "motion:constrain-report": "node scripts/motion-batch.mjs constrain-report",
+    "review:shots": "node scripts/review-shots.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "1.1.0",
