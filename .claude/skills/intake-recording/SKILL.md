@@ -34,7 +34,7 @@ npm run motion:batch -- private-data/videos-hq/<id>.webm --out private-data/expo
 ```
 - `work/batch-report.md`에서 좌·우 손 누락률(전체·동작 구간), 화면 밖·화면 안 실패를 봅니다. 이전 영상과 비교표를 만들어 사용자에게 보여 줍니다.
 - 이 클라우드 Chromium은 H.264 MP4를 디코딩하지 못합니다. WebM을 쓰거나, 로컬 PC에서는 `--channel chrome`.
-- 대안(본체 PC, `.mov` 직접): `tools/extract/extract.py` → `npm run motion:import -- <detections 폴더> --out <폴더> --videos <원본 폴더>`. 추출에 쓴 파일이 권리 기록의 해시 파일과 같아야 합니다(`docs/LOCAL_EXTRACTION.md`).
+- 대안(본체 PC, `.mov` 직접, 더 강한 손 모델 `--backend wilor|sam3d` 선택 가능): `tools/extract/extract.py` → `npm run motion:import -- <detections 폴더> --out <폴더> --videos <원본 폴더>`. 추출에 쓴 파일이 권리 기록의 해시 파일과 같아야 합니다(`docs/LOCAL_EXTRACTION.md`).
 
 ## 5. 패키지 준비
 - 새 후보: `npm run content -- register <id> private-data/<id>` 뒤 `entry.json`에 권리·해시를 적고 단계를 옮깁니다(`docs/CONTENT_PUBLISHING.md`).

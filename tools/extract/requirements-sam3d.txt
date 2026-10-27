@@ -1,0 +1,9 @@
+# --backend sam3d (SAM 3D Body). Python 3.11, NVIDIA CUDA GPU required. Linux or WSL2 (detectron2 builds there).
+# 1) git clone https://github.com/facebookresearch/sam-3d-body && git -C sam-3d-body checkout b5c765a0d89d789985e186d396315e7590887b94
+# 2) PyTorch with CUDA (https://pytorch.org/get-started/locally/), then the dependencies in sam-3d-body/INSTALL.md
+#    steps 3-4 (pip list and detectron2). MoGe and SAM3 (optional steps) are not used.
+# 3) Request access to https://huggingface.co/facebook/sam-3d-body-dinov3, `hf auth login`, then
+#      hf download facebook/sam-3d-body-dinov3 --local-dir checkpoints/sam-3d-body-dinov3
+# 4) then: pip install -r tools/extract/requirements-sam3d.txt   (decoder for this extractor)
+opencv-python==5.0.0.93
+numpy

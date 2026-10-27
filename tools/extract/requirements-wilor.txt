@@ -1,0 +1,8 @@
+# --backend wilor (MediaPipe pose + WiLoR hands). Python 3.10, NVIDIA GPU recommended (CPU works, slowly).
+# 1) PyTorch first, matching your CUDA (WiLoR-mini needs torch <= 2.5):
+#      pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu121
+# 2) then: pip install -r tools/extract/requirements-wilor.txt
+# 3) MANO_RIGHT.pkl: register at https://mano.is.tue.mpg.de and pass it with --mano (non-commercial license).
+#    WiLoR weights are downloaded from the authors' release on first run and checked by SHA-256 (CC BY-NC-ND).
+-r requirements.txt
+wilor_mini @ git+https://github.com/warmshao/WiLoR-mini@ebec42f94c389070cdd7dda6fd1bf0b4a659c960
