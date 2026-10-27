@@ -32,7 +32,7 @@ jobs:
       - name: Test reconstruction geometry and data contracts
         run: npm test
       - name: Test local extractor coordinate conversions (numpy only, no models)
-        run: python3 -m pip install --quiet numpy && python3 -m unittest tools/extract/test_convert.py tools/extract/test_backends.py
+        run: python3 -m venv /tmp/extract-test && /tmp/extract-test/bin/pip install --quiet numpy && /tmp/extract-test/bin/python -m unittest tools/extract/test_convert.py tools/extract/test_backends.py
       - name: Evaluate controlled temporal occlusion on synthetic observations
         run: npm run evaluate:temporal -- --synthetic --output work/evaluation/temporal-synthetic.json
       - name: Build for repository subpath
