@@ -19,6 +19,7 @@
     "motion:compare": "node scripts/motion-batch.mjs compare",
     "motion:report": "node scripts/motion-batch.mjs report",
     "motion:constrain-report": "node scripts/motion-batch.mjs constrain-report",
+    "motion:import": "node scripts/motion-batch.mjs import",
     "review:shots": "node scripts/review-shots.mjs"
   },
   "dependencies": {

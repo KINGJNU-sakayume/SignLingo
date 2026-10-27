@@ -20,3 +20,4 @@
 - 클라우드 세션이 시작되면 `.claude/hooks/session-start.sh`가 `npm ci`(잠금 파일이 바뀐 경우만), `CHROMIUM_PATH` 지정, 비어 있는 `private-data/`를 `../signlingo-private/private-data`에서 복사하고 검수 대기 패키지를 알려 줍니다. 로컬 PC에서는 아무것도 하지 않습니다.
 - 콘텐츠 작업 스킬: `intake-recording`(새 촬영 영상 → 패키지) → `review-candidate`(수정 요청 → 후보·화면) → `approve-publish`(승인 피드백 → 기록·공개).
 - 검수 화면 그림: `npm run dev` 뒤 `npm run review:shots -- <id>` → `work/screens/review-<id>-<view>.png`.
+- 본체 PC 로컬 추출: `tools/extract/extract.py`(MediaPipe Python, heavy, `.mov` 직접) → `npm run motion:import` → `content prepare`. `docs/LOCAL_EXTRACTION.md`.

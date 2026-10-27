@@ -13,3 +13,6 @@ playwright-report/
 *.evaluation.json
 private-data/
 evaluation-output/
+*.detections.json
+__pycache__/
+.venv/

@@ -4,7 +4,8 @@ import { exportMotion, importMotion } from '../motion/serialization';
 import { applyConstraints, constraintHash, parseConstraints } from '../motion/constraints';
 import { batchConstraintEntry, constraintMarkdown, constraintReport } from './constraintReport';
 import { PIPELINE_VERSIONS, type PipelineVersion } from '../motion/pipeline';
-import { collectInputs, constraintsName, MOTION, motionName, parseArgs, VIDEO, type BatchArgs } from './args';
+import { collectInputs, constraintsName, DETECTIONS, MOTION, motionName, parseArgs, VIDEO, type BatchArgs } from './args';
+import { motionFromDetections, parseDetections } from '../motion/external';
 import { ensureModels, sha256File, wasmHashes } from './models';
 import { batchMarkdown, clipMetrics, compareMarkdown, NOTICE, unionInterval, type BatchReport, type Interval, type ClipEntry, type CompareReport, type Environment } from './report';
 import { openSession, type Session } from './runner';
@@ -35,6 +36,53 @@ async function start(args: BatchArgs): Promise<{ session: Session; environment: 
 }
 
 type Processed = { entry: ClipEntry; clip?: MotionClip; fusion?: FusionRecord[] };
+/** Prior intent (--constraints): <video name>.constraints.json, applied right after recognition to the stored frames. */
+async function withConstraints(clip: MotionClip, json: string, video: string, size: number, args: BatchArgs) {
+  let saved = clip, constraints: ClipEntry['constraints'];
+  const constraintFile = args.constraints ? constraintsName(args.constraints, video) : undefined;
+  if (constraintFile && await stat(constraintFile).then(() => true, () => false)) {
+    const set = parseConstraints(await readFile(constraintFile, 'utf8'));
+    const corrected = await applyConstraints(clip, set);
+    json = exportMotion(corrected.clip); saved = importMotion(json);
+    if (saved.source.name !== path.basename(video) || saved.source.size !== size || saved.version !== 2) throw new Error('제약 조건을 적용한 동작을 다시 읽지 못했습니다.');
+    constraints = batchConstraintEntry(path.relative(process.cwd(), constraintFile).split(path.sep).join('/'), await constraintHash(set), corrected.clip, corrected.solution);
+    log(`  제약 조건 ${set.constraints.length}개 적용: 바뀐 프레임 ${constraints.changedFrames}`);
+  }
+  return { json, saved, constraints };
+}
+
+/**
+ * motion:import: detections from a local extractor (tools/extract/) → the Motion Lab solver → MotionClip.
+ * The output is named after the source video, exactly like a Motion Lab export, so `content prepare` accepts it.
+ */
+async function importDetections(file: string, args: BatchArgs): Promise<ClipEntry> {
+  const bytes = await readFile(file), name = path.basename(file);
+  const base: ClipEntry = { file: name, bytes: bytes.length, sha256: await sha256File(file), pipeline: '0.2.0', sampleHz: 0, mirrored: false };
+  log(name);
+  try {
+    const doc = parseDetections(bytes.toString());
+    const entry: ClipEntry = { ...base, sampleHz: doc.source.sampleHz, mirrored: doc.source.mirrored };
+    if (args.videos) {
+      const video = path.join(args.videos, doc.source.name);
+      const info = await stat(video).catch(() => { throw new Error(`원본 영상을 찾지 못했습니다: ${video}`); });
+      if (info.size !== doc.source.size) throw new Error(`원본 영상 크기가 다릅니다: ${video}`);
+      if (doc.source.sha256 && await sha256File(video) !== doc.source.sha256) throw new Error(`원본 영상 SHA-256이 추출 기록과 다릅니다: ${video}`);
+    }
+    const clip = motionFromDetections(doc);
+    const reread = importMotion(exportMotion(clip));
+    const { json, saved, constraints } = await withConstraints(reread, exportMotion(reread), doc.source.name, doc.source.size, args);
+    await mkdir(args.out!, { recursive: true });
+    const output = path.join(args.out!, motionName(doc.source.name));
+    await writeFile(output, json);
+    log(`  → ${output} (${doc.detector}, ${saved.frames.length}프레임)`);
+    return { ...entry, file: doc.source.name, ...(doc.source.sha256 ? { sha256: doc.source.sha256 } : {}), output, metrics: clipMetrics(saved), ...(constraints ? { constraints } : {}),
+      measurements: { requests: doc.frames.length, observations: doc.frames.length, inferenceFps: null, analysisFps: null, elapsedMs: 0, backend: doc.detector } };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    log(`  실패: ${message}`);
+    return { ...base, error: message };
+  }
+}
 async function processVideoFile(session: Session, video: string, pipeline: PipelineVersion, args: BatchArgs, outDir: string, trace = false): Promise<Processed> {
   const info = await stat(video), file = path.basename(video);
   const entry: ClipEntry = { file, bytes: info.size, sha256: await sha256File(video), pipeline, sampleHz: args.hz, mirrored: args.mirrored };
@@ -46,17 +94,7 @@ async function processVideoFile(session: Session, video: string, pipeline: Pipel
     // The same check as `content prepare`: the export must name the original file and its exact size.
     if (clip.source.name !== file || clip.source.size !== info.size) throw new Error('내보낸 source.name/size가 원본 영상과 다릅니다.');
     if (clip.pipeline.version !== pipeline) throw new Error(`요청한 ${pipeline} 대신 ${clip.pipeline.version}이 기록되었습니다.`);
-    // Prior intent (--constraints): <video name>.constraints.json, applied right after recognition to the stored frames.
-    let json = result.json, saved = clip, constraints: ClipEntry['constraints'];
-    const constraintFile = args.constraints ? constraintsName(args.constraints, video) : undefined;
-    if (constraintFile && await stat(constraintFile).then(() => true, () => false)) {
-      const set = parseConstraints(await readFile(constraintFile, 'utf8'));
-      const corrected = await applyConstraints(clip, set);
-      json = exportMotion(corrected.clip); saved = importMotion(json);
-      if (saved.source.name !== file || saved.source.size !== info.size || saved.version !== 2) throw new Error('제약 조건을 적용한 동작을 다시 읽지 못했습니다.');
-      constraints = batchConstraintEntry(path.relative(process.cwd(), constraintFile).split(path.sep).join('/'), await constraintHash(set), corrected.clip, corrected.solution);
-      log(`  제약 조건 ${set.constraints.length}개 적용: 바뀐 프레임 ${constraints.changedFrames}`);
-    }
+    const { json, saved, constraints } = await withConstraints(clip, result.json, video, info.size, args);
     await mkdir(outDir, { recursive: true });
     const output = path.join(outDir, motionName(video));
     await writeFile(output, json);
@@ -83,6 +121,15 @@ async function main() {
       motion: { file: relative(motionFile), bytes: bytes.length, sha256: await sha256File(motionFile), version: clip.version, pipeline: clip.pipeline.version,
         frames: clip.frames.length, sampleHz: clip.source.sampleHz, duration: clip.source.duration } });
     await writeReport(args.report, report, constraintMarkdown(report));
+    return;
+  }
+  if (args.command === 'import') {
+    const files = await collectInputs(args.inputs, DETECTIONS);
+    const clips: ClipEntry[] = [];
+    for (const file of files) clips.push(await importDetections(file, args));
+    const report: BatchReport = { format: 'signlingo.motion-batch', version: 1, environment: { generatedAt: new Date().toISOString() }, clips, notice: NOTICE };
+    await writeReport(args.report, report, batchMarkdown(report));
+    if (clips.some(c => c.error)) process.exitCode = 1;
     return;
   }
   if (args.command === 'report') {
